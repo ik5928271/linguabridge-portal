@@ -42,16 +42,14 @@ export default function ThreeWayCallRoom({
   onEndCall, 
   onOpenGlossary 
 }) {
-  const {
-    roomId = 'room-default',
-    role = 'host', // 'host', 'interpreter', 'guest'
-    participantName = 'Participant',
-    targetLanguage = 'Spanish',
-    specialty = 'Medical / Healthcare',
-    patientName = 'Carlos Hernandez',
-    hostName = 'Dr. Sarah Jenkins, MD',
-    callType = 'audio'
-  } = sessionData;
+  const hostName = sessionData.hostName || sessionData.mainClientName || 'English Host';
+  const interpreterName = sessionData.interpreter?.name || sessionData.interpreterName || 'Certified Interpreter';
+  const patientName = sessionData.patientName || sessionData.guestName || 'Guest Client';
+  const targetLanguage = sessionData.targetLanguage || 'Spanish';
+  const specialty = sessionData.specialty || 'General';
+  const role = sessionData.role || 'host';
+  const roomId = sessionData.roomId || 'room-default';
+  const callType = sessionData.callType || 'audio';
 
   // Real Audible Voice Output State (Default: True)
   const [isVoiceActive, setIsVoiceActive] = useState(true);
@@ -69,7 +67,7 @@ export default function ThreeWayCallRoom({
     playConnectedChime();
     const timeout = setTimeout(() => {
       if (isVoiceActive) {
-        speakText(`Connected. English host ${hostName} is in the room with certified interpreter Elena Rodriguez and client ${patientName}.`, 'en-US');
+        speakText(`Connected. ${hostName} is in the room with certified interpreter ${interpreterName} and guest ${patientName}.`, 'en-US');
       }
     }, 800);
     return () => clearTimeout(timeout);
@@ -97,32 +95,16 @@ export default function ThreeWayCallRoom({
       role: 'system',
       text: 'Encrypted 3-party interpretation session established. WebRTC peer connection active.',
       timestamp: '00:01'
-    },
-    {
-      id: 'm2',
-      sender: hostName,
-      role: 'host',
-      text: `Hello Elena, thank you for joining. We have Mr. ${patientName} with us today for a cardiology consultation.`,
-      translation: `Hola Elena, gracias por unirte. Tenemos con nosotros hoy al Sr. ${patientName} para una consulta de cardiología.`,
-      timestamp: '00:05'
-    },
-    {
-      id: 'm3',
-      sender: 'Elena Rodriguez, CCHI',
-      role: 'interpreter',
-      text: 'Good morning Dr. Jenkins. I am ready to interpret consecutively.',
-      translation: 'Buenos días Dra. Jenkins. Estoy lista para interpretar de forma consecutiva.',
-      timestamp: '00:08'
     }
   ]);
   const [messageInput, setMessageInput] = useState('');
 
-  // Live Simulated Captions / Transcripts
+  // Live Captions / Transcripts
   const [liveCaption, setLiveCaption] = useState({
-    speaker: hostName,
-    speakerRole: 'host',
-    enText: 'Please ask Mr. Hernandez if he has been experiencing any shortness of breath during light exercise.',
-    targetText: 'Por favor pregúntele al Sr. Hernández si ha estado sintiendo falta de aire durante el ejercicio ligero.'
+    speaker: 'System',
+    speakerRole: 'system',
+    enText: 'Live 3-party conference active. Speak into your microphone or type messages in chat.',
+    targetText: `Connecting ${targetLanguage} audio feed.`
   });
 
   // Interpreter Pause Banner Alert
@@ -135,9 +117,7 @@ export default function ThreeWayCallRoom({
   // Debrief Modal on End
   const [showDebrief, setShowDebrief] = useState(false);
   const [callRating, setCallRating] = useState(5);
-  const [sessionNotes, setSessionNotes] = useState(
-    `Patient confirmed adherence to prescribed ACE inhibitors. Discussed echocardiogram scheduled for next Thursday.`
-  );
+  const [sessionNotes, setSessionNotes] = useState('3-party interpretation consultation completed successfully.');
 
   // Rotate simulated active speaker periodically & speak audio aloud through speakers
   useEffect(() => {
@@ -448,7 +428,7 @@ export default function ThreeWayCallRoom({
                 <div className="relative">
                   <img
                     src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&auto=format&fit=crop&q=80"
-                    alt="Elena Rodriguez, CCHI"
+                    alt={interpreterName}
                     className="w-24 h-24 rounded-full object-cover shadow-2xl ring-4 ring-emerald-500/30"
                   />
                   {activeSpeaker === 'interpreter' && (
@@ -458,7 +438,7 @@ export default function ThreeWayCallRoom({
                     </div>
                   )}
                 </div>
-                <h4 className="text-sm font-bold text-white mt-3">Elena Rodriguez, CCHI</h4>
+                <h4 className="text-sm font-bold text-white mt-3">{interpreterName}</h4>
                 <span className="text-[11px] font-semibold text-emerald-400">
                   Certified Interpreter (English ⟷ {targetLanguage})
                 </span>

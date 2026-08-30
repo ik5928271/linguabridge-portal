@@ -63,19 +63,61 @@ export default function MainClientBookingFlow({
   const [selectedLanguage, setSelectedLanguage] = useState('Russian');
   const [selectedSpecialty, setSelectedSpecialty] = useState('General / Customer Support');
   const [matchMode, setMatchMode] = useState('specific');
-  const [selectedInterpreter, setSelectedInterpreter] = useState(getInterpretersForLanguage('Russian')[0] || INITIAL_INTERPRETERS[0]);
+  const [realInterpreters, setRealInterpreters] = useState([]);
+  const [selectedInterpreter, setSelectedInterpreter] = useState(null);
+
+  // Fetch real registered interpreters from database
+  useEffect(() => {
+    fetch('/api/interpreters')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setRealInterpreters(data);
+        } else {
+          fetch('/api/admin/users')
+            .then(r => r.json())
+            .then(users => {
+              if (Array.isArray(users)) {
+                const interps = users.filter(u => u.role === 'interpreter');
+                setRealInterpreters(interps);
+              }
+            })
+            .catch(() => {});
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Filter registered interpreters for selected language
+  const availableInterpreters = realInterpreters.filter(i => {
+    const lang = selectedLanguage.toLowerCase();
+    const pLang = (i.primaryLang || '').toLowerCase();
+    const allLangs = (i.languages || []).map(l => l.toLowerCase());
+    return pLang.includes(lang) || allLangs.some(l => l.includes(lang)) || lang.includes(pLang);
+  });
+
+  // Keep selected interpreter in sync
+  useEffect(() => {
+    if (availableInterpreters.length > 0) {
+      if (!selectedInterpreter || !availableInterpreters.some(i => i.id === selectedInterpreter.id)) {
+        setSelectedInterpreter(availableInterpreters[0]);
+      }
+    } else {
+      setSelectedInterpreter(null);
+    }
+  }, [selectedLanguage, realInterpreters]);
   
   // Date & Modality
   const [bookingType, setBookingType] = useState('scheduled'); // 'instant' or 'scheduled'
-  const [bookingDate, setBookingDate] = useState('2026-08-29');
+  const [bookingDate, setBookingDate] = useState('2026-08-30');
   const [bookingTime, setBookingTime] = useState('02:30 PM');
   const [timezone, setTimezone] = useState('Eastern Time (ET - US/Canada)');
   const [durationMinutes, setDurationMinutes] = useState(30);
   const [callType, setCallType] = useState('audio'); // 'audio' by default
   
-  // Client & Guest Information (Clean slate for real-time testing)
-  const [mainClientName, setMainClientName] = useState(currentUser?.name || '');
-  const [mainClientOrg, setMainClientOrg] = useState(currentUser?.org || '');
+  // Client & Guest Information
+  const [mainClientName, setMainClientName] = useState(currentUser?.name || 'Client Account');
+  const [mainClientOrg, setMainClientOrg] = useState(currentUser?.org || 'IK Enterprises Client');
   const [guestName, setGuestName] = useState('');
   const [sessionNotes, setSessionNotes] = useState('');
 
@@ -85,11 +127,8 @@ export default function MainClientBookingFlow({
   const [showQrModal, setShowQrModal] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
-  // Get active interpreters for chosen language
-  const availableInterpreters = getInterpretersForLanguage(selectedLanguage);
-
   // Calculate pricing
-  const hourlyRate = selectedInterpreter?.hourlyRate || 55;
+  const hourlyRate = selectedInterpreter?.hourlyRate || 5;
   const estimatedCost = ((durationMinutes / 60) * hourlyRate).toFixed(2);
   const platformFee = '3.50';
   const totalCost = (parseFloat(estimatedCost) + parseFloat(platformFee)).toFixed(2);
@@ -488,55 +527,74 @@ END:VCALENDAR`;
           </div>
 
           {/* Interpreter Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {availableInterpreters.map((interp) => (
-              <div
-                key={interp.id}
-                onClick={() => setSelectedInterpreter(interp)}
-                className={`p-5 rounded-2xl border transition-all cursor-pointer space-y-3 relative ${
-                  selectedInterpreter?.id === interp.id
-                    ? 'bg-brand-600/15 border-brand-500 ring-2 ring-brand-500/50 shadow-xl'
-                    : 'bg-slate-900/70 border-slate-800 hover:border-slate-700'
-                }`}
-              >
-                <div className="flex items-start gap-3.5">
-                  <img src={interp.avatar} alt={interp.name} className="w-14 h-14 rounded-2xl object-cover ring-2 ring-emerald-500/30 shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-bold text-white truncate">{interp.name}</h4>
-                      <span className="text-xs font-black text-emerald-400 shrink-0">\${interp.hourlyRate}/hr</span>
-                    </div>
-                    <p className="text-[11px] text-slate-300 font-medium">{interp.languages.join(' ⟷ ')}</p>
-                    <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-400">
-                      <span className="flex items-center gap-1 text-amber-400 font-bold">
-                        <Star className="w-3 h-3 fill-amber-400" />
-                        <span>{interp.rating}</span>
-                      </span>
-                      <span>•</span>
-                      <span>{interp.totalCalls} sessions completed</span>
+          {availableInterpreters.length === 0 ? (
+            <div className="p-10 rounded-3xl bg-slate-900/60 border border-slate-800 text-center space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-400 flex items-center justify-center mx-auto">
+                <Users className="w-6 h-6" />
+              </div>
+              <p className="text-sm font-bold text-white">No Certified Interpreters Registered for {selectedLanguage} Yet</p>
+              <p className="text-xs text-slate-400 max-w-md mx-auto">
+                Please create an interpreter in {selectedLanguage} in your Admin Control Center or have them sign up online.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {availableInterpreters.map((interp) => (
+                <div
+                  key={interp.id}
+                  onClick={() => setSelectedInterpreter(interp)}
+                  className={`p-5 rounded-2xl border transition-all cursor-pointer space-y-3 relative ${
+                    selectedInterpreter?.id === interp.id
+                      ? 'bg-brand-600/15 border-brand-500 ring-2 ring-brand-500/50 shadow-xl'
+                      : 'bg-slate-900/70 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-start gap-3.5">
+                    {interp.avatar ? (
+                      <img src={interp.avatar} alt={interp.name} className="w-14 h-14 rounded-2xl object-cover ring-2 ring-emerald-500/30 shrink-0" />
+                    ) : (
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 font-bold text-white flex items-center justify-center text-lg shrink-0 shadow-lg shadow-emerald-500/20">
+                        {interp.name?.charAt(0) || 'I'}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-bold text-white truncate">{interp.name}</h4>
+                        <span className="text-xs font-black text-emerald-400 shrink-0">${interp.hourlyRate || 5}/hr</span>
+                      </div>
+                      <p className="text-[11px] text-slate-300 font-medium">
+                        {(interp.languages || [interp.primaryLang || selectedLanguage, 'English']).join(' ⟷ ')}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-400">
+                        <span className="flex items-center gap-1 text-emerald-400 font-bold">
+                          ● Online & Ready
+                        </span>
+                        <span>•</span>
+                        <span>{interp.specialty || interp.specialties?.[0] || 'General / Customer Support'}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed bg-slate-950/40 p-2.5 rounded-xl border border-slate-800/80">
-                  {interp.bio}
-                </p>
+                  <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed bg-slate-950/40 p-2.5 rounded-xl border border-slate-800/80">
+                    {interp.bio || `Certified ${interp.primaryLang || selectedLanguage} professional linguist ready for live assignments.`}
+                  </p>
 
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    {interp.certifications[0]}
-                  </span>
-                  {selectedInterpreter?.id === interp.id ? (
-                    <span className="text-xs font-bold text-brand-400 flex items-center gap-1">
-                      <Check className="w-3.5 h-3.5" /> Selected
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      {Array.isArray(interp.certifications) ? interp.certifications[0] : (interp.certifications || 'Certified Professional Linguist')}
                     </span>
-                  ) : (
-                    <span className="text-xs text-slate-500">Click to choose</span>
-                  )}
+                    {selectedInterpreter?.id === interp.id ? (
+                      <span className="text-xs font-bold text-brand-400 flex items-center gap-1">
+                        <Check className="w-3.5 h-3.5" /> Selected
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-500">Click to choose</span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
           <div className="pt-4 border-t border-slate-800 flex justify-between">
             <button
