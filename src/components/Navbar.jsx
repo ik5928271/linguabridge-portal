@@ -211,10 +211,10 @@ export default function Navbar({
                 className="flex items-center gap-2 p-1.5 pl-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 transition"
               >
                 <div className="w-6 h-6 rounded-full bg-brand-500 text-white font-bold text-xs flex items-center justify-center">
-                  {currentUser.name.charAt(0)}
+                  {currentUser.name?.charAt(0) || 'U'}
                 </div>
                 <div className="text-left hidden sm:block">
-                  <p className="text-[11px] font-bold text-white leading-tight truncate max-w-[110px]">{currentUser.name}</p>
+                  <p className="text-[11px] font-bold text-white leading-tight truncate max-w-[110px]">{currentUser.name || 'User'}</p>
                   <p className="text-[9px] text-slate-400 capitalize">
                     {currentUser.role === 'admin' ? 'Administrator' : currentUser.role === 'interpreter' ? 'Interpreter' : 'Client / Payer'}
                   </p>
@@ -225,8 +225,8 @@ export default function Navbar({
               {showUserMenu && (
                 <div className="absolute right-0 mt-2 w-52 glass-panel p-2 rounded-2xl border border-slate-700 shadow-2xl space-y-1 text-xs z-50">
                   <div className="px-3 py-2 border-b border-slate-800">
-                    <p className="font-bold text-white truncate">{currentUser.name}</p>
-                    <p className="text-[10px] text-slate-400 truncate">{currentUser.email}</p>
+                    <p className="font-bold text-white truncate">{currentUser.name || 'User'}</p>
+                    <p className="text-[10px] text-slate-400 truncate">{currentUser.email || ''}</p>
                     <span className="inline-block mt-1 text-[9px] font-bold px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-300">
                       {currentUser.role === 'admin' ? '👑 Admin Account' : currentUser.role === 'interpreter' ? '🎧 Certified Linguist' : '💳 Client / Payer Account'}
                     </span>

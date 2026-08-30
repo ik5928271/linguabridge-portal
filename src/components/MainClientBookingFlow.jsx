@@ -289,21 +289,23 @@ END:VCALENDAR`;
           {/* Card 1: Total Paid */}
           <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800">
             <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Amount Paid</span>
-            <p className="text-xl sm:text-2xl font-black text-white mt-1">\${wallet.totalPaid.toFixed(2)}</p>
+            <p className="text-xl sm:text-2xl font-black text-white mt-1">
+              ${(wallet?.totalPaid !== undefined && !isNaN(Number(wallet.totalPaid)) ? Number(wallet.totalPaid) : 0).toFixed(2)}
+            </p>
             <span className="text-[10px] text-slate-500 font-medium">Lifetime payment receipts</span>
           </div>
 
           {/* Card 2: Total Minutes Credited */}
           <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800">
             <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Minutes Credited</span>
-            <p className="text-xl sm:text-2xl font-black text-brand-400 mt-1">{wallet.totalMinutesPurchased} Mins</p>
+            <p className="text-xl sm:text-2xl font-black text-brand-400 mt-1">{wallet?.totalMinutesPurchased || 0} Mins</p>
             <span className="text-[10px] text-slate-500 font-medium">Advance purchased volume</span>
           </div>
 
           {/* Card 3: Minutes Used */}
           <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800">
             <span className="text-[10px] uppercase font-bold text-slate-400 block">Minutes Consumed</span>
-            <p className="text-xl sm:text-2xl font-black text-amber-400 mt-1">{wallet.minutesUsed} Mins</p>
+            <p className="text-xl sm:text-2xl font-black text-amber-400 mt-1">{wallet?.minutesUsed || 0} Mins</p>
             <span className="text-[10px] text-slate-500 font-medium">Across all 3-party sessions</span>
           </div>
 
@@ -311,7 +313,7 @@ END:VCALENDAR`;
           <div className="p-4 rounded-2xl bg-emerald-950/30 border border-emerald-500/40 flex items-center justify-between">
             <div>
               <span className="text-[10px] uppercase font-bold text-emerald-400 block">Remaining Balance</span>
-              <p className="text-xl sm:text-2xl font-black text-emerald-300 mt-1">{wallet.minutesRemaining} Mins</p>
+              <p className="text-xl sm:text-2xl font-black text-emerald-300 mt-1">{wallet?.minutesRemaining !== undefined ? wallet.minutesRemaining : 0} Mins</p>
               <span className="text-[10px] text-emerald-400/80 font-medium">Ready for instant calls</span>
             </div>
 
@@ -888,7 +890,7 @@ END:VCALENDAR`;
             <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
               <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800">
                 <span className="text-slate-400">Available Prepaid Balance:</span>
-                <span className="font-black text-emerald-400">{wallet.minutesRemaining} Minutes</span>
+                <span className="font-black text-emerald-400">{wallet?.minutesRemaining || 0} Minutes</span>
               </div>
               <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800">
                 <span className="text-slate-400">Minutes Required for this Session:</span>
@@ -897,7 +899,7 @@ END:VCALENDAR`;
               <div className="flex items-center justify-between text-xs pt-1">
                 <span className="font-bold text-slate-300">Remaining Balance after Session:</span>
                 <span className={`font-black ${hasSufficientPrepaid ? 'text-emerald-300' : 'text-red-400'}`}>
-                  {wallet.minutesRemaining - durationMinutes} Minutes
+                  {(wallet?.minutesRemaining || 0) - durationMinutes} Minutes
                 </span>
               </div>
 
@@ -905,7 +907,7 @@ END:VCALENDAR`;
                 <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-300 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-                    <span>Insufficient minutes in wallet ({wallet.minutesRemaining} min available). Please top up.</span>
+                    <span>Insufficient minutes in wallet ({wallet?.minutesRemaining || 0} min available). Please top up.</span>
                   </div>
                   <button
                     type="button"
