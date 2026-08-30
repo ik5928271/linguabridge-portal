@@ -1099,8 +1099,12 @@ END:VCALENDAR`;
                   <Award className="w-3.5 h-3.5 text-purple-400" />
                   <span>Certified Interpreter:</span>
                 </span>
-                <p className="font-extrabold text-purple-300">{generatedSession.interpreter?.name}</p>
-                <p className="text-[10px] text-slate-400">{generatedSession.interpreter?.certifications?.[0]}</p>
+                <p className="font-extrabold text-purple-300">{generatedSession.interpreter?.name || 'Assigned Certified Linguist'}</p>
+                <p className="text-[10px] text-slate-400">
+                  {Array.isArray(generatedSession.interpreter?.certifications) 
+                    ? generatedSession.interpreter.certifications[0] 
+                    : (generatedSession.interpreter?.certifications || 'Certified Professional Linguist')}
+                </p>
               </div>
 
             </div>

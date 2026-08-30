@@ -29,13 +29,18 @@ class ErrorBoundary extends React.Component {
             <p className="text-xs text-slate-400 leading-relaxed">
               Your session state has been updated. Click the button below to proceed to your dashboard.
             </p>
+            {this.state.error?.message && (
+              <p className="text-[11px] text-amber-400 font-mono bg-amber-950/30 p-2 rounded-xl border border-amber-500/20">
+                {this.state.error.message}
+              </p>
+            )}
             <button
               onClick={() => {
-                window.location.href = '/';
+                this.setState({ hasError: false, error: null });
               }}
               className="w-full py-3.5 px-6 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-sm transition shadow-lg shadow-brand-500/30"
             >
-              Enter Dashboard
+              Continue to Dashboard
             </button>
           </div>
         </div>
