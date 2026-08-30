@@ -103,7 +103,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       primaryLang: formLang,
       specialty: formSpecialty,
       hourlyRate: parseInt(formHourlyRate) || 5,
-      initialMinutes: parseInt(formInitialMinutes) || 60,
+      initialMinutes: parseInt(formInitialMinutes) !== undefined && !isNaN(parseInt(formInitialMinutes)) ? parseInt(formInitialMinutes) : 120,
       billingType: formBillingType
     };
 
@@ -498,8 +498,12 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
                             <span className="text-amber-300 font-bold">Unlimited Root</span>
                           ) : (
                             <div>
-                              <span className="font-bold text-white">{u.wallet?.minutesRemaining || 60} Mins</span>
-                              <span className="text-[10px] text-slate-400 block">${u.wallet?.totalPaid || 0} Paid</span>
+                              <span className="font-bold text-white">
+                                {u.wallet?.minutesRemaining !== undefined ? u.wallet.minutesRemaining : (u.initialMinutes || 0)} Mins
+                              </span>
+                              <span className="text-[10px] text-slate-400 block">
+                                ${(u.wallet?.totalPaid !== undefined ? u.wallet.totalPaid : 0).toFixed(2)} Paid
+                              </span>
                             </div>
                           )}
                         </td>

@@ -40,72 +40,118 @@ export default function AuthModal({
   const handleSignInSubmit = (e) => {
     e.preventDefault();
     const cleanEmail = signInEmail.toLowerCase().trim();
+
+    fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: cleanEmail, password: signInPassword })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.user) {
+          onSuccessLogin(data.user, data.wallet);
+          onClose();
+        } else {
+          fallbackSignIn(cleanEmail);
+        }
+      })
+      .catch(() => {
+        fallbackSignIn(cleanEmail);
+      });
+  };
+
+  const fallbackSignIn = (cleanEmail) => {
     if (cleanEmail === 'ik5928271@gmail.com' || cleanEmail.includes('admin')) {
       onSuccessLogin({
+        id: 'usr-owner-ikram',
         name: 'Ikram-ul-haq Mian',
         email: 'ik5928271@gmail.com',
         role: 'admin',
         isOwner: true,
         org: 'IK Enterprises'
-      });
+      }, { totalPaid: 1000, totalMinutesPurchased: 9999, minutesRemaining: 9999, billingType: 'unlimited_owner' });
     } else if (cleanEmail.includes('elena') || cleanEmail.includes('interp')) {
       onSuccessLogin({
+        id: 'usr-elena',
         name: 'Elena Rodriguez, CCHI',
         email: cleanEmail,
         role: 'interpreter',
         org: 'Certified Linguist Pool',
         primaryLang: 'Spanish',
         rating: 4.98
-      });
+      }, null);
     } else {
       onSuccessLogin({
+        id: `usr-${Date.now().toString(36)}`,
         name: signInEmail.split('@')[0] || 'Client Account',
         email: cleanEmail || 'client@example.com',
         role: 'host',
         org: 'IK Enterprises Client Pool'
-      });
+      }, { totalPaid: 0, totalMinutesPurchased: 0, minutesRemaining: 0, billingType: 'prepaid' });
     }
     onClose();
   };
 
   const handleSignUpSubmit = (e) => {
     e.preventDefault();
-    onSuccessLogin({
+    const payload = {
       name: name || (role === 'interpreter' ? 'New Interpreter' : 'Organization Client'),
       email: email || 'user@linguabridge.com',
+      password: password || 'pass123',
       role: role,
       org: orgName || 'IK Enterprises Client',
       primaryLang: primaryLang,
       specialty: specialty
-    });
-    onClose();
+    };
+
+    fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.user) {
+          onSuccessLogin(data.user, data.wallet);
+        } else {
+          onSuccessLogin(payload, { totalPaid: 0, totalMinutesPurchased: 0, minutesRemaining: 0, billingType: 'prepaid' });
+        }
+        onClose();
+      })
+      .catch(() => {
+        onSuccessLogin(payload, { totalPaid: 0, totalMinutesPurchased: 0, minutesRemaining: 0, billingType: 'prepaid' });
+        onClose();
+      });
   };
 
   const quickDemoLogin = (userRole) => {
     if (userRole === 'host') {
       onSuccessLogin({
+        id: 'usr-jenkins',
         name: 'Dr. Sarah Jenkins, MD',
         email: 's.jenkins@mercygeneral.org',
         role: 'host',
         org: 'Mercy General Hospital - Cardiology'
-      });
+      }, { totalPaid: 150, totalMinutesPurchased: 150, minutesRemaining: 150, billingType: 'prepaid' });
     } else if (userRole === 'interpreter') {
       onSuccessLogin({
+        id: 'usr-elena',
         name: 'Elena Rodriguez, CCHI',
         email: 'elena.rodriguez@interpreters.org',
         role: 'interpreter',
         org: 'Certified Linguist Pool',
         primaryLang: 'Spanish',
         rating: 4.98
-      });
+      }, null);
     } else if (userRole === 'admin') {
       onSuccessLogin({
+        id: 'usr-owner-ikram',
         name: 'Ikram-ul-haq Mian',
         email: 'ik5928271@gmail.com',
         role: 'admin',
         isOwner: true,
         org: 'IK Enterprises'
-      });
+      }, { totalPaid: 1000, totalMinutesPurchased: 9999, minutesRemaining: 9999, billingType: 'unlimited_owner' });
     }
     onClose();
   };

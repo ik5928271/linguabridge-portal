@@ -106,6 +106,8 @@ const glossary = [
     id: 'g-1',
     category: 'Medical',
     termEn: 'Informed Consent',
+    termUr: 'باخبر رضامندی (Informed Consent)',
+    termPa: 'ਜਾਣੂ ਸਹਿਮਤੀ (Informed Consent)',
     termEs: 'Consentimiento Informado',
     termAr: 'الموافقة المستنيرة',
     termZh: '知情同意',
@@ -118,6 +120,8 @@ const glossary = [
     id: 'g-2',
     category: 'Medical',
     termEn: 'Myocardial Infarction (Heart Attack)',
+    termUr: 'دل کا دورہ / ہارٹ اٹیک (Heart Attack)',
+    termPa: 'ਦਿਲ ਦਾ ਦੌਰਾ (Heart Attack)',
     termEs: 'Infarto de Miocardio (Ataque Cardíaco)',
     termAr: 'احتشاء عضلة القلب (أزمة قلبية)',
     termZh: '心肌梗死（心脏病发作）',
@@ -130,6 +134,8 @@ const glossary = [
     id: 'g-3',
     category: 'Medical',
     termEn: 'Hypertension',
+    termUr: 'بلند فشار خون / ہائی بلڈ پریشر (High BP)',
+    termPa: 'ਹਾਈ ਬਲੱਡ ਪ੍ਰੈਸ਼ਰ (High BP)',
     termEs: 'Hipertensión Arterial / Presión Alta',
     termAr: 'ارتفاع ضغط الدم',
     termZh: '高血压',
@@ -142,6 +148,8 @@ const glossary = [
     id: 'g-4',
     category: 'Legal',
     termEn: 'Affidavit',
+    termUr: 'حلف نامہ / بیان حلفی (Affidavit)',
+    termPa: 'ਹਲਫਨਾਮਾ (Affidavit)',
     termEs: 'Declaración Jurada',
     termAr: 'إفادة خطية مشفوعة بيمين',
     termZh: '宣誓书 / 宣誓证明',
@@ -154,6 +162,8 @@ const glossary = [
     id: 'g-5',
     category: 'Legal',
     termEn: 'Subpoena',
+    termUr: 'عدالتی پروانہ / سمن (Subpoena)',
+    termPa: 'ਸੰਮਨ (Subpoena)',
     termEs: 'Citación Judicial / Orden de Comparecencia',
     termAr: 'مذكرة استدعاء قضائية',
     termZh: '传票 / 出庭令',
@@ -166,6 +176,8 @@ const glossary = [
     id: 'g-6',
     category: 'Legal',
     termEn: 'Power of Attorney',
+    termUr: 'مختار نامہ / پاور آف اٹارنی (Power of Attorney)',
+    termPa: 'ਮੁਖਤਿਆਰਨਾਮਾ (Power of Attorney)',
     termEs: 'Poder Notarial / Carta Poder',
     termAr: 'توكيل رسمي',
     termZh: '委托授权书',
@@ -386,12 +398,13 @@ app.post('/api/admin/users', (req, res) => {
   }
 
   // If created as Client / Payer or Admin
+  const parsedMins = (initialMinutes !== undefined && !isNaN(parseInt(initialMinutes))) ? parseInt(initialMinutes) : 120;
   store.wallets[userId] = {
     userId,
-    totalPaid: role === 'admin' ? 1000 : (initialMinutes * 0.95),
-    totalMinutesPurchased: parseInt(initialMinutes) || 60,
+    totalPaid: role === 'admin' ? 1000 : (parsedMins * 0.95),
+    totalMinutesPurchased: parsedMins,
     minutesUsed: 0,
-    minutesRemaining: parseInt(initialMinutes) || 60,
+    minutesRemaining: parsedMins,
     billingType: billingType || 'prepaid'
   };
 

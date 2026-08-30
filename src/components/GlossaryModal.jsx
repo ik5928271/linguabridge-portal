@@ -13,6 +13,8 @@ export default function GlossaryModal({ isOpen, onClose }) {
       id: 'g-1',
       category: 'Medical',
       en: 'Informed Consent',
+      ur: 'باخبر رضامندی',
+      pa: 'ਜਾਣੂ ਸਹਿਮਤੀ',
       es: 'Consentimiento Informado',
       ar: 'الموافقة المستنيرة',
       zh: '知情同意',
@@ -24,6 +26,8 @@ export default function GlossaryModal({ isOpen, onClose }) {
       id: 'g-2',
       category: 'Medical',
       en: 'Myocardial Infarction (Heart Attack)',
+      ur: 'دل کا دورہ / ہارٹ اٹیک',
+      pa: 'ਦਿਲ ਦਾ ਦੌਰਾ',
       es: 'Infarto de Miocardio (Ataque Cardíaco)',
       ar: 'احتشاء عضلة القلب (أزمة قلبية)',
       zh: '心肌梗死（心脏病发作）',
@@ -35,6 +39,8 @@ export default function GlossaryModal({ isOpen, onClose }) {
       id: 'g-3',
       category: 'Medical',
       en: 'Hypertension',
+      ur: 'بلند فشار خون / ہائی بلڈ پریشر',
+      pa: 'ਹਾਈ ਬਲੱਡ ਪ੍ਰੈਸ਼ਰ',
       es: 'Hipertensión Arterial / Presión Alta',
       ar: 'ارتفاع ضغط الدم',
       zh: '高血压',
@@ -46,6 +52,8 @@ export default function GlossaryModal({ isOpen, onClose }) {
       id: 'g-4',
       category: 'Medical',
       en: 'Adverse Reaction',
+      ur: 'منفی ردعمل / ضمنی اثر',
+      pa: 'ਮਾੜਾ ਪ੍ਰਭਾਵ',
       es: 'Reacción Adversa / Efecto Secundario Grave',
       ar: 'تفاعل دوائي ضار',
       zh: '药物不良反应',
@@ -57,6 +65,8 @@ export default function GlossaryModal({ isOpen, onClose }) {
       id: 'g-5',
       category: 'Medical',
       en: 'Biopsy',
+      ur: 'بایوپسی / نسیجی معائنہ',
+      pa: 'ਬਾਇਓਪਸੀ',
       es: 'Biopsia',
       ar: 'خزعة',
       zh: '活检 / 活体组织检查',
@@ -68,6 +78,8 @@ export default function GlossaryModal({ isOpen, onClose }) {
       id: 'g-6',
       category: 'Legal',
       en: 'Affidavit',
+      ur: 'حلف نامہ / بیان حلفی',
+      pa: 'ਹਲਫਨਾਮਾ',
       es: 'Declaración Jurada',
       ar: 'إفادة خطية مشفوعة بيمين',
       zh: '宣誓书 / 宣誓证明',
@@ -79,6 +91,8 @@ export default function GlossaryModal({ isOpen, onClose }) {
       id: 'g-7',
       category: 'Legal',
       en: 'Subpoena',
+      ur: 'عدالتی سمن / پروانہ',
+      pa: 'ਅਦਾਲਤੀ ਸੰਮਨ',
       es: 'Citación Judicial / Orden de Comparecencia',
       ar: 'مذكرة استدعاء قضائية',
       zh: '传票 / 出庭令',
@@ -90,6 +104,8 @@ export default function GlossaryModal({ isOpen, onClose }) {
       id: 'g-8',
       category: 'Legal',
       en: 'Power of Attorney',
+      ur: 'مختار نامہ / پاور آف اٹارنی',
+      pa: 'ਮੁਖਤਿਆਰਨਾਮਾ',
       es: 'Poder Notarial / Carta Poder',
       ar: 'توكيل رسمي',
       zh: '委托授权书',
@@ -101,6 +117,8 @@ export default function GlossaryModal({ isOpen, onClose }) {
       id: 'g-9',
       category: 'Legal',
       en: 'Deposition',
+      ur: 'بیان حلفی برائے عدالت',
+      pa: 'ਅਦਾਲਤੀ ਬਿਆਨ',
       es: 'Declaración Testimonial / Deposición',
       ar: 'شهادة خطية مسجلة',
       zh: '庭外采证 / 宣誓证言',
@@ -112,6 +130,8 @@ export default function GlossaryModal({ isOpen, onClose }) {
       id: 'g-10',
       category: 'Financial',
       en: 'Escrow Account',
+      ur: 'امانتی کھاتہ / ایسکرو اکاؤنٹ',
+      pa: 'ਐਸਕਰੋ ਖਾਤਾ',
       es: 'Cuenta de Fideicomiso / Cuenta de Garantía',
       ar: 'حساب ضمان ائتماني',
       zh: '第三方托管账户',
@@ -126,6 +146,8 @@ export default function GlossaryModal({ isOpen, onClose }) {
     const q = query.toLowerCase();
     const matchesQuery = !query ||
       item.en.toLowerCase().includes(q) ||
+      (item.ur && item.ur.toLowerCase().includes(q)) ||
+      (item.pa && item.pa.toLowerCase().includes(q)) ||
       item.es.toLowerCase().includes(q) ||
       item.def.toLowerCase().includes(q);
     return matchesCat && matchesQuery;
@@ -160,15 +182,15 @@ export default function GlossaryModal({ isOpen, onClose }) {
           </button>
         </div>
 
-        {/* Search & Filters */}
-        <div className="flex flex-col sm:flex-row gap-3 shrink-0">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+        {/* Search & Category Filter */}
+        <div className="space-y-3 shrink-0">
+          <div className="relative">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by English, Spanish, or clinical definition..."
+              placeholder="Search by English, Urdu, Punjabi, Spanish, or clinical definition..."
               className="w-full glass-input pl-10 pr-4 py-2.5 rounded-xl text-xs text-white focus:outline-none"
             />
           </div>
@@ -204,7 +226,7 @@ export default function GlossaryModal({ isOpen, onClose }) {
                   </span>
                 </div>
                 <button
-                  onClick={() => copyTerm(item.es, item.id)}
+                  onClick={() => copyTerm(item.ur || item.es, item.id)}
                   className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] flex items-center gap-1 transition"
                   title="Copy Translation"
                 >
@@ -214,7 +236,15 @@ export default function GlossaryModal({ isOpen, onClose }) {
               </div>
 
               {/* Multi-language translations grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800">
+                  <span className="text-[10px] text-emerald-400 font-semibold block">🇵🇰 اردو (Urdu):</span>
+                  <span className="font-bold text-amber-300">{item.ur}</span>
+                </div>
+                <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800">
+                  <span className="text-[10px] text-amber-400 font-semibold block">🇵🇰 پنجابی (Punjabi):</span>
+                  <span className="font-bold text-amber-300">{item.pa}</span>
+                </div>
                 <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800">
                   <span className="text-[10px] text-slate-500 font-semibold block">🇪🇸 Español:</span>
                   <span className="font-bold text-amber-300">{item.es}</span>

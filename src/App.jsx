@@ -136,9 +136,17 @@ export default function App() {
     setIsAuthOpen(true);
   };
 
-  const handleSuccessLogin = (user) => {
+  const handleSuccessLogin = (user, walletData) => {
     setCurrentUser(user);
     setCurrentRole(user.role);
+    if (walletData) {
+      setClientWallet(walletData);
+    } else if (user.id) {
+      fetch(`/api/wallet/${user.id}`)
+        .then(res => res.json())
+        .then(w => { if (w) setClientWallet(w); })
+        .catch(() => {});
+    }
     setCurrentView(user.role === 'admin' ? 'admin' : user.role === 'interpreter' ? 'interpreter' : 'host');
   };
 
