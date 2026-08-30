@@ -138,7 +138,8 @@ export default function App() {
 
   const handleSuccessLogin = (user, walletData) => {
     setCurrentUser(user);
-    setCurrentRole(user.role);
+    const normalizedRole = (user.role === 'client' || user.role === 'host') ? 'host' : user.role;
+    setCurrentRole(normalizedRole);
     if (walletData) {
       setClientWallet(walletData);
     } else if (user.id) {
@@ -147,7 +148,7 @@ export default function App() {
         .then(w => { if (w) setClientWallet(w); })
         .catch(() => {});
     }
-    setCurrentView(user.role === 'admin' ? 'admin' : user.role === 'interpreter' ? 'interpreter' : 'host');
+    setCurrentView(normalizedRole === 'admin' ? 'admin' : normalizedRole === 'interpreter' ? 'interpreter' : 'host');
   };
 
   const handleLogout = () => {
@@ -193,7 +194,7 @@ export default function App() {
           />
         )}
 
-        {currentView === 'host' && (
+        {(currentView === 'host' || currentView === 'client') && (
           <MainClientBookingFlow
             onStartCall={handleStartCall}
             onSaveAppointment={handleSaveAppointment}

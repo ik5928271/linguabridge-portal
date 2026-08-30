@@ -135,7 +135,7 @@ export default function MainClientBookingFlow({
   const totalCost = (parseFloat(estimatedCost) + parseFloat(platformFee)).toFixed(2);
 
   // Has sufficient minutes in prepaid wallet?
-  const hasSufficientPrepaid = wallet.minutesRemaining >= durationMinutes;
+  const hasSufficientPrepaid = (wallet?.minutesRemaining || 0) >= durationMinutes;
 
   // Handle Payment / Minute Deduction & Create Link
   const handleConfirmAndPay = () => {
@@ -147,8 +147,8 @@ export default function MainClientBookingFlow({
       if (clientBillingType === 'prepaid') {
         if (onUpdateWallet) {
           onUpdateWallet({
-            minutesUsed: wallet.minutesUsed + durationMinutes,
-            minutesRemaining: Math.max(0, wallet.minutesRemaining - durationMinutes)
+            minutesUsed: (wallet?.minutesUsed || 0) + durationMinutes,
+            minutesRemaining: Math.max(0, (wallet?.minutesRemaining || 0) - durationMinutes)
           });
         }
       }
@@ -171,7 +171,7 @@ export default function MainClientBookingFlow({
         guestName,
         language: selectedLanguage,
         specialty: selectedSpecialty,
-        interpreter: selectedInterpreter,
+        interpreter: selectedInterpreter || { name: 'Assigned Certified Linguist', primaryLang: selectedLanguage, hourlyRate: hourlyRate || 5 },
         bookingType,
         date: bookingDate,
         time: bookingTime,
@@ -195,9 +195,9 @@ export default function MainClientBookingFlow({
   const handleTopUpSuccess = ({ minutesAdded, amountPaid }) => {
     if (onUpdateWallet) {
       onUpdateWallet({
-        totalPaid: wallet.totalPaid + amountPaid,
-        totalMinutesPurchased: wallet.totalMinutesPurchased + minutesAdded,
-        minutesRemaining: wallet.minutesRemaining + minutesAdded
+        totalPaid: (wallet?.totalPaid || 0) + amountPaid,
+        totalMinutesPurchased: (wallet?.totalMinutesPurchased || 0) + minutesAdded,
+        minutesRemaining: (wallet?.minutesRemaining || 0) + minutesAdded
       });
     }
   };
@@ -1202,7 +1202,7 @@ END:VCALENDAR`;
         isOpen={isWalletModalOpen}
         onClose={() => setIsWalletModalOpen(false)}
         onTopUpSuccess={handleTopUpSuccess}
-        currentBalance={wallet.minutesRemaining}
+        currentBalance={wallet?.minutesRemaining || 0}
       />
 
     </div>
