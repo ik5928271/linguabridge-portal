@@ -31,7 +31,8 @@ import {
   AlertCircle,
   Plus,
   Download,
-  CalendarCheck
+  CalendarCheck,
+  Building2
 } from 'lucide-react';
 import { LANGUAGES, SPECIALTIES, INITIAL_INTERPRETERS, getInterpretersForLanguage } from '../data/mockData';
 import PrepaidWalletModal from './PrepaidWalletModal';
@@ -53,7 +54,7 @@ export default function MainClientBookingFlow({
 }) {
   // Client Payer Profile: Is Main Client English-speaking or Non-English speaking?
   const [payerType, setPayerType] = useState('english_payer'); // 'english_payer' (e.g. Doctor/Lawyer) or 'foreign_payer' (e.g. Non-English Client)
-  const [clientBillingType, setClientBillingType] = useState(wallet.billingType || 'prepaid'); // 'prepaid' (Standard) or 'postpaid_hospital' (Enterprise)
+  const clientBillingType = wallet?.billingType || currentUser?.billingType || 'prepaid';
 
   // Step in Wizard: 1: Service & Language, 2: Select Interpreter, 3: Date & Modality, 4: Payment / Minute Deduction, 5: Share Link Ready
   const [currentStep, setCurrentStep] = useState(1);
@@ -256,36 +257,29 @@ END:VCALENDAR`;
                 <span>Client Account Billing & Minute Ledger</span>
               </span>
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                clientBillingType === 'prepaid' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+                clientBillingType === 'postpaid_hospital' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
               }`}>
-                {clientBillingType === 'prepaid' ? 'Prepaid Wallet (Charged Before Service)' : 'Post-Paid Enterprise (Billed Monthly Net 30)'}
+                {clientBillingType === 'postpaid_hospital' ? 'Enterprise Post-Paid (Net 30 Invoicing)' : 'Prepaid Minutes Wallet (Active)'}
               </span>
             </div>
             <p className="text-xs text-slate-300 mt-1">
-              {clientBillingType === 'prepaid' 
-                ? 'Standard Client Model: Minutes are charged in advance and deducted automatically during sessions.'
-                : 'Hospital / Enterprise Model: Delivered first and billed monthly with itemized department invoicing.'}
+              {clientBillingType === 'postpaid_hospital' 
+                ? 'Hospital / Enterprise Model: Delivered first and billed monthly with itemized department invoicing.'
+                : 'Standard Client Model: Minutes are charged in advance and deducted automatically during sessions.'}
             </p>
           </div>
 
-          {/* Billing Type Switcher */}
-          <div className="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs font-semibold">
-            <button
-              onClick={() => setClientBillingType('prepaid')}
-              className={`px-3 py-1.5 rounded-lg transition ${
-                clientBillingType === 'prepaid' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Prepaid Model
-            </button>
-            <button
-              onClick={() => setClientBillingType('postpaid_hospital')}
-              className={`px-3 py-1.5 rounded-lg transition ${
-                clientBillingType === 'postpaid_hospital' ? 'bg-purple-600 text-white font-bold' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Hospital Post-Paid
-            </button>
+          {/* Billing Settlement Model Badge (Admin Controlled) */}
+          <div className="flex items-center gap-2.5 bg-slate-900/90 px-3.5 py-2 rounded-2xl border border-slate-800 shrink-0">
+            <ShieldCheck className={`w-4 h-4 ${clientBillingType === 'postpaid_hospital' ? 'text-purple-400' : 'text-emerald-400'}`} />
+            <div>
+              <span className="text-[10px] text-slate-400 block font-semibold uppercase tracking-wider">Account Billing Model</span>
+              <span className={`text-xs font-bold ${
+                clientBillingType === 'postpaid_hospital' ? 'text-purple-300' : 'text-emerald-400'
+              }`}>
+                {clientBillingType === 'postpaid_hospital' ? 'Hospital Post-Paid (Net 30)' : 'Prepaid Minutes Wallet'}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -606,8 +600,13 @@ END:VCALENDAR`;
             </button>
             <button
               type="button"
+              disabled={availableInterpreters.length === 0}
               onClick={() => setCurrentStep(3)}
-              className="px-6 py-3 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs flex items-center gap-2 transition shadow-lg shadow-brand-500/30"
+              className={`px-6 py-3 rounded-xl font-bold text-xs flex items-center gap-2 transition shadow-lg ${
+                availableInterpreters.length === 0
+                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                  : 'bg-brand-600 hover:bg-brand-500 text-white shadow-brand-500/30'
+              }`}
             >
               <span>Continue: Timing & Modality</span>
               <ArrowRight className="w-4 h-4" />
@@ -639,7 +638,7 @@ END:VCALENDAR`;
                   <Zap className="w-4 h-4 text-amber-400" />
                   <p className="text-xs font-bold text-white">Instant On-Demand</p>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-1">Connect immediately with {selectedInterpreter.name}</p>
+                <p className="text-[10px] text-slate-400 mt-1">Connect immediately with {selectedInterpreter?.name || 'Assigned Certified Linguist'}</p>
               </button>
 
               <button

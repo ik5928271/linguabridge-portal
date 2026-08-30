@@ -415,7 +415,7 @@ app.post('/api/admin/users', (req, res) => {
 // Update / Edit full user account details
 app.put('/api/admin/users/:id', (req, res) => {
   const { id } = req.params;
-  const { name, email, org, role, primaryLang, specialty, hourlyRate, minutesRemaining, totalPaid, password } = req.body;
+  const { name, email, org, role, primaryLang, specialty, hourlyRate, minutesRemaining, totalPaid, password, billingType } = req.body;
 
   const user = store.users.find(u => u.id === id);
   if (!user) {
@@ -430,6 +430,7 @@ app.put('/api/admin/users/:id', (req, res) => {
   if (specialty) user.specialty = specialty;
   if (password) user.password = password;
   if (hourlyRate !== undefined) user.hourlyRate = parseInt(hourlyRate);
+  if (billingType) user.billingType = billingType;
 
   // Update corresponding interpreter profile if applicable
   const interp = store.interpreters.find(i => i.userId === id || i.id === id || i.email === user.email);
@@ -447,6 +448,7 @@ app.put('/api/admin/users/:id', (req, res) => {
   if (store.wallets[id]) {
     if (minutesRemaining !== undefined) store.wallets[id].minutesRemaining = parseInt(minutesRemaining);
     if (totalPaid !== undefined) store.wallets[id].totalPaid = parseFloat(totalPaid);
+    if (billingType) store.wallets[id].billingType = billingType;
   }
 
   saveStore();

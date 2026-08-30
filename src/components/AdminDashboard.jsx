@@ -75,6 +75,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   const [editHourlyRate, setEditHourlyRate] = useState(5);
   const [editMinutes, setEditMinutes] = useState(60);
   const [editTotalPaid, setEditTotalPaid] = useState(0);
+  const [editBillingType, setEditBillingType] = useState('prepaid');
 
   // Fetch users from backend
   const fetchUsers = () => {
@@ -127,7 +128,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
         const localUser = {
           id: `usr-${Date.now()}`,
           ...payload,
-          wallet: { totalPaid: payload.initialMinutes * 0.95, minutesRemaining: payload.initialMinutes }
+          wallet: { totalPaid: payload.initialMinutes * 0.95, minutesRemaining: payload.initialMinutes, billingType: payload.billingType }
         };
         setUsersList(prev => [localUser, ...prev]);
         setIsCreateModalOpen(false);
@@ -145,6 +146,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
     setEditHourlyRate(u.hourlyRate !== undefined ? u.hourlyRate : (u.interpreterProfile?.hourlyRate !== undefined ? u.interpreterProfile.hourlyRate : 5));
     setEditMinutes(u.wallet?.minutesRemaining !== undefined ? u.wallet.minutesRemaining : 60);
     setEditTotalPaid(u.wallet?.totalPaid !== undefined ? u.wallet.totalPaid : 0);
+    setEditBillingType(u.wallet?.billingType || u.billingType || 'prepaid');
     setIsEditModalOpen(true);
   };
 
@@ -159,7 +161,8 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       specialty: editSpecialty,
       hourlyRate: parseInt(editHourlyRate) || 5,
       minutesRemaining: parseInt(editMinutes) || 0,
-      totalPaid: parseFloat(editTotalPaid) || 0
+      totalPaid: parseFloat(editTotalPaid) || 0,
+      billingType: editBillingType
     };
 
     fetch(`/api/admin/users/${editingUserId}`, {
@@ -170,12 +173,12 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       .then(res => res.json())
       .then(data => {
         if (data.success) {
-          setUsersList(prev => prev.map(u => u.id === editingUserId ? { ...u, ...payload, wallet: data.wallet || u.wallet } : u));
+          setUsersList(prev => prev.map(u => u.id === editingUserId ? { ...u, ...payload, wallet: data.wallet || { ...u.wallet, ...payload } } : u));
           setIsEditModalOpen(false);
         }
       })
       .catch(() => {
-        setUsersList(prev => prev.map(u => u.id === editingUserId ? { ...u, ...payload } : u));
+        setUsersList(prev => prev.map(u => u.id === editingUserId ? { ...u, ...payload, wallet: { ...u.wallet, ...payload } } : u));
         setIsEditModalOpen(false);
       });
   };
@@ -799,24 +802,46 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
                   )}
 
                   {editRole === 'host' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <label className="font-semibold text-slate-300">Remaining Minutes</label>
-                        <input
-                          type="number"
-                          value={editMinutes}
-                          onChange={(e) => setEditMinutes(e.target.value)}
-                          className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
-                        />
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="font-semibold text-slate-300">Remaining Minutes</label>
+                          <input
+                            type="number"
+                            value={editMinutes}
+                            onChange={(e) => setEditMinutes(e.target.value)}
+                            className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="font-semibold text-slate-300">Total Paid ($)</label>
+                          <input
+                            type="number"
+                            value={editTotalPaid}
+                            onChange={(e) => setEditTotalPaid(e.target.value)}
+                            className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
+                          />
+                        </div>
                       </div>
+
                       <div className="space-y-1">
-                        <label className="font-semibold text-slate-300">Total Paid ($)</label>
-                        <input
-                          type="number"
-                          value={editTotalPaid}
-                          onChange={(e) => setEditTotalPaid(e.target.value)}
-                          className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
-                        />
+                        <label className="font-semibold text-purple-300 flex items-center gap-1.5">
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                          <span>Client Billing Model (Admin Only)</span>
+                        </label>
+                        <select
+                          value={editBillingType}
+                          onChange={(e) => setEditBillingType(e.target.value)}
+                          className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none bg-slate-900 border border-purple-500/40"
+                        >
+                          <option value="prepaid">⚡ Standard Prepaid Wallet (Default)</option>
+                          <option value="postpaid_hospital">🏢 Hospital / Enterprise Post-Paid (Net 30 Invoicing)</option>
+                        </select>
+                        <p className="text-[10px] text-slate-400">
+                          {editBillingType === 'postpaid_hospital'
+                            ? 'Client can book without prepaid minute balance. Invoiced monthly Net 30.'
+                            : 'Client must have prepaid minutes in wallet to connect to live interpreters.'}
+                        </p>
                       </div>
                     </div>
                   )}
