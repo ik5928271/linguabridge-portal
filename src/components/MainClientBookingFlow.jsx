@@ -202,6 +202,12 @@ export default function MainClientBookingFlow({
     }
   };
 
+  // Sync client name if currentUser loads
+  useEffect(() => {
+    if (currentUser?.name) setMainClientName(currentUser.name);
+    if (currentUser?.org) setMainClientOrg(currentUser.org);
+  }, [currentUser]);
+
   const copyGuestLink = () => {
     if (generatedSession?.guestLink) {
       navigator.clipboard.writeText(generatedSession.guestLink);
@@ -211,25 +217,28 @@ export default function MainClientBookingFlow({
   };
 
   const shareViaWhatsApp = () => {
-    const timeFormatted = generatedSession.bookingType === 'scheduled' ? `Scheduled on ${generatedSession.date} at ${generatedSession.time} (${generatedSession.timezone})` : 'Starting now (Instant On-Demand)';
-    const text = `Hello ${guestName}, here is your private 3-party interpretation session link with ${mainClientName} and certified ${selectedLanguage} interpreter ${selectedInterpreter.name}.\n\n⏰ Time: ${timeFormatted}\n🔗 Join Free: ${generatedSession.guestLink}`;
+    const interpName = selectedInterpreter?.name || 'Assigned Certified Linguist';
+    const timeFormatted = generatedSession?.bookingType === 'scheduled' ? `Scheduled on ${generatedSession?.date} at ${generatedSession?.time} (${generatedSession?.timezone})` : 'Starting now (Instant On-Demand)';
+    const text = `Hello ${guestName || 'Guest'}, here is your private 3-party interpretation session link with ${mainClientName || 'Host'} and certified ${selectedLanguage} interpreter ${interpName}.\n\n⏰ Time: ${timeFormatted}\n🔗 Join Free: ${generatedSession?.guestLink}`;
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
   };
 
   const shareViaEmail = () => {
-    const timeFormatted = generatedSession.bookingType === 'scheduled' ? `${generatedSession.date} at ${generatedSession.time} (${generatedSession.timezone})` : 'Starting immediately';
-    const subject = `Confirmed: 3-Party Interpretation Session (${selectedLanguage}) on ${generatedSession.date}`;
-    const body = `Hello ${guestName},\n\nYou are scheduled for a private 3-party interpretation session.\n\n📅 Date & Time: ${timeFormatted}\n🌐 Language: English ⟷ ${selectedLanguage} (${selectedSpecialty})\n👩‍💼 Certified Interpreter: ${selectedInterpreter.name}\n👤 Host / Payer: ${mainClientName}\n🎙️ Call Type: ${callType === 'audio' ? 'Audio Call (Default)' : 'HD Video Call'}\n⏳ Duration: ${durationMinutes} Minutes\n\n🔗 Meeting Link: ${generatedSession.guestLink}\n\nClick the link at your appointment time to join directly from any browser for free.`;
+    const interpName = selectedInterpreter?.name || 'Assigned Certified Linguist';
+    const timeFormatted = generatedSession?.bookingType === 'scheduled' ? `${generatedSession?.date} at ${generatedSession?.time} (${generatedSession?.timezone})` : 'Starting immediately';
+    const subject = `Confirmed: 3-Party Interpretation Session (${selectedLanguage}) on ${generatedSession?.date}`;
+    const body = `Hello ${guestName || 'Guest'},\n\nYou are scheduled for a private 3-party interpretation session.\n\n📅 Date & Time: ${timeFormatted}\n🌐 Language: English ⟷ ${selectedLanguage} (${selectedSpecialty})\n👩‍💼 Certified Interpreter: ${interpName}\n👤 Host / Payer: ${mainClientName || 'Host'}\n🎙️ Call Type: ${callType === 'audio' ? 'Audio Call (Default)' : 'HD Video Call'}\n⏳ Duration: ${durationMinutes} Minutes\n\n🔗 Meeting Link: ${generatedSession?.guestLink}\n\nClick the link at your appointment time to join directly from any browser for free.`;
     window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
   };
 
   const downloadCalendarFile = () => {
+    const interpName = selectedInterpreter?.name || 'Assigned Certified Linguist';
     const icsContent = `BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//LinguaBridge//Interpreter Session//EN
 BEGIN:VEVENT
-SUMMARY:LinguaBridge Interpretation Session with ${mainClientName} (${selectedLanguage})
-DESCRIPTION:3-Party Interpretation Session. Interpreter: ${selectedInterpreter.name}. Join URL: ${generatedSession.guestLink}
+SUMMARY:LinguaBridge Interpretation Session with ${mainClientName || 'Client'} (${selectedLanguage})
+DESCRIPTION:3-Party Interpretation Session. Interpreter: ${interpName}. Join URL: ${generatedSession?.guestLink}
 LOCATION:LinguaBridge Online Conference Room
 STATUS:CONFIRMED
 END:VEVENT
