@@ -37,22 +37,129 @@ const DEFAULT_OWNER = {
   createdAt: new Date().toISOString()
 };
 
+// Permanent Seed Accounts (Always available across every deployment)
+const SEED_USERS = [
+  DEFAULT_OWNER,
+  {
+    id: 'usr-interp-kamila',
+    name: 'Kamila',
+    email: 'kamila@linguabridge.com',
+    password: 'interpreter123',
+    role: 'interpreter',
+    primaryLang: 'Russian',
+    languages: ['Russian', 'English', 'Ukrainian'],
+    specialty: 'General / Customer Support',
+    hourlyRate: 5,
+    rating: 4.98,
+    status: 'online',
+    certifications: ['Certified Professional Russian Linguist', 'State Judiciary Certified'],
+    bio: 'Professional Russian and Ukrainian consecutive & simultaneous interpreter with over 8 years of live interpretation experience.',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'usr-interp-wali',
+    name: 'Wali',
+    email: 'wali@linguabridge.com',
+    password: 'interpreter123',
+    role: 'interpreter',
+    primaryLang: 'Arabic',
+    languages: ['Arabic', 'English'],
+    specialty: 'Medical / Healthcare',
+    hourlyRate: 5,
+    rating: 4.97,
+    status: 'online',
+    certifications: ['Certified Arabic Healthcare Linguist', 'Court Certified'],
+    bio: 'Certified Arabic interpreter specializing in healthcare encounters, customer care, and legal proceedings.',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'usr-interp-tariq',
+    name: 'Tariq Khan',
+    email: 'tariq@linguabridge.com',
+    password: 'interpreter123',
+    role: 'interpreter',
+    primaryLang: 'Urdu',
+    languages: ['Urdu', 'Punjabi', 'English'],
+    specialty: 'General / Customer Support',
+    hourlyRate: 5,
+    rating: 4.99,
+    status: 'online',
+    certifications: ['Certified Urdu & Punjabi Court Interpreter', 'Healthcare Certified'],
+    bio: 'Native Urdu and Punjabi professional linguist providing high-accuracy remote translation services.',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'usr-interp-sofia',
+    name: 'Sofia Martinez',
+    email: 'sofia@linguabridge.com',
+    password: 'interpreter123',
+    role: 'interpreter',
+    primaryLang: 'Spanish',
+    languages: ['Spanish', 'English'],
+    specialty: 'Medical / Healthcare',
+    hourlyRate: 5,
+    rating: 4.98,
+    status: 'online',
+    certifications: ['Certified Spanish Healthcare Interpreter (CCHI)', 'State Certified'],
+    bio: 'Experienced Spanish medical and judicial interpreter bridging communication in clinics and corporate meetings.',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'usr-client-demo',
+    name: 'IK Client (Prepaid 120 Mins)',
+    email: 'client@linguabridge.com',
+    password: 'client123',
+    role: 'host',
+    org: 'IK Enterprises Client Corp',
+    billingType: 'prepaid',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'usr-client-hospital',
+    name: 'Mercy Hospital Client (Net 30)',
+    email: 'hospital@linguabridge.com',
+    password: 'client123',
+    role: 'host',
+    org: 'Mercy Healthcare Network',
+    billingType: 'postpaid_hospital',
+    createdAt: new Date().toISOString()
+  }
+];
+
+const SEED_WALLETS = {
+  'usr-owner-ikram': {
+    userId: 'usr-owner-ikram',
+    totalPaid: 1000.00,
+    totalMinutesPurchased: 9999,
+    minutesUsed: 0,
+    minutesRemaining: 9999,
+    billingType: 'unlimited_owner'
+  },
+  'usr-client-demo': {
+    userId: 'usr-client-demo',
+    totalPaid: 100.00,
+    totalMinutesPurchased: 120,
+    minutesUsed: 0,
+    minutesRemaining: 120,
+    billingType: 'prepaid'
+  },
+  'usr-client-hospital': {
+    userId: 'usr-client-hospital',
+    totalPaid: 0.00,
+    totalMinutesPurchased: 0,
+    minutesUsed: 0,
+    minutesRemaining: 0,
+    billingType: 'postpaid_hospital'
+  }
+};
+
 // Initial State Structure
 let store = {
-  users: [DEFAULT_OWNER],
-  interpreters: [],
+  users: [...SEED_USERS],
+  interpreters: SEED_USERS.filter(u => u.role === 'interpreter'),
   appointments: [],
   callLogs: [],
-  wallets: {
-    'usr-owner-ikram': {
-      userId: 'usr-owner-ikram',
-      totalPaid: 1000.00,
-      totalMinutesPurchased: 9999,
-      minutesUsed: 0,
-      minutesRemaining: 9999,
-      billingType: 'unlimited_owner'
-    }
-  }
+  wallets: { ...SEED_WALLETS }
 };
 
 // Load existing store if available
@@ -70,16 +177,25 @@ function loadStore() {
         store.users.unshift(DEFAULT_OWNER);
       }
 
-      if (!store.wallets[DEFAULT_OWNER.id]) {
-        store.wallets[DEFAULT_OWNER.id] = {
-          userId: DEFAULT_OWNER.id,
-          totalPaid: 1000.00,
-          totalMinutesPurchased: 9999,
-          minutesUsed: 0,
-          minutesRemaining: 9999,
-          billingType: 'unlimited_owner'
-        };
-      }
+      // Ensure Seed Users exist
+      SEED_USERS.forEach(seedUser => {
+        const existingIdx = store.users.findIndex(u => u.id === seedUser.id || u.email.toLowerCase() === seedUser.email.toLowerCase());
+        if (existingIdx >= 0) {
+          store.users[existingIdx] = { ...seedUser, ...store.users[existingIdx] };
+        } else {
+          store.users.push(seedUser);
+        }
+      });
+
+      // Ensure Seed Wallets exist
+      Object.keys(SEED_WALLETS).forEach(uId => {
+        if (!store.wallets[uId]) {
+          store.wallets[uId] = { ...SEED_WALLETS[uId] };
+        }
+      });
+
+      // Ensure Interpreters collection is synchronized
+      store.interpreters = store.users.filter(u => u.role === 'interpreter');
 
       console.log(`[Database Loaded] Users: ${store.users.length}, Interpreters: ${store.interpreters.length}, Appointments: ${store.appointments.length}`);
     } else {
