@@ -357,6 +357,7 @@ app.post('/api/admin/users', (req, res) => {
     org: org || (role === 'admin' ? 'IK Enterprises Operations' : role === 'interpreter' ? 'Linguist Pool' : 'Client Account'),
     primaryLang,
     specialty,
+    hourlyRate: parseInt(hourlyRate) || 55,
     createdAt: new Date().toISOString()
   };
 
@@ -396,6 +397,47 @@ app.post('/api/admin/users', (req, res) => {
 
   saveStore();
   res.json({ success: true, user: newUser, wallet: store.wallets[userId] });
+});
+
+// Update / Edit full user account details
+app.put('/api/admin/users/:id', (req, res) => {
+  const { id } = req.params;
+  const { name, email, org, role, primaryLang, specialty, hourlyRate, minutesRemaining, totalPaid, password } = req.body;
+
+  const user = store.users.find(u => u.id === id);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  if (name) user.name = name;
+  if (email) user.email = email.toLowerCase().trim();
+  if (org !== undefined) user.org = org;
+  if (role) user.role = role;
+  if (primaryLang) user.primaryLang = primaryLang;
+  if (specialty) user.specialty = specialty;
+  if (password) user.password = password;
+  if (hourlyRate !== undefined) user.hourlyRate = parseInt(hourlyRate);
+
+  // Update corresponding interpreter profile if applicable
+  const interp = store.interpreters.find(i => i.userId === id || i.id === id || i.email === user.email);
+  if (interp) {
+    if (name) interp.name = name;
+    if (primaryLang) {
+      interp.primaryLang = primaryLang;
+      interp.languages = [primaryLang, 'English'];
+    }
+    if (specialty) interp.specialties = [specialty, 'General / Customer Support'];
+    if (hourlyRate !== undefined) interp.hourlyRate = parseInt(hourlyRate);
+  }
+
+  // Update corresponding wallet if applicable
+  if (store.wallets[id]) {
+    if (minutesRemaining !== undefined) store.wallets[id].minutesRemaining = parseInt(minutesRemaining);
+    if (totalPaid !== undefined) store.wallets[id].totalPaid = parseFloat(totalPaid);
+  }
+
+  saveStore();
+  res.json({ success: true, user, wallet: store.wallets[id], interpreterProfile: interp || null });
 });
 
 // Grant / update minutes for any user

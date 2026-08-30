@@ -26,14 +26,14 @@ import {
   RefreshCw,
   X
 } from 'lucide-react';
-import { INITIAL_INTERPRETERS, LANGUAGES, SPECIALTIES } from '../data/mockData';
+import { LANGUAGES, SPECIALTIES } from '../data/mockData';
 
 export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'roster', 'billing', 'users'
   const [searchTerm, setSearchTerm] = useState('');
   const [userRoleFilter, setUserRoleFilter] = useState('all');
 
-  // State for dynamic users
+  // Dynamic user list
   const [usersList, setUsersList] = useState([
     {
       id: 'usr-owner-ikram',
@@ -44,25 +44,39 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       org: 'IK Enterprises',
       primaryLang: 'All Languages',
       specialty: 'Master Operations & Platform Owner',
+      hourlyRate: 0,
       wallet: { totalPaid: 1000, totalMinutesPurchased: 9999, minutesRemaining: 9999, billingType: 'unlimited_owner' },
       createdAt: '2026-08-30'
     }
   ]);
 
-  // Modal for creating / provisioning new accounts
+  // Modal for creating new accounts
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [newAccountRole, setNewAccountRole] = useState('host'); // 'admin', 'interpreter', 'host', 'test'
+  const [newAccountRole, setNewAccountRole] = useState('host'); // 'admin', 'interpreter', 'host'
   const [formName, setFormName] = useState('');
   const [formEmail, setFormEmail] = useState('');
   const [formPassword, setFormPassword] = useState('pass123');
   const [formOrg, setFormOrg] = useState('');
   const [formLang, setFormLang] = useState('Spanish');
   const [formSpecialty, setFormSpecialty] = useState('Medical / Healthcare');
-  const [formHourlyRate, setFormHourlyRate] = useState(55);
+  const [formHourlyRate, setFormHourlyRate] = useState(5);
   const [formInitialMinutes, setFormInitialMinutes] = useState(120);
   const [formBillingType, setFormBillingType] = useState('prepaid');
 
-  // Fetch users from backend on load
+  // Modal for EDITING existing accounts
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingUserId, setEditingUserId] = useState(null);
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editOrg, setEditOrg] = useState('');
+  const [editRole, setEditRole] = useState('host');
+  const [editLang, setEditLang] = useState('Spanish');
+  const [editSpecialty, setEditSpecialty] = useState('Medical / Healthcare');
+  const [editHourlyRate, setEditHourlyRate] = useState(5);
+  const [editMinutes, setEditMinutes] = useState(60);
+  const [editTotalPaid, setEditTotalPaid] = useState(0);
+
+  // Fetch users from backend
   const fetchUsers = () => {
     fetch('/api/admin/users')
       .then(res => res.json())
@@ -84,12 +98,12 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       name: formName,
       email: formEmail,
       password: formPassword,
-      role: newAccountRole === 'test' ? 'host' : newAccountRole,
+      role: newAccountRole,
       org: formOrg || (newAccountRole === 'admin' ? 'IK Enterprises Operations' : newAccountRole === 'interpreter' ? 'Certified Linguist Pool' : 'IK Enterprises Client'),
       primaryLang: formLang,
       specialty: formSpecialty,
-      hourlyRate: parseInt(formHourlyRate),
-      initialMinutes: parseInt(formInitialMinutes),
+      hourlyRate: parseInt(formHourlyRate) || 5,
+      initialMinutes: parseInt(formInitialMinutes) || 60,
       billingType: formBillingType
     };
 
@@ -103,14 +117,13 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
         if (data.success && data.user) {
           setUsersList(prev => [data.user, ...prev.filter(u => u.id !== data.user.id)]);
           setIsCreateModalOpen(false);
-          // Reset form
           setFormName('');
           setFormEmail('');
           setFormOrg('');
+          setFormHourlyRate(5);
         }
       })
       .catch(() => {
-        // Fallback local state
         const localUser = {
           id: `usr-${Date.now()}`,
           ...payload,
@@ -118,6 +131,52 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
         };
         setUsersList(prev => [localUser, ...prev]);
         setIsCreateModalOpen(false);
+      });
+  };
+
+  const handleOpenEditModal = (u) => {
+    setEditingUserId(u.id);
+    setEditName(u.name || '');
+    setEditEmail(u.email || '');
+    setEditOrg(u.org || '');
+    setEditRole(u.role || 'host');
+    setEditLang(u.primaryLang || 'Spanish');
+    setEditSpecialty(u.specialty || 'General');
+    setEditHourlyRate(u.hourlyRate !== undefined ? u.hourlyRate : (u.interpreterProfile?.hourlyRate !== undefined ? u.interpreterProfile.hourlyRate : 5));
+    setEditMinutes(u.wallet?.minutesRemaining !== undefined ? u.wallet.minutesRemaining : 60);
+    setEditTotalPaid(u.wallet?.totalPaid !== undefined ? u.wallet.totalPaid : 0);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveEdit = (e) => {
+    e.preventDefault();
+    const payload = {
+      name: editName,
+      email: editEmail,
+      org: editOrg,
+      role: editRole,
+      primaryLang: editLang,
+      specialty: editSpecialty,
+      hourlyRate: parseInt(editHourlyRate) || 5,
+      minutesRemaining: parseInt(editMinutes) || 0,
+      totalPaid: parseFloat(editTotalPaid) || 0
+    };
+
+    fetch(`/api/admin/users/${editingUserId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setUsersList(prev => prev.map(u => u.id === editingUserId ? { ...u, ...payload, wallet: data.wallet || u.wallet } : u));
+          setIsEditModalOpen(false);
+        }
+      })
+      .catch(() => {
+        setUsersList(prev => prev.map(u => u.id === editingUserId ? { ...u, ...payload } : u));
+        setIsEditModalOpen(false);
       });
   };
 
@@ -290,7 +349,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
                 <span>Account Provisioning & Management</span>
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                Create and manage Admins, Interpreters, Clients/Payers, and Test Accounts with full access
+                Create, edit rates, adjust balances, or remove accounts across the platform
               </p>
             </div>
 
@@ -388,6 +447,8 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
                 <tbody className="divide-y divide-slate-800/60">
                   {filteredUsers.map((u) => {
                     const isMasterOwner = u.isOwner || u.email === 'ik5928271@gmail.com';
+                    const activeRate = u.hourlyRate !== undefined ? u.hourlyRate : (u.interpreterProfile?.hourlyRate !== undefined ? u.interpreterProfile.hourlyRate : 5);
+
                     return (
                       <tr key={u.id} className="hover:bg-slate-800/30 transition">
                         <td className="py-3.5 px-4">
@@ -432,19 +493,28 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
 
                         <td className="py-3.5 px-4">
                           {u.role === 'interpreter' ? (
-                            <span className="font-mono text-emerald-400 font-bold">$55 / hr</span>
+                            <span className="font-mono text-emerald-400 font-bold">${activeRate} / hr</span>
                           ) : isMasterOwner ? (
                             <span className="text-amber-300 font-bold">Unlimited Root</span>
                           ) : (
                             <div>
                               <span className="font-bold text-white">{u.wallet?.minutesRemaining || 60} Mins</span>
-                              <span className="text-[10px] text-slate-400 block">${u.wallet?.totalPaid || 54} Paid</span>
+                              <span className="text-[10px] text-slate-400 block">${u.wallet?.totalPaid || 0} Paid</span>
                             </div>
                           )}
                         </td>
 
                         <td className="py-3.5 px-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
+                            {/* Edit Button for all accounts */}
+                            <button
+                              onClick={() => handleOpenEditModal(u)}
+                              title="Edit Account Details & Rates"
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+                            >
+                              <Edit className="w-3.5 h-3.5 text-brand-300" />
+                            </button>
+
                             {u.role === 'host' && (
                               <button
                                 onClick={() => handleGrantMinutes(u.id, 60)}
@@ -459,7 +529,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
                               <button
                                 onClick={() => handleDeleteUser(u.id)}
                                 title="Remove User Account"
-                                className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20"
+                                className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -474,7 +544,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
             </div>
           </div>
 
-          {/* PROVISION NEW ACCOUNT MODAL */}
+          {/* 1. PROVISION NEW ACCOUNT MODAL */}
           {isCreateModalOpen && (
             <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
               <div className="max-w-md w-full glass-panel p-6 sm:p-8 rounded-3xl border border-purple-500/40 shadow-2xl space-y-6 relative overflow-hidden">
@@ -485,7 +555,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
                     </div>
                     <div>
                       <h3 className="text-base font-bold text-white">Create New System Account</h3>
-                      <p className="text-xs text-slate-400">Provision account with custom access and balance</p>
+                      <p className="text-xs text-slate-400">Provision account with custom access and rates</p>
                     </div>
                   </div>
                   <button onClick={() => setIsCreateModalOpen(false)} className="text-slate-400 hover:text-white">
@@ -494,7 +564,6 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
                 </div>
 
                 <form onSubmit={handleCreateAccount} className="space-y-4 text-xs">
-                  {/* Role picker */}
                   <div className="space-y-1">
                     <label className="font-semibold text-slate-300">Account Type to Provision:</label>
                     <div className="grid grid-cols-3 gap-2">
@@ -554,7 +623,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
                         type="text"
                         value={formOrg}
                         onChange={(e) => setFormOrg(e.target.value)}
-                        placeholder="e.g. IK Enterprises / Hospital"
+                        placeholder="e.g. IK Enterprises"
                         className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
                       />
                     </div>
@@ -583,12 +652,13 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
                         </select>
                       </div>
                       <div className="space-y-1">
-                        <label className="font-semibold text-slate-300">Hourly Rate ($)</label>
+                        <label className="font-semibold text-slate-300">Hourly Rate ($ / hr)</label>
                         <input
                           type="number"
                           value={formHourlyRate}
                           onChange={(e) => setFormHourlyRate(e.target.value)}
                           className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
+                          min="1"
                         />
                       </div>
                     </div>
@@ -625,6 +695,134 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
                   >
                     <Plus className="w-4 h-4" />
                     <span>Create & Activate Account</span>
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* 2. EDIT ACCOUNT MODAL */}
+          {isEditModalOpen && (
+            <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+              <div className="max-w-md w-full glass-panel p-6 sm:p-8 rounded-3xl border border-brand-500/40 shadow-2xl space-y-6 relative overflow-hidden">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-brand-600 flex items-center justify-center text-white font-bold">
+                      <Edit className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-white">Edit Account & Rates</h3>
+                      <p className="text-xs text-slate-400">Update rates, email, organization, or minutes</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setIsEditModalOpen(false)} className="text-slate-400 hover:text-white">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveEdit} className="space-y-4 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="font-semibold text-slate-300">Full Name</label>
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="font-semibold text-slate-300">Email Address</label>
+                      <input
+                        type="email"
+                        value={editEmail}
+                        onChange={(e) => setEditEmail(e.target.value)}
+                        className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="font-semibold text-slate-300">Organization / Company</label>
+                      <input
+                        type="text"
+                        value={editOrg}
+                        onChange={(e) => setEditOrg(e.target.value)}
+                        className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="font-semibold text-slate-300">Account Role</label>
+                      <select
+                        value={editRole}
+                        onChange={(e) => setEditRole(e.target.value)}
+                        className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none bg-slate-900"
+                      >
+                        <option value="host">Client / Payer</option>
+                        <option value="interpreter">Certified Interpreter</option>
+                        <option value="admin">Administrator</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {editRole === 'interpreter' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="font-semibold text-slate-300">Primary Language</label>
+                        <select
+                          value={editLang}
+                          onChange={(e) => setEditLang(e.target.value)}
+                          className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none bg-slate-900"
+                        >
+                          {LANGUAGES.map(l => <option key={l.code} value={l.name}>{l.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="font-semibold text-slate-300">Hourly Rate ($ / hr)</label>
+                        <input
+                          type="number"
+                          value={editHourlyRate}
+                          onChange={(e) => setEditHourlyRate(e.target.value)}
+                          className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
+                          min="1"
+                          required
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {editRole === 'host' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="font-semibold text-slate-300">Remaining Minutes</label>
+                        <input
+                          type="number"
+                          value={editMinutes}
+                          onChange={(e) => setEditMinutes(e.target.value)}
+                          className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="font-semibold text-slate-300">Total Paid ($)</label>
+                        <input
+                          type="number"
+                          value={editTotalPaid}
+                          onChange={(e) => setEditTotalPaid(e.target.value)}
+                          className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    className="w-full py-3 rounded-xl bg-gradient-to-r from-brand-500 to-indigo-600 hover:from-brand-600 hover:to-indigo-700 text-white font-extrabold text-xs shadow-lg shadow-brand-500/30 transition flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Save Changes</span>
                   </button>
                 </form>
               </div>
@@ -670,7 +868,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
 
             </div>
 
-            {/* Language Demand & Quality Stats */}
+            {/* Operations Status */}
             <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-5">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-purple-400" />
@@ -741,26 +939,38 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {usersList.filter(u => u.role === 'interpreter').map((i) => (
-                <div key={i.id} className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3 hover:border-slate-700 transition">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-emerald-600 text-white font-black text-base flex items-center justify-center">
-                      {i.name.charAt(0)}
+              {usersList.filter(u => u.role === 'interpreter').map((i) => {
+                const rate = i.hourlyRate !== undefined ? i.hourlyRate : (i.interpreterProfile?.hourlyRate !== undefined ? i.interpreterProfile.hourlyRate : 5);
+                return (
+                  <div key={i.id} className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3 hover:border-slate-700 transition">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-emerald-600 text-white font-black text-base flex items-center justify-center">
+                          {i.name?.charAt(0) || 'I'}
+                        </div>
+                        <div className="overflow-hidden">
+                          <p className="text-xs font-bold text-white truncate">{i.name}</p>
+                          <p className="text-[11px] text-brand-300">{i.primaryLang || 'Spanish'} ⟷ English</p>
+                          <span className="text-[10px] text-emerald-400 font-semibold">● Online & Ready</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleOpenEditModal(i)}
+                        title="Edit Interpreter Rate & Details"
+                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+                      >
+                        <Edit className="w-3.5 h-3.5 text-brand-300" />
+                      </button>
                     </div>
-                    <div className="overflow-hidden">
-                      <p className="text-xs font-bold text-white truncate">{i.name}</p>
-                      <p className="text-[11px] text-brand-300">{i.primaryLang || 'Spanish'} ⟷ English</p>
-                      <span className="text-[10px] text-emerald-400 font-semibold">● Online & Ready</span>
-                    </div>
-                  </div>
 
-                  <div className="text-[11px] text-slate-400 border-t border-slate-800/80 pt-2 space-y-1">
-                    <p>Domain: <strong className="text-slate-200">{i.specialty || 'General / Healthcare'}</strong></p>
-                    <p>Email: <strong className="text-slate-300 font-mono text-[10px]">{i.email}</strong></p>
-                    <p>Rate: <strong className="text-white">${i.hourlyRate || 55} / hr</strong></p>
+                    <div className="text-[11px] text-slate-400 border-t border-slate-800/80 pt-2 space-y-1">
+                      <p>Domain: <strong className="text-slate-200">{i.specialty || 'General / Healthcare'}</strong></p>
+                      <p>Email: <strong className="text-slate-300 font-mono text-[10px]">{i.email}</strong></p>
+                      <p>Hourly Rate: <strong className="text-white font-mono font-bold">${rate} / hr</strong></p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
