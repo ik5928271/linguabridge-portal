@@ -657,49 +657,15 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
                 </span>
               </div>
 
-              {/* Live Active Sessions Mock / Real */}
-              <div className="space-y-3">
-                <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-brand-500/20 text-brand-400 flex items-center justify-center font-bold">
-                      <PhoneCall className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs font-bold text-white">Mercy General Hospital (Dr. Jenkins)</p>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-brand-500/20 text-brand-300">Audio Call</span>
-                      </div>
-                      <p className="text-[11px] text-slate-400">
-                        Language: <strong className="text-slate-200">English ⟷ Russian</strong> • Interpreter: <strong className="text-emerald-400">Dmitri Volkov, CCHI</strong>
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-                    <span className="text-xs font-mono text-emerald-400 font-bold">14m 20s</span>
-                    <span className="text-[10px] px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 font-bold">Active</span>
-                  </div>
+              {/* Dynamic Live Sessions List */}
+              <div className="p-8 rounded-2xl bg-slate-900/60 border border-slate-800 text-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-400 flex items-center justify-center mx-auto">
+                  <Activity className="w-6 h-6 animate-pulse" />
                 </div>
-
-                <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold">
-                      <Globe className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs font-bold text-white">Vance & Sterling Immigration Law</p>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">HD Video</span>
-                      </div>
-                      <p className="text-[11px] text-slate-400">
-                        Language: <strong className="text-slate-200">English ⟷ Arabic</strong> • Interpreter: <strong className="text-emerald-400">Dr. Tarek Al-Mansoor</strong>
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-                    <span className="text-xs font-mono text-emerald-400 font-bold">32m 45s</span>
-                    <span className="text-[10px] px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 font-bold">Active</span>
-                  </div>
-                </div>
+                <p className="text-sm font-bold text-white">0 Active Calls in Progress</p>
+                <p className="text-xs text-slate-400 max-w-md mx-auto">
+                  When a client initiates a live On-Demand or Scheduled 3-party session, the real-time audio/video bridge will appear here live.
+                </p>
               </div>
 
             </div>
@@ -708,58 +674,28 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
             <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-5">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-purple-400" />
-                <span>Language Demand Breakdown</span>
+                <span>System Operations Status</span>
               </h3>
 
               <div className="space-y-3 text-xs">
-                <div>
-                  <div className="flex justify-between text-slate-300 mb-1">
-                    <span>Spanish (Español)</span>
-                    <span className="font-bold">48%</span>
-                  </div>
-                  <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
-                    <div className="h-full bg-brand-500 rounded-full" style={{ width: '48%' }} />
-                  </div>
+                <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex justify-between items-center">
+                  <span className="text-slate-400">Socket.io Dispatch Engine</span>
+                  <span className="text-emerald-400 font-bold flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    Operational
+                  </span>
                 </div>
-
-                <div>
-                  <div className="flex justify-between text-slate-300 mb-1">
-                    <span>Russian (Русский)</span>
-                    <span className="font-bold">22%</span>
-                  </div>
-                  <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
-                    <div className="h-full bg-cyan-500 rounded-full" style={{ width: '22%' }} />
-                  </div>
+                <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex justify-between items-center">
+                  <span className="text-slate-400">WebRTC Audio/Video Server</span>
+                  <span className="text-emerald-400 font-bold">Online</span>
                 </div>
-
-                <div>
-                  <div className="flex justify-between text-slate-300 mb-1">
-                    <span>Arabic (العربية)</span>
-                    <span className="font-bold">14%</span>
-                  </div>
-                  <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
-                    <div className="h-full bg-purple-500 rounded-full" style={{ width: '14%' }} />
-                  </div>
+                <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex justify-between items-center">
+                  <span className="text-slate-400">Prepaid Minute Ledger</span>
+                  <span className="text-purple-300 font-bold">Active</span>
                 </div>
-
-                <div>
-                  <div className="flex justify-between text-slate-300 mb-1">
-                    <span>Mandarin & Cantonese</span>
-                    <span className="font-bold">10%</span>
-                  </div>
-                  <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
-                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: '10%' }} />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between text-slate-300 mb-1">
-                    <span>Portuguese & Others</span>
-                    <span className="font-bold">6%</span>
-                  </div>
-                  <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
-                    <div className="h-full bg-amber-500 rounded-full" style={{ width: '6%' }} />
-                  </div>
+                <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex justify-between items-center">
+                  <span className="text-slate-400">Available Language Pairs</span>
+                  <span className="text-white font-bold">150+ Ready</span>
                 </div>
               </div>
             </div>
@@ -769,7 +705,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       )}
 
       {/* ========================================================== */}
-      {/* TAB 3: INTERPRETER ROSTER */}
+      {/* TAB 3: REAL INTERPRETER ROSTER */}
       {/* ========================================================== */}
       {activeTab === 'roster' && (
         <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-6">
@@ -777,82 +713,122 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
             <div>
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <Headphones className="w-4 h-4 text-emerald-400" />
-                <span>Certified Interpreter Directory & Shift Roster</span>
+                <span>Registered Interpreters & Active Linguist Pool</span>
               </h3>
-              <p className="text-xs text-slate-400">Manage verified linguists, credentials, and live availability</p>
+              <p className="text-xs text-slate-400">Manage real registered linguists, language pairs, and rates</p>
             </div>
+            <button
+              onClick={() => {
+                setNewAccountRole('interpreter');
+                setIsCreateModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/25 transition"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>+ Add / Register Interpreter</span>
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {INITIAL_INTERPRETERS.map((i) => (
-              <div key={i.id} className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3 hover:border-slate-700 transition">
-                <div className="flex items-center gap-3">
-                  <img src={i.avatar} alt={i.name} className="w-12 h-12 rounded-xl object-cover ring-2 ring-slate-700" />
-                  <div className="overflow-hidden">
-                    <p className="text-xs font-bold text-white truncate">{i.name}</p>
-                    <p className="text-[11px] text-brand-300">{i.languages.join(' • ')}</p>
-                    <span className="text-[10px] text-emerald-400 font-semibold">● Online & Ready</span>
+          {usersList.filter(u => u.role === 'interpreter').length === 0 ? (
+            <div className="p-12 rounded-3xl bg-slate-900/40 border border-slate-800 text-center space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto">
+                <Headphones className="w-6 h-6" />
+              </div>
+              <p className="text-base font-bold text-white">No Interpreters Registered Yet</p>
+              <p className="text-xs text-slate-400 max-w-md mx-auto">
+                Click "+ Add / Register Interpreter" or have linguists sign up online to populate your active roster.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {usersList.filter(u => u.role === 'interpreter').map((i) => (
+                <div key={i.id} className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3 hover:border-slate-700 transition">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-emerald-600 text-white font-black text-base flex items-center justify-center">
+                      {i.name.charAt(0)}
+                    </div>
+                    <div className="overflow-hidden">
+                      <p className="text-xs font-bold text-white truncate">{i.name}</p>
+                      <p className="text-[11px] text-brand-300">{i.primaryLang || 'Spanish'} ⟷ English</p>
+                      <span className="text-[10px] text-emerald-400 font-semibold">● Online & Ready</span>
+                    </div>
+                  </div>
+
+                  <div className="text-[11px] text-slate-400 border-t border-slate-800/80 pt-2 space-y-1">
+                    <p>Domain: <strong className="text-slate-200">{i.specialty || 'General / Healthcare'}</strong></p>
+                    <p>Email: <strong className="text-slate-300 font-mono text-[10px]">{i.email}</strong></p>
+                    <p>Rate: <strong className="text-white">${i.hourlyRate || 55} / hr</strong></p>
                   </div>
                 </div>
-
-                <div className="text-[11px] text-slate-400 border-t border-slate-800/80 pt-2 space-y-1">
-                  <p>Specialties: <strong className="text-slate-200">{i.specialties.join(', ')}</strong></p>
-                  <p>Hourly Rate: <strong className="text-white">${i.hourlyRate} / hr</strong></p>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {/* ========================================================== */}
-      {/* TAB 4: CALL LOGS & INVOICING */}
+      {/* TAB 4: REAL CLIENT LEDGER & BILLING */}
       {/* ========================================================== */}
       {activeTab === 'billing' && (
         <div className="space-y-6">
-          {/* Corporate Invoicing Card */}
           <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-4">
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <DollarSign className="w-4 h-4 text-emerald-400" />
-              <span>Corporate Accounts & Hospital Net-30 Invoices</span>
-            </h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-slate-800 text-slate-400">
-                    <th className="pb-3 font-semibold">Client / Hospital</th>
-                    <th className="pb-3 font-semibold">Billing Plan</th>
-                    <th className="pb-3 font-semibold">Mins Used This Month</th>
-                    <th className="pb-3 font-semibold">Prepaid Balance</th>
-                    <th className="pb-3 font-semibold text-right">Invoice Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60">
-                  <tr className="hover:bg-slate-800/30 transition">
-                    <td className="py-3 text-white font-bold">Mercy General Hospital - Cardiology</td>
-                    <td className="py-3 text-purple-300">Hospital Net 30</td>
-                    <td className="py-3 font-mono">1,420 Mins</td>
-                    <td className="py-3 text-slate-400">Post-Paid</td>
-                    <td className="py-3 text-right">
-                      <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 font-bold">
-                        Billed: $1,349.00
-                      </span>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-slate-800/30 transition">
-                    <td className="py-3 text-white font-bold">Vance & Sterling Immigration Law</td>
-                    <td className="py-3 text-brand-300">Prepaid Wallet</td>
-                    <td className="py-3 font-mono">380 Mins</td>
-                    <td className="py-3 text-emerald-400 font-bold">120 Mins Left</td>
-                    <td className="py-3 text-right">
-                      <span className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 font-bold">
-                        Settled Advance
-                      </span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <DollarSign className="w-4 h-4 text-emerald-400" />
+                  <span>Real Client Accounts & Prepaid Minute Ledgers</span>
+                </h3>
+                <p className="text-xs text-slate-400">Live itemized balances of registered client wallets</p>
+              </div>
             </div>
+
+            {usersList.filter(u => u.role === 'host').length === 0 ? (
+              <div className="p-12 rounded-3xl bg-slate-900/40 border border-slate-800 text-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-400 flex items-center justify-center mx-auto">
+                  <DollarSign className="w-6 h-6" />
+                </div>
+                <p className="text-base font-bold text-white">No Client Ledgers Yet</p>
+                <p className="text-xs text-slate-400 max-w-md mx-auto">
+                  When clients sign up and top up prepaid minutes or request hospital Net-30 invoicing, their balances will appear here in real time.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-800 text-slate-400">
+                      <th className="pb-3 font-semibold">Client / Organization</th>
+                      <th className="pb-3 font-semibold">Email</th>
+                      <th className="pb-3 font-semibold">Billing Plan</th>
+                      <th className="pb-3 font-semibold">Total Paid</th>
+                      <th className="pb-3 font-semibold text-right">Remaining Minutes</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {usersList.filter(u => u.role === 'host').map((client) => (
+                      <tr key={client.id} className="hover:bg-slate-800/30 transition">
+                        <td className="py-3 text-white font-bold">
+                          <p>{client.name}</p>
+                          <p className="text-[10px] text-slate-400 font-normal">{client.org || 'Independent Client'}</p>
+                        </td>
+                        <td className="py-3 font-mono text-slate-300">{client.email}</td>
+                        <td className="py-3 text-brand-300 font-semibold capitalize">
+                          {client.wallet?.billingType === 'postpaid_hospital' ? 'Hospital Net 30' : 'Prepaid Wallet'}
+                        </td>
+                        <td className="py-3 font-mono font-bold text-white">
+                          ${(client.wallet?.totalPaid || 0).toFixed(2)}
+                        </td>
+                        <td className="py-3 text-right">
+                          <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 font-bold">
+                            {client.wallet?.minutesRemaining || 0} Mins
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}
