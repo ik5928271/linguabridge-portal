@@ -229,33 +229,47 @@ export default function AuthModal({
             {/* Role Selection */}
             <div className="space-y-1">
               <label className="font-semibold text-slate-300">I am joining as:</label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <button
                   type="button"
                   onClick={() => setRole('host')}
-                  className={`p-2.5 rounded-xl border text-left transition flex items-center gap-2 ${
+                  className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
                     role === 'host' ? 'bg-brand-600/20 border-brand-500 text-white ring-1 ring-brand-500' : 'bg-slate-900 border-slate-800 text-slate-400'
                   }`}
                 >
-                  <Building2 className="w-4 h-4 text-brand-400 shrink-0" />
-                  <div>
-                    <p className="font-bold text-[11px]">Client / Organization (Payer)</p>
-                    <p className="text-[9px] text-slate-400">Individual Client, Doctor, Law Firm, Hospital</p>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Building2 className="w-4 h-4 text-brand-400 shrink-0" />
+                    <p className="font-bold text-[11px] text-white">Client (Payer)</p>
                   </div>
+                  <p className="text-[9px] text-slate-400">Individual, Hospital, Law Firm</p>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setRole('interpreter')}
-                  className={`p-2.5 rounded-xl border text-left transition flex items-center gap-2 ${
+                  className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
                     role === 'interpreter' ? 'bg-emerald-600/20 border-emerald-500 text-white ring-1 ring-emerald-500' : 'bg-slate-900 border-slate-800 text-slate-400'
                   }`}
                 >
-                  <Headphones className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <div>
-                    <p className="font-bold text-[11px]">Certified Interpreter</p>
-                    <p className="text-[9px] text-slate-400">Professional Linguist</p>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Headphones className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <p className="font-bold text-[11px] text-white">Interpreter</p>
                   </div>
+                  <p className="text-[9px] text-slate-400">Certified Linguist Pool</p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setRole('admin')}
+                  className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
+                    role === 'admin' ? 'bg-purple-600/20 border-purple-500 text-white ring-1 ring-purple-500' : 'bg-slate-900 border-slate-800 text-slate-400'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <ShieldCheck className="w-4 h-4 text-purple-400 shrink-0" />
+                    <p className="font-bold text-[11px] text-white">Admin</p>
+                  </div>
+                  <p className="text-[9px] text-slate-400">Owner & Operations</p>
                 </button>
               </div>
             </div>
@@ -310,6 +324,17 @@ export default function AuthModal({
                     {SPECIALTIES.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
                   </select>
                 </div>
+              </div>
+            ) : role === 'admin' ? (
+              <div className="space-y-1">
+                <label className="font-semibold text-slate-300">Operations Title / Department</label>
+                <input
+                  type="text"
+                  value={orgName}
+                  onChange={(e) => setOrgName(e.target.value)}
+                  placeholder="e.g. Platform Owner / Operations Management"
+                  className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
+                />
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
