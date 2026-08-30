@@ -25,13 +25,34 @@ if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-// Clean Initial State Structure for Live Real-Time Testing
+// Default Master Owner & Platform Administrator
+const DEFAULT_OWNER = {
+  id: 'usr-owner-ikram',
+  name: 'Ikram-ul-haq Mian',
+  email: 'ik5928271@gmail.com',
+  password: 'admin123',
+  role: 'admin',
+  isOwner: true,
+  org: 'IK Enterprises',
+  createdAt: new Date().toISOString()
+};
+
+// Initial State Structure
 let store = {
-  users: [],
+  users: [DEFAULT_OWNER],
   interpreters: [],
   appointments: [],
   callLogs: [],
-  wallets: {}
+  wallets: {
+    'usr-owner-ikram': {
+      userId: 'usr-owner-ikram',
+      totalPaid: 1000.00,
+      totalMinutesPurchased: 9999,
+      minutesUsed: 0,
+      minutesRemaining: 9999,
+      billingType: 'unlimited_owner'
+    }
+  }
 };
 
 // Load existing store if available
@@ -40,6 +61,26 @@ function loadStore() {
     if (fs.existsSync(STORE_FILE)) {
       const data = fs.readFileSync(STORE_FILE, 'utf8');
       store = JSON.parse(data);
+
+      // Ensure Owner Account always exists with latest credentials
+      const ownerIndex = store.users.findIndex(u => u.email.toLowerCase() === DEFAULT_OWNER.email.toLowerCase() || u.isOwner);
+      if (ownerIndex >= 0) {
+        store.users[ownerIndex] = { ...store.users[ownerIndex], ...DEFAULT_OWNER };
+      } else {
+        store.users.unshift(DEFAULT_OWNER);
+      }
+
+      if (!store.wallets[DEFAULT_OWNER.id]) {
+        store.wallets[DEFAULT_OWNER.id] = {
+          userId: DEFAULT_OWNER.id,
+          totalPaid: 1000.00,
+          totalMinutesPurchased: 9999,
+          minutesUsed: 0,
+          minutesRemaining: 9999,
+          billingType: 'unlimited_owner'
+        };
+      }
+
       console.log(`[Database Loaded] Users: ${store.users.length}, Interpreters: ${store.interpreters.length}, Appointments: ${store.appointments.length}`);
     } else {
       saveStore();
@@ -154,7 +195,7 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// 2. Authentication: Register New Real Account
+// 2. Authentication: Register New Account (Public Sign Up only allows Client & Interpreter)
 app.post('/api/auth/register', (req, res) => {
   const { 
     name, 
@@ -184,7 +225,7 @@ app.post('/api/auth/register', (req, res) => {
     name,
     email: email.toLowerCase(),
     password: password || 'password123',
-    role: role || 'host', // 'host' (Client/Payer), 'interpreter', 'admin'
+    role: role || 'host', // 'host' (Client/Payer), 'interpreter'
     org: org || (role === 'host' ? 'Independent Client' : 'Language Services'),
     primaryLang,
     specialty,
@@ -242,26 +283,25 @@ app.post('/api/auth/login', (req, res) => {
     return res.status(400).json({ error: 'Email is required.' });
   }
 
-  // Check admin login shortcut
-  if (email.toLowerCase().includes('admin')) {
-    const adminUser = {
-      id: 'usr-admin-master',
-      name: 'Platform Administrator',
-      email: email.toLowerCase(),
-      role: 'admin',
-      org: 'LinguaBridge Operations Management'
-    };
-    return res.json({ success: true, user: adminUser });
+  const cleanEmail = email.toLowerCase().trim();
+
+  // Check default Owner Account (Ikram-ul-haq Mian)
+  if (cleanEmail === DEFAULT_OWNER.email.toLowerCase() || cleanEmail === 'admin@linguabridge.com' || cleanEmail.includes('admin')) {
+    const ownerUser = store.users.find(u => u.email.toLowerCase() === DEFAULT_OWNER.email.toLowerCase()) || DEFAULT_OWNER;
+    return res.json({ 
+      success: true, 
+      user: ownerUser,
+      wallet: store.wallets[ownerUser.id] || { totalPaid: 1000, totalMinutesPurchased: 9999, minutesUsed: 0, minutesRemaining: 9999, billingType: 'unlimited_owner' }
+    });
   }
 
-  const user = store.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+  const user = store.users.find(u => u.email.toLowerCase() === cleanEmail);
   if (!user) {
-    // If not found in database, allow instant creation for smooth real-time onboarding
-    const isInterp = email.includes('interp') || email.includes('elena') || email.includes('dmitri');
+    const isInterp = cleanEmail.includes('interp') || cleanEmail.includes('elena') || cleanEmail.includes('dmitri');
     const autoUser = {
       id: `usr-${Date.now().toString(36)}`,
       name: isInterp ? 'Certified Interpreter' : 'Client / Payer Account',
-      email: email.toLowerCase(),
+      email: cleanEmail,
       role: isInterp ? 'interpreter' : 'host',
       org: isInterp ? 'Certified Linguist Pool' : 'Client Account'
     };
@@ -278,12 +318,136 @@ app.post('/api/auth/login', (req, res) => {
   res.json({ success: true, user, wallet: userWallet });
 });
 
-// 4. Interpreters Roster
+// 4. Admin Account Management: Get all users & provision new accounts
+app.get('/api/admin/users', (req, res) => {
+  const userList = store.users.map(u => ({
+    ...u,
+    wallet: store.wallets[u.id] || null,
+    interpreterProfile: store.interpreters.find(i => i.userId === u.id || i.email === u.email) || null
+  }));
+  res.json(userList);
+});
+
+app.post('/api/admin/users', (req, res) => {
+  const { 
+    name, 
+    email, 
+    password, 
+    role, 
+    org, 
+    primaryLang = 'Spanish', 
+    specialty = 'General', 
+    hourlyRate = 55, 
+    initialMinutes = 60,
+    billingType = 'prepaid',
+    certifications = 'Certified Linguist'
+  } = req.body;
+
+  if (!name || !email) {
+    return res.status(400).json({ error: 'Name and email are required.' });
+  }
+
+  const userId = `usr-${Date.now().toString(36)}`;
+  const newUser = {
+    id: userId,
+    name,
+    email: email.toLowerCase().trim(),
+    password: password || 'admin123',
+    role: role || 'host', // 'admin', 'interpreter', 'host', 'guest'
+    org: org || (role === 'admin' ? 'IK Enterprises Operations' : role === 'interpreter' ? 'Linguist Pool' : 'Client Account'),
+    primaryLang,
+    specialty,
+    createdAt: new Date().toISOString()
+  };
+
+  store.users.push(newUser);
+
+  // If created as an Interpreter
+  if (role === 'interpreter') {
+    const newInterpreter = {
+      id: `int-${Date.now().toString(36)}`,
+      userId: newUser.id,
+      name: newUser.name,
+      email: newUser.email,
+      avatar: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 900000000)}?w=150&auto=format&fit=crop&q=80`,
+      languages: [primaryLang, 'English'],
+      primaryLang,
+      specialties: [specialty, 'General / Customer Support'],
+      status: 'online',
+      rating: 5.0,
+      totalCalls: 0,
+      hourlyRate: parseInt(hourlyRate) || 55,
+      certifications: [certifications],
+      bio: `Professional ${primaryLang} interpreter provisioned by administration.`
+    };
+    store.interpreters.push(newInterpreter);
+    io.emit('interpreter-registered', newInterpreter);
+  }
+
+  // If created as Client / Payer or Admin
+  store.wallets[userId] = {
+    userId,
+    totalPaid: role === 'admin' ? 1000 : (initialMinutes * 0.95),
+    totalMinutesPurchased: parseInt(initialMinutes) || 60,
+    minutesUsed: 0,
+    minutesRemaining: parseInt(initialMinutes) || 60,
+    billingType: billingType || 'prepaid'
+  };
+
+  saveStore();
+  res.json({ success: true, user: newUser, wallet: store.wallets[userId] });
+});
+
+// Grant / update minutes for any user
+app.post('/api/admin/users/:id/wallet', (req, res) => {
+  const { id } = req.params;
+  const { minutesToAdd, amountPaid } = req.body;
+  if (!store.wallets[id]) {
+    store.wallets[id] = {
+      userId: id,
+      totalPaid: 0,
+      totalMinutesPurchased: 0,
+      minutesUsed: 0,
+      minutesRemaining: 0,
+      billingType: 'prepaid'
+    };
+  }
+
+  const w = store.wallets[id];
+  if (minutesToAdd) {
+    w.totalMinutesPurchased += parseInt(minutesToAdd);
+    w.minutesRemaining += parseInt(minutesToAdd);
+  }
+  if (amountPaid) {
+    w.totalPaid += parseFloat(amountPaid);
+  }
+
+  saveStore();
+  res.json({ success: true, wallet: w });
+});
+
+// Delete user account
+app.delete('/api/admin/users/:id', (req, res) => {
+  const { id } = req.params;
+  const user = store.users.find(u => u.id === id);
+  if (user && user.isOwner) {
+    return res.status(403).json({ error: 'Master Platform Owner account cannot be deleted.' });
+  }
+
+  store.users = store.users.filter(u => u.id !== id);
+  store.interpreters = store.interpreters.filter(i => i.userId !== id && i.id !== id);
+  delete store.wallets[id];
+
+  saveStore();
+  res.json({ success: true, message: 'Account removed successfully.' });
+});
+
+// 5. Interpreters Roster
 app.get('/api/interpreters', (req, res) => {
   res.json(store.interpreters);
 });
 
-// 5. Update Interpreter Online/Offline Status
+// Update Interpreter Online/Offline Status
 app.post('/api/interpreters/:id/status', (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
@@ -393,20 +557,6 @@ app.get('/api/glossary', (req, res) => {
   res.json(results);
 });
 
-// 10. Clear All Data (Clean Slate Action)
-app.post('/api/reset-data', (req, res) => {
-  store = {
-    users: [],
-    interpreters: [],
-    appointments: [],
-    callLogs: [],
-    wallets: {}
-  };
-  saveStore();
-  io.emit('data-reset');
-  res.json({ success: true, message: 'All test data cleared successfully.' });
-});
-
 // ==========================================
 // SOCKET.IO REAL-TIME SIGNALING & ROOMS
 // ==========================================
@@ -450,7 +600,6 @@ io.on('connection', (socket) => {
 
     // Broadcast incoming call notification to all online interpreters
     io.emit('incoming-call-alert', dispatchRecord);
-    console.log(`[Dispatch Alert Broadcast] Language: ${dispatchRecord.targetLanguage} for ${dispatchRecord.hostName}`);
   });
 
   // Interpreter Accepts Call
@@ -513,8 +662,6 @@ io.on('connection', (socket) => {
 
     activeRooms[roomId].participants = activeRooms[roomId].participants.filter(p => p.socketId !== socket.id);
     activeRooms[roomId].participants.push(participant);
-
-    console.log(`[Room ${roomId}] ${participant.name} (${role}) entered. Total in room: ${activeRooms[roomId].participants.length}`);
 
     socket.emit('room-joined-success', {
       roomId,
@@ -618,7 +765,6 @@ const distPath = path.join(process.cwd(), 'dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
   app.get('*', (req, res) => {
-    // Avoid intercepting API routes
     if (!req.path.startsWith('/api') && !req.path.startsWith('/socket.io')) {
       res.sendFile(path.join(distPath, 'index.html'));
     }

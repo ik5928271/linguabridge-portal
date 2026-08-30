@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ShieldAlert, 
   Activity, 
@@ -14,246 +14,751 @@ import {
   DollarSign,
   Download,
   Star,
-  PhoneCall
+  PhoneCall,
+  UserPlus,
+  Plus,
+  Trash2,
+  Edit,
+  Key,
+  ShieldCheck,
+  CreditCard,
+  Sparkles,
+  RefreshCw,
+  X
 } from 'lucide-react';
-import { INITIAL_INTERPRETERS } from '../data/mockData';
+import { INITIAL_INTERPRETERS, LANGUAGES, SPECIALTIES } from '../data/mockData';
 
 export default function AdminDashboard({ callLogs = [], appointments = [] }) {
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'roster', 'billing'
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'roster', 'billing', 'users'
   const [searchTerm, setSearchTerm] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState('all');
 
-  const interpretersList = INITIAL_INTERPRETERS;
+  // State for dynamic users
+  const [usersList, setUsersList] = useState([
+    {
+      id: 'usr-owner-ikram',
+      name: 'Ikram-ul-haq Mian',
+      email: 'ik5928271@gmail.com',
+      role: 'admin',
+      isOwner: true,
+      org: 'IK Enterprises',
+      primaryLang: 'All Languages',
+      specialty: 'Master Operations & Platform Owner',
+      wallet: { totalPaid: 1000, totalMinutesPurchased: 9999, minutesRemaining: 9999, billingType: 'unlimited_owner' },
+      createdAt: '2026-08-30'
+    }
+  ]);
+
+  // Modal for creating / provisioning new accounts
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [newAccountRole, setNewAccountRole] = useState('host'); // 'admin', 'interpreter', 'host', 'test'
+  const [formName, setFormName] = useState('');
+  const [formEmail, setFormEmail] = useState('');
+  const [formPassword, setFormPassword] = useState('pass123');
+  const [formOrg, setFormOrg] = useState('');
+  const [formLang, setFormLang] = useState('Spanish');
+  const [formSpecialty, setFormSpecialty] = useState('Medical / Healthcare');
+  const [formHourlyRate, setFormHourlyRate] = useState(55);
+  const [formInitialMinutes, setFormInitialMinutes] = useState(120);
+  const [formBillingType, setFormBillingType] = useState('prepaid');
+
+  // Fetch users from backend on load
+  const fetchUsers = () => {
+    fetch('/api/admin/users')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setUsersList(data);
+        }
+      })
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const handleCreateAccount = (e) => {
+    e.preventDefault();
+    const payload = {
+      name: formName,
+      email: formEmail,
+      password: formPassword,
+      role: newAccountRole === 'test' ? 'host' : newAccountRole,
+      org: formOrg || (newAccountRole === 'admin' ? 'IK Enterprises Operations' : newAccountRole === 'interpreter' ? 'Certified Linguist Pool' : 'IK Enterprises Client'),
+      primaryLang: formLang,
+      specialty: formSpecialty,
+      hourlyRate: parseInt(formHourlyRate),
+      initialMinutes: parseInt(formInitialMinutes),
+      billingType: formBillingType
+    };
+
+    fetch('/api/admin/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.user) {
+          setUsersList(prev => [data.user, ...prev.filter(u => u.id !== data.user.id)]);
+          setIsCreateModalOpen(false);
+          // Reset form
+          setFormName('');
+          setFormEmail('');
+          setFormOrg('');
+        }
+      })
+      .catch(() => {
+        // Fallback local state
+        const localUser = {
+          id: `usr-${Date.now()}`,
+          ...payload,
+          wallet: { totalPaid: payload.initialMinutes * 0.95, minutesRemaining: payload.initialMinutes }
+        };
+        setUsersList(prev => [localUser, ...prev]);
+        setIsCreateModalOpen(false);
+      });
+  };
+
+  const handleGrantMinutes = (userId, minutes = 60) => {
+    fetch(`/api/admin/users/${userId}/wallet`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ minutesToAdd: minutes, amountPaid: minutes * 0.90 })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setUsersList(prev => prev.map(u => u.id === userId ? { ...u, wallet: data.wallet } : u));
+        }
+      })
+      .catch(() => {
+        setUsersList(prev => prev.map(u => {
+          if (u.id === userId) {
+            const currentMins = u.wallet?.minutesRemaining || 0;
+            return { ...u, wallet: { ...u.wallet, minutesRemaining: currentMins + minutes } };
+          }
+          return u;
+        }));
+      });
+  };
+
+  const handleDeleteUser = (userId) => {
+    if (confirm('Are you sure you want to delete this account?')) {
+      fetch(`/api/admin/users/${userId}`, { method: 'DELETE' })
+        .then(() => {
+          setUsersList(prev => prev.filter(u => u.id !== userId));
+        })
+        .catch(() => {
+          setUsersList(prev => prev.filter(u => u.id !== userId));
+        });
+    }
+  };
+
+  const filteredUsers = usersList.filter(user => {
+    const matchesSearch = 
+      (user.name && user.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (user.org && user.org.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    if (userRoleFilter === 'all') return matchesSearch;
+    if (userRoleFilter === 'admin') return matchesSearch && user.role === 'admin';
+    if (userRoleFilter === 'interpreter') return matchesSearch && user.role === 'interpreter';
+    if (userRoleFilter === 'host') return matchesSearch && user.role === 'host';
+    return matchesSearch;
+  });
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
       
-      {/* Header Banner */}
-      <div className="glass-panel p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      {/* Header Banner with Owner Profile */}
+      <div className="glass-panel p-6 rounded-3xl border border-purple-500/30 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
+        
         <div>
-          <div className="flex items-center gap-2 text-purple-400 text-xs font-bold uppercase tracking-wider mb-1">
-            <ShieldAlert className="w-4 h-4" />
-            <span>Platform Dispatch & Administration</span>
+          <div className="flex items-center gap-2 text-purple-400 text-xs font-bold uppercase tracking-wider mb-1.5">
+            <span className="px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Master Platform Owner & Dispatch</span>
+            </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white">
-            System Overview & Interpreter Operations
+          <h1 className="text-2xl sm:text-3xl font-black text-white flex items-center gap-3">
+            <span>IK Enterprises Control Center</span>
           </h1>
           <p className="text-sm text-slate-400 mt-1">
-            Real-time quality monitoring, language queue analytics, and billing ledger
+            Logged in as: <strong className="text-white">Ikram-ul-haq Mian</strong> (<span className="text-purple-300">ik5928271@gmail.com</span>) • Full Root Privileges
           </p>
         </div>
 
         {/* Tab switcher */}
-        <div className="flex items-center bg-slate-900/80 p-1 rounded-xl border border-slate-800">
+        <div className="flex flex-wrap items-center bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 shadow-inner">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
-              activeTab === 'overview' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+              activeTab === 'overview' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
             Live Monitor
           </button>
           <button
-            onClick={() => setActiveTab('roster')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
-              activeTab === 'roster' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+            onClick={() => setActiveTab('users')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+              activeTab === 'users' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
-            Interpreter Roster
+            <Users className="w-3.5 h-3.5" />
+            <span>User & Account Manager</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('roster')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+              activeTab === 'roster' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Interpreters
           </button>
           <button
             onClick={() => setActiveTab('billing')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
-              activeTab === 'billing' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+              activeTab === 'billing' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
-            Call Logs & Invoicing
+            Ledger & Billing
           </button>
         </div>
       </div>
 
-      {/* 4 Stat Cards */}
+      {/* 4 Quick Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="glass-panel p-5 rounded-2xl border border-slate-800">
+          <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
+            <span>Total Registered Accounts</span>
+            <Users className="w-4 h-4 text-purple-400" />
+          </div>
+          <p className="text-2xl font-black text-white mt-2">{usersList.length} Accounts</p>
+          <span className="text-[11px] text-purple-300 font-medium mt-1 inline-block">
+            Managed under IK Enterprises
+          </span>
+        </div>
+
         <div className="glass-panel p-5 rounded-2xl border border-slate-800">
           <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
             <span>Active 3-Way Calls</span>
             <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />
           </div>
-          <p className="text-2xl font-black text-white mt-2">18 Live</p>
+          <p className="text-2xl font-black text-white mt-2">Live WebRTC</p>
           <span className="text-[11px] text-emerald-400 font-medium mt-1 inline-block">
-            ● 0 calls waiting in queue
+            ● 0 dispatch wait time
           </span>
         </div>
 
         <div className="glass-panel p-5 rounded-2xl border border-slate-800">
           <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
-            <span>Online Interpreters</span>
+            <span>Available Interpreters</span>
             <Headphones className="w-4 h-4 text-brand-400" />
           </div>
-          <p className="text-2xl font-black text-white mt-2">42 Certified</p>
+          <p className="text-2xl font-black text-white mt-2">150+ Languages</p>
           <span className="text-[11px] text-slate-400 font-medium mt-1 inline-block">
-            Covering 36 language pairs
+            Russian, Spanish, Arabic, Hindi...
           </span>
         </div>
 
         <div className="glass-panel p-5 rounded-2xl border border-slate-800">
           <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
-            <span>Avg Connect Time</span>
-            <Clock className="w-4 h-4 text-amber-400" />
+            <span>Prepaid Balance System</span>
+            <DollarSign className="w-4 h-4 text-emerald-400" />
           </div>
-          <p className="text-2xl font-black text-emerald-400 mt-2">11.4 sec</p>
-          <span className="text-[11px] text-emerald-400 font-medium mt-1 inline-block">
-            ↓ 3.2s faster than SLA target
-          </span>
-        </div>
-
-        <div className="glass-panel p-5 rounded-2xl border border-slate-800">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
-            <span>Client Satisfaction</span>
-            <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-          </div>
-          <p className="text-2xl font-black text-amber-300 mt-2">4.97 / 5.0</p>
+          <p className="text-2xl font-black text-emerald-400 mt-2">Active</p>
           <span className="text-[11px] text-slate-400 font-medium mt-1 inline-block">
-            Based on 1,480 ratings
+            Advance Minute Wallets + Net 30
           </span>
         </div>
       </div>
 
-      {/* TAB 1: Live Overview & Demand Breakdown */}
+      {/* ========================================================== */}
+      {/* TAB 1: 👑 USER & ACCOUNT MANAGEMENT SUITE (MASTER ACCESS) */}
+      {/* ========================================================== */}
+      {activeTab === 'users' && (
+        <div className="space-y-6">
+          
+          {/* Action Toolbar */}
+          <div className="glass-panel p-6 rounded-3xl border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Users className="w-5 h-5 text-purple-400" />
+                <span>Account Provisioning & Management</span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Create and manage Admins, Interpreters, Clients/Payers, and Test Accounts with full access
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                onClick={() => {
+                  setNewAccountRole('host');
+                  setIsCreateModalOpen(true);
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold shadow-lg shadow-brand-600/25 transition"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>+ Create Client / Payer</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setNewAccountRole('interpreter');
+                  setIsCreateModalOpen(true);
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/25 transition"
+              >
+                <Headphones className="w-3.5 h-3.5" />
+                <span>+ Create Interpreter</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setNewAccountRole('admin');
+                  setIsCreateModalOpen(true);
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-lg shadow-purple-600/25 transition"
+              >
+                <ShieldAlert className="w-3.5 h-3.5" />
+                <span>+ Create Sub-Admin</span>
+              </button>
+            </div>
+          </div>
+
+          {/* User Filter and Search Bar */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="flex items-center bg-slate-900/80 p-1 rounded-xl border border-slate-800 text-xs font-bold">
+              <button
+                onClick={() => setUserRoleFilter('all')}
+                className={`px-3 py-1.5 rounded-lg transition ${userRoleFilter === 'all' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                All Accounts ({usersList.length})
+              </button>
+              <button
+                onClick={() => setUserRoleFilter('host')}
+                className={`px-3 py-1.5 rounded-lg transition ${userRoleFilter === 'host' ? 'bg-brand-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                Clients / Payers
+              </button>
+              <button
+                onClick={() => setUserRoleFilter('interpreter')}
+                className={`px-3 py-1.5 rounded-lg transition ${userRoleFilter === 'interpreter' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                Interpreters
+              </button>
+              <button
+                onClick={() => setUserRoleFilter('admin')}
+                className={`px-3 py-1.5 rounded-lg transition ${userRoleFilter === 'admin' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                Admins
+              </button>
+            </div>
+
+            <div className="relative flex-1 max-w-xs">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search by name, email, or org..."
+                className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+              />
+            </div>
+          </div>
+
+          {/* User Accounts Table */}
+          <div className="glass-panel rounded-3xl border border-slate-800 overflow-hidden shadow-2xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-800 bg-slate-900/50 text-slate-400">
+                    <th className="py-3.5 px-4 font-semibold">User & Organization</th>
+                    <th className="py-3.5 px-4 font-semibold">Email</th>
+                    <th className="py-3.5 px-4 font-semibold">Account Role</th>
+                    <th className="py-3.5 px-4 font-semibold">Language / Domain</th>
+                    <th className="py-3.5 px-4 font-semibold">Wallet / Rates</th>
+                    <th className="py-3.5 px-4 font-semibold text-right">Owner Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {filteredUsers.map((u) => {
+                    const isMasterOwner = u.isOwner || u.email === 'ik5928271@gmail.com';
+                    return (
+                      <tr key={u.id} className="hover:bg-slate-800/30 transition">
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-xl font-bold flex items-center justify-center text-white ${
+                              isMasterOwner ? 'bg-gradient-to-tr from-amber-500 to-purple-600 ring-2 ring-amber-400' :
+                              u.role === 'admin' ? 'bg-purple-600' :
+                              u.role === 'interpreter' ? 'bg-emerald-600' : 'bg-brand-600'
+                            }`}>
+                              {u.name?.charAt(0) || 'U'}
+                            </div>
+                            <div>
+                              <p className="font-bold text-white flex items-center gap-1.5">
+                                <span>{u.name}</span>
+                                {isMasterOwner && (
+                                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                                    👑 MASTER OWNER
+                                  </span>
+                                )}
+                              </p>
+                              <p className="text-[10px] text-slate-400">{u.org || 'IK Enterprises'}</p>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="py-3.5 px-4 font-mono text-slate-300">{u.email}</td>
+
+                        <td className="py-3.5 px-4">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${
+                            u.role === 'admin' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' :
+                            u.role === 'interpreter' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                            'bg-brand-500/20 text-brand-300 border border-brand-500/30'
+                          }`}>
+                            {u.role === 'host' ? 'Client (Payer)' : u.role}
+                          </span>
+                        </td>
+
+                        <td className="py-3.5 px-4 text-slate-300">
+                          <p className="font-medium">{u.primaryLang || 'English'}</p>
+                          <p className="text-[10px] text-slate-500">{u.specialty || 'General'}</p>
+                        </td>
+
+                        <td className="py-3.5 px-4">
+                          {u.role === 'interpreter' ? (
+                            <span className="font-mono text-emerald-400 font-bold">$55 / hr</span>
+                          ) : isMasterOwner ? (
+                            <span className="text-amber-300 font-bold">Unlimited Root</span>
+                          ) : (
+                            <div>
+                              <span className="font-bold text-white">{u.wallet?.minutesRemaining || 60} Mins</span>
+                              <span className="text-[10px] text-slate-400 block">${u.wallet?.totalPaid || 54} Paid</span>
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {u.role === 'host' && (
+                              <button
+                                onClick={() => handleGrantMinutes(u.id, 60)}
+                                title="Grant 60 Free Prepaid Minutes"
+                                className="px-2 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-[10px] font-bold border border-emerald-500/30"
+                              >
+                                +60 Mins
+                              </button>
+                            )}
+
+                            {!isMasterOwner && (
+                              <button
+                                onClick={() => handleDeleteUser(u.id)}
+                                title="Remove User Account"
+                                className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* PROVISION NEW ACCOUNT MODAL */}
+          {isCreateModalOpen && (
+            <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+              <div className="max-w-md w-full glass-panel p-6 sm:p-8 rounded-3xl border border-purple-500/40 shadow-2xl space-y-6 relative overflow-hidden">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-purple-600 flex items-center justify-center text-white font-bold">
+                      <UserPlus className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-white">Create New System Account</h3>
+                      <p className="text-xs text-slate-400">Provision account with custom access and balance</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setIsCreateModalOpen(false)} className="text-slate-400 hover:text-white">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleCreateAccount} className="space-y-4 text-xs">
+                  {/* Role picker */}
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-300">Account Type to Provision:</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setNewAccountRole('host')}
+                        className={`p-2 rounded-xl border text-center font-bold transition ${newAccountRole === 'host' ? 'bg-brand-600 text-white border-brand-500' : 'bg-slate-900 border-slate-800 text-slate-400'}`}
+                      >
+                        Client / Payer
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewAccountRole('interpreter')}
+                        className={`p-2 rounded-xl border text-center font-bold transition ${newAccountRole === 'interpreter' ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-900 border-slate-800 text-slate-400'}`}
+                      >
+                        Interpreter
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewAccountRole('admin')}
+                        className={`p-2 rounded-xl border text-center font-bold transition ${newAccountRole === 'admin' ? 'bg-purple-600 text-white border-purple-500' : 'bg-slate-900 border-slate-800 text-slate-400'}`}
+                      >
+                        Sub-Admin
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="font-semibold text-slate-300">Full Name</label>
+                      <input
+                        type="text"
+                        value={formName}
+                        onChange={(e) => setFormName(e.target.value)}
+                        placeholder="e.g. Maria Gonzalez"
+                        className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="font-semibold text-slate-300">Email Address</label>
+                      <input
+                        type="email"
+                        value={formEmail}
+                        onChange={(e) => setFormEmail(e.target.value)}
+                        placeholder="user@example.com"
+                        className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="font-semibold text-slate-300">Organization / Company</label>
+                      <input
+                        type="text"
+                        value={formOrg}
+                        onChange={(e) => setFormOrg(e.target.value)}
+                        placeholder="e.g. IK Enterprises / Hospital"
+                        className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="font-semibold text-slate-300">Password</label>
+                      <input
+                        type="text"
+                        value={formPassword}
+                        onChange={(e) => setFormPassword(e.target.value)}
+                        className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {newAccountRole === 'interpreter' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="font-semibold text-slate-300">Primary Language</label>
+                        <select
+                          value={formLang}
+                          onChange={(e) => setFormLang(e.target.value)}
+                          className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none bg-slate-900"
+                        >
+                          {LANGUAGES.map(l => <option key={l.code} value={l.name}>{l.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="font-semibold text-slate-300">Hourly Rate ($)</label>
+                        <input
+                          type="number"
+                          value={formHourlyRate}
+                          onChange={(e) => setFormHourlyRate(e.target.value)}
+                          className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {newAccountRole === 'host' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="font-semibold text-slate-300">Initial Minute Credits</label>
+                        <input
+                          type="number"
+                          value={formInitialMinutes}
+                          onChange={(e) => setFormInitialMinutes(e.target.value)}
+                          className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="font-semibold text-slate-300">Billing Settlement</label>
+                        <select
+                          value={formBillingType}
+                          onChange={(e) => setFormBillingType(e.target.value)}
+                          className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none bg-slate-900"
+                        >
+                          <option value="prepaid">Prepaid Minutes Wallet</option>
+                          <option value="postpaid_hospital">Hospital Net-30 Invoicing</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold text-xs shadow-lg shadow-purple-600/30 transition flex items-center justify-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Create & Activate Account</span>
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+        </div>
+      )}
+
+      {/* ========================================================== */}
+      {/* TAB 2: LIVE OPERATIONS MONITOR */}
+      {/* ========================================================== */}
       {activeTab === 'overview' && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
-            {/* Live Active Conference Rooms */}
-            <div className="lg:col-span-2 glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
+            {/* Live Call Map & Dispatch Queue */}
+            <div className="lg:col-span-2 glass-panel p-6 rounded-3xl border border-slate-800 space-y-6">
               <div className="flex items-center justify-between">
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-emerald-400" />
-                  <span>Real-Time Active Sessions Matrix</span>
-                </h3>
-                <span className="text-xs text-slate-400">Auto-refreshing live</span>
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-emerald-400" />
+                    <span>Live 3-Party Dispatch Queue</span>
+                  </h3>
+                  <p className="text-xs text-slate-400">Incoming match requests and active video/audio bridges</p>
+                </div>
+                <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Real-Time WebSockets</span>
+                </span>
               </div>
 
+              {/* Live Active Sessions Mock / Real */}
               <div className="space-y-3">
-                <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                      <span className="text-xs font-extrabold text-white">Mercy General Emergency</span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-brand-500/20 text-brand-300">
-                        Spanish (Medical)
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-300">
-                      Host: Dr. Jenkins ⟷ Interpreter: Elena Rodriguez ⟷ Client: Carlos H.
-                    </p>
-                  </div>
+                <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <span className="text-xs font-mono font-bold text-amber-400">14m 20s</span>
-                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                      Stable 1080p
-                    </span>
+                    <div className="w-10 h-10 rounded-xl bg-brand-500/20 text-brand-400 flex items-center justify-center font-bold">
+                      <PhoneCall className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-bold text-white">Mercy General Hospital (Dr. Jenkins)</p>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-brand-500/20 text-brand-300">Audio Call</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        Language: <strong className="text-slate-200">English ⟷ Russian</strong> • Interpreter: <strong className="text-emerald-400">Dmitri Volkov, CCHI</strong>
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+                    <span className="text-xs font-mono text-emerald-400 font-bold">14m 20s</span>
+                    <span className="text-[10px] px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 font-bold">Active</span>
                   </div>
                 </div>
 
-                <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                      <span className="text-xs font-extrabold text-white">Vance & Sterling Immigration</span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">
-                        Arabic (Legal)
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-300">
-                      Host: Marcus Vance, Esq. ⟷ Interpreter: Dr. Tarek Al-Mansoor ⟷ Client: Amira H.
-                    </p>
-                  </div>
+                <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <span className="text-xs font-mono font-bold text-amber-400">08m 45s</span>
-                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                      Stable 1080p
-                    </span>
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                      <span className="text-xs font-extrabold text-white">First Horizon Commercial Banking</span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">
-                        Mandarin (Financial)
-                      </span>
+                    <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold">
+                      <Globe className="w-5 h-5" />
                     </div>
-                    <p className="text-xs text-slate-300">
-                      Host: Loan Officer Sterling ⟷ Interpreter: Mei-Ling Chen ⟷ Client: Bao Wei
-                    </p>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-bold text-white">Vance & Sterling Immigration Law</p>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">HD Video</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        Language: <strong className="text-slate-200">English ⟷ Arabic</strong> • Interpreter: <strong className="text-emerald-400">Dr. Tarek Al-Mansoor</strong>
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-mono font-bold text-amber-400">22m 10s</span>
-                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                      Stable 1080p
-                    </span>
+                  <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+                    <span className="text-xs font-mono text-emerald-400 font-bold">32m 45s</span>
+                    <span className="text-[10px] px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 font-bold">Active</span>
                   </div>
                 </div>
               </div>
+
             </div>
 
-            {/* Language Demand Pie / Percentage Breakdown */}
-            <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
+            {/* Language Demand & Quality Stats */}
+            <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-5">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Globe className="w-4 h-4 text-brand-400" />
-                <span>Today's Language Demand</span>
+                <TrendingUp className="w-4 h-4 text-purple-400" />
+                <span>Language Demand Breakdown</span>
               </h3>
 
-              <div className="space-y-3 pt-2">
+              <div className="space-y-3 text-xs">
                 <div>
-                  <div className="flex justify-between text-xs font-semibold text-slate-300 mb-1">
+                  <div className="flex justify-between text-slate-300 mb-1">
                     <span>Spanish (Español)</span>
-                    <span className="text-brand-400">48%</span>
+                    <span className="font-bold">48%</span>
                   </div>
-                  <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                  <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
                     <div className="h-full bg-brand-500 rounded-full" style={{ width: '48%' }} />
                   </div>
                 </div>
 
                 <div>
-                  <div className="flex justify-between text-xs font-semibold text-slate-300 mb-1">
-                    <span>Mandarin / Cantonese</span>
-                    <span className="text-indigo-400">22%</span>
+                  <div className="flex justify-between text-slate-300 mb-1">
+                    <span>Russian (Русский)</span>
+                    <span className="font-bold">22%</span>
                   </div>
-                  <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-indigo-500 rounded-full" style={{ width: '22%' }} />
+                  <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                    <div className="h-full bg-cyan-500 rounded-full" style={{ width: '22%' }} />
                   </div>
                 </div>
 
                 <div>
-                  <div className="flex justify-between text-xs font-semibold text-slate-300 mb-1">
+                  <div className="flex justify-between text-slate-300 mb-1">
                     <span>Arabic (العربية)</span>
-                    <span className="text-emerald-400">14%</span>
+                    <span className="font-bold">14%</span>
                   </div>
-                  <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: '14%' }} />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between text-xs font-semibold text-slate-300 mb-1">
-                    <span>Vietnamese (Tiếng Việt)</span>
-                    <span className="text-amber-400">9%</span>
-                  </div>
-                  <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-amber-500 rounded-full" style={{ width: '9%' }} />
+                  <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                    <div className="h-full bg-purple-500 rounded-full" style={{ width: '14%' }} />
                   </div>
                 </div>
 
                 <div>
-                  <div className="flex justify-between text-xs font-semibold text-slate-300 mb-1">
-                    <span>French & Haitian Creole</span>
-                    <span className="text-purple-400">7%</span>
+                  <div className="flex justify-between text-slate-300 mb-1">
+                    <span>Mandarin & Cantonese</span>
+                    <span className="font-bold">10%</span>
                   </div>
-                  <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-purple-500 rounded-full" style={{ width: '7%' }} />
+                  <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: '10%' }} />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-slate-300 mb-1">
+                    <span>Portuguese & Others</span>
+                    <span className="font-bold">6%</span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                    <div className="h-full bg-amber-500 rounded-full" style={{ width: '6%' }} />
                   </div>
                 </div>
               </div>
@@ -263,253 +768,92 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
         </div>
       )}
 
-      {/* TAB 2: Interpreter Roster */}
+      {/* ========================================================== */}
+      {/* TAB 3: INTERPRETER ROSTER */}
+      {/* ========================================================== */}
       {activeTab === 'roster' && (
-        <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
+        <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <Headphones className="w-4 h-4 text-emerald-400" />
-              <span>Certified Interpreter Registry</span>
-            </h3>
-            <span className="text-xs text-slate-400">5 Verified Linguists on Shift</span>
+            <div>
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <Headphones className="w-4 h-4 text-emerald-400" />
+                <span>Certified Interpreter Directory & Shift Roster</span>
+              </h3>
+              <p className="text-xs text-slate-400">Manage verified linguists, credentials, and live availability</p>
+            </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-800 text-slate-400">
-                  <th className="pb-3 font-semibold">Interpreter</th>
-                  <th className="pb-3 font-semibold">Language Pairs</th>
-                  <th className="pb-3 font-semibold">Specialties</th>
-                  <th className="pb-3 font-semibold">Certifications</th>
-                  <th className="pb-3 font-semibold">Rating & Calls</th>
-                  <th className="pb-3 font-semibold">Status</th>
-                  <th className="pb-3 font-semibold text-right">Rate</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60">
-                {interpretersList.map((interp) => (
-                  <tr key={interp.id} className="hover:bg-slate-800/30 transition">
-                    <td className="py-3 font-bold text-white flex items-center gap-3">
-                      <img src={interp.avatar} alt={interp.name} className="w-9 h-9 rounded-xl object-cover" />
-                      <div>
-                        <p>{interp.name}</p>
-                        <p className="text-[10px] text-slate-400 font-normal">{interp.id}</p>
-                      </div>
-                    </td>
-                    <td className="py-3 text-slate-300">{interp.languages.join(', ')}</td>
-                    <td className="py-3 text-slate-400">{interp.specialties.join(', ')}</td>
-                    <td className="py-3">
-                      <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium">
-                        {interp.certifications[0]}
-                      </span>
-                    </td>
-                    <td className="py-3 font-semibold text-amber-400">
-                      ★ {interp.rating} <span className="text-slate-400 font-normal">({interp.totalCalls})</span>
-                    </td>
-                    <td className="py-3">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                        interp.status === 'online' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-800 text-slate-400'
-                      }`}>
-                        {interp.status.toUpperCase()}
-                      </span>
-                    </td>
-                    <td className="py-3 text-right font-bold text-white">\${interp.hourlyRate}/hr</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {INITIAL_INTERPRETERS.map((i) => (
+              <div key={i.id} className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3 hover:border-slate-700 transition">
+                <div className="flex items-center gap-3">
+                  <img src={i.avatar} alt={i.name} className="w-12 h-12 rounded-xl object-cover ring-2 ring-slate-700" />
+                  <div className="overflow-hidden">
+                    <p className="text-xs font-bold text-white truncate">{i.name}</p>
+                    <p className="text-[11px] text-brand-300">{i.languages.join(' • ')}</p>
+                    <span className="text-[10px] text-emerald-400 font-semibold">● Online & Ready</span>
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-slate-400 border-t border-slate-800/80 pt-2 space-y-1">
+                  <p>Specialties: <strong className="text-slate-200">{i.specialties.join(', ')}</strong></p>
+                  <p>Hourly Rate: <strong className="text-white">${i.hourlyRate} / hr</strong></p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      {/* TAB 3: Client Minute Wallets, Call Logs & Invoicing */}
+      {/* ========================================================== */}
+      {/* TAB 4: CALL LOGS & INVOICING */}
+      {/* ========================================================== */}
       {activeTab === 'billing' && (
         <div className="space-y-6">
-          
-          {/* 🌟 1. CLIENT PREPAID MINUTE WALLETS & ENTERPRISE LEDGER */}
-          <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <DollarSign className="w-4 h-4 text-emerald-400" />
-                  <span>Client Prepaid Minute Accounts & Corporate Ledger</span>
-                </h3>
-                <p className="text-xs text-slate-400">Real-time overview of clients charged in advance vs hospital post-paid credit lines</p>
-              </div>
-              <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-                Total Prepaid Liability: 840 Mins ($756.00)
-              </span>
-            </div>
-
+          {/* Corporate Invoicing Card */}
+          <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-4">
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-emerald-400" />
+              <span>Corporate Accounts & Hospital Net-30 Invoices</span>
+            </h3>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-slate-800 text-slate-400">
-                    <th className="pb-3 font-semibold">Client & Account</th>
-                    <th className="pb-3 font-semibold">Billing Architecture</th>
-                    <th className="pb-3 font-semibold">Total Paid ($)</th>
-                    <th className="pb-3 font-semibold">Minutes Credited</th>
-                    <th className="pb-3 font-semibold">Minutes Used</th>
-                    <th className="pb-3 font-semibold">Remaining Balance</th>
-                    <th className="pb-3 font-semibold text-right">Account Action</th>
+                    <th className="pb-3 font-semibold">Client / Hospital</th>
+                    <th className="pb-3 font-semibold">Billing Plan</th>
+                    <th className="pb-3 font-semibold">Mins Used This Month</th>
+                    <th className="pb-3 font-semibold">Prepaid Balance</th>
+                    <th className="pb-3 font-semibold text-right">Invoice Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
                   <tr className="hover:bg-slate-800/30 transition">
-                    <td className="py-3 font-bold text-white">
-                      <p>Dr. Sarah Jenkins, MD</p>
-                      <p className="text-[10px] text-slate-400 font-normal">Cardiology Dept (#CL-8492)</p>
-                    </td>
-                    <td className="py-3">
-                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
-                        Prepaid (Charged Upfront)
+                    <td className="py-3 text-white font-bold">Mercy General Hospital - Cardiology</td>
+                    <td className="py-3 text-purple-300">Hospital Net 30</td>
+                    <td className="py-3 font-mono">1,420 Mins</td>
+                    <td className="py-3 text-slate-400">Post-Paid</td>
+                    <td className="py-3 text-right">
+                      <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 font-bold">
+                        Billed: $1,349.00
                       </span>
                     </td>
-                    <td className="py-3 font-bold text-white">$153.00</td>
-                    <td className="py-3 text-brand-400 font-bold">180 mins</td>
-                    <td className="py-3 text-amber-400 font-semibold">95 mins</td>
-                    <td className="py-3 font-black text-emerald-400 text-sm">85 mins left</td>
-                    <td className="py-3 text-right">
-                      <button 
-                        onClick={() => alert('Credit adjustment modal for Dr. Sarah Jenkins')}
-                        className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold transition"
-                      >
-                        Adjust Credits
-                      </button>
-                    </td>
                   </tr>
-
                   <tr className="hover:bg-slate-800/30 transition">
-                    <td className="py-3 font-bold text-white">
-                      <p>Vance & Sterling Immigration</p>
-                      <p className="text-[10px] text-slate-400 font-normal">Marcus Vance, Esq. (#CL-7104)</p>
-                    </td>
-                    <td className="py-3">
-                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
-                        Prepaid (Charged Upfront)
-                      </span>
-                    </td>
-                    <td className="py-3 font-bold text-white">$300.00</td>
-                    <td className="py-3 text-brand-400 font-bold">360 mins</td>
-                    <td className="py-3 text-amber-400 font-semibold">210 mins</td>
-                    <td className="py-3 font-black text-emerald-400 text-sm">150 mins left</td>
+                    <td className="py-3 text-white font-bold">Vance & Sterling Immigration Law</td>
+                    <td className="py-3 text-brand-300">Prepaid Wallet</td>
+                    <td className="py-3 font-mono">380 Mins</td>
+                    <td className="py-3 text-emerald-400 font-bold">120 Mins Left</td>
                     <td className="py-3 text-right">
-                      <button 
-                        onClick={() => alert('Credit adjustment modal for Vance & Sterling')}
-                        className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold transition"
-                      >
-                        Adjust Credits
-                      </button>
-                    </td>
-                  </tr>
-
-                  <tr className="hover:bg-slate-800/30 transition">
-                    <td className="py-3 font-bold text-white">
-                      <p>Sr. Carlos Hernandez (Self-Payer)</p>
-                      <p className="text-[10px] text-slate-400 font-normal">Spanish Client Account (#CL-3921)</p>
-                    </td>
-                    <td className="py-3">
-                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
-                        Prepaid (Charged Upfront)
+                      <span className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 font-bold">
+                        Settled Advance
                       </span>
-                    </td>
-                    <td className="py-3 font-bold text-white">$54.00</td>
-                    <td className="py-3 text-brand-400 font-bold">60 mins</td>
-                    <td className="py-3 text-amber-400 font-semibold">30 mins</td>
-                    <td className="py-3 font-black text-emerald-400 text-sm">30 mins left</td>
-                    <td className="py-3 text-right">
-                      <button 
-                        onClick={() => alert('Credit adjustment modal for Carlos Hernandez')}
-                        className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold transition"
-                      >
-                        Adjust Credits
-                      </button>
-                    </td>
-                  </tr>
-
-                  <tr className="hover:bg-slate-800/30 transition bg-purple-950/10">
-                    <td className="py-3 font-bold text-white">
-                      <p>Mercy General Health System</p>
-                      <p className="text-[10px] text-slate-400 font-normal">Hospital System (#HOSP-8921)</p>
-                    </td>
-                    <td className="py-3">
-                      <span className="px-2.5 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20 font-bold">
-                        Post-Paid (Net 30 Invoiced After Delivery)
-                      </span>
-                    </td>
-                    <td className="py-3 font-bold text-purple-300">Monthly Net 30</td>
-                    <td className="py-3 text-slate-400">Unlimited Corp</td>
-                    <td className="py-3 text-amber-400 font-bold">482 mins this mo</td>
-                    <td className="py-3 font-bold text-purple-300">$457.90 accrued</td>
-                    <td className="py-3 text-right">
-                      <button 
-                        onClick={() => alert('Generated Net 30 Statement for Mercy General')}
-                        className="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-[11px] font-bold transition"
-                      >
-                        Send Monthly Bill
-                      </button>
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
           </div>
-
-          {/* 2. COMPLETED CALL LOGS */}
-          <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-brand-400" />
-                  <span>Completed Session Logs & Itemized Charges</span>
-                </h3>
-                <p className="text-xs text-slate-400">Call-by-call breakdown of prepaid deductions and post-paid records</p>
-              </div>
-              <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700">
-                <Download className="w-3.5 h-3.5" />
-                <span>Export CSV</span>
-              </button>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-slate-800 text-slate-400">
-                    <th className="pb-3 font-semibold">Date & Time</th>
-                    <th className="pb-3 font-semibold">Host / Payer</th>
-                    <th className="pb-3 font-semibold">Client & Language</th>
-                    <th className="pb-3 font-semibold">Interpreter</th>
-                    <th className="pb-3 font-semibold">Duration</th>
-                    <th className="pb-3 font-semibold">Settlement Method</th>
-                    <th className="pb-3 font-semibold text-right">Rating</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60">
-                  {callLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-slate-800/30 transition">
-                      <td className="py-3 font-medium text-white">{log.date}</td>
-                      <td className="py-3 text-slate-300">
-                        <p className="font-semibold">{log.hostName}</p>
-                        <p className="text-[10px] text-slate-500">{log.hostOrg}</p>
-                      </td>
-                      <td className="py-3 text-slate-300">{log.clientName}</td>
-                      <td className="py-3 text-emerald-400 font-medium">{log.interpreterName}</td>
-                      <td className="py-3 font-mono text-slate-300">{log.duration}</td>
-                      <td className="py-3">
-                        <span className="text-xs font-bold text-white">
-                          {log.cost}
-                        </span>
-                        <span className="text-[10px] text-emerald-400 block font-medium">Prepaid Deducted</span>
-                      </td>
-                      <td className="py-3 text-right text-amber-400 font-bold">★ {log.rating}.0</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
         </div>
       )}
 
