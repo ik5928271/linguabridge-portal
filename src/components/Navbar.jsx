@@ -98,7 +98,7 @@ export default function Navbar({
               Pricing & Minutes
             </button>
           </nav>
-        ) : currentUser.role === 'admin' ? (
+        ) : currentUser?.role === 'admin' ? (
           /* 2. ADMIN USER NAVIGATION (Master access to all dashboards) */
           <div className="flex items-center bg-slate-900/90 p-1 rounded-xl border border-purple-500/40 shadow-inner">
             <button
@@ -146,7 +146,7 @@ export default function Navbar({
               <span>Interpreter</span>
             </button>
           </div>
-        ) : currentUser.role === 'interpreter' ? (
+        ) : currentUser?.role === 'interpreter' ? (
           /* 3. LOGGED-IN INTERPRETER NAVIGATION */
           <div className="flex items-center bg-slate-900/90 p-1 rounded-xl border border-emerald-500/30">
             <button
@@ -216,7 +216,7 @@ export default function Navbar({
                 <div className="text-left hidden sm:block">
                   <p className="text-[11px] font-bold text-white leading-tight truncate max-w-[110px]">{currentUser.name || 'User'}</p>
                   <p className="text-[9px] text-slate-400 capitalize">
-                    {currentUser.role === 'admin' ? 'Administrator' : currentUser.role === 'interpreter' ? 'Interpreter' : 'Client / Payer'}
+                    {currentUser?.role === 'admin' ? 'Administrator' : currentUser?.role === 'interpreter' ? 'Interpreter' : 'Client / Payer'}
                   </p>
                 </div>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
@@ -228,13 +228,13 @@ export default function Navbar({
                     <p className="font-bold text-white truncate">{currentUser.name || 'User'}</p>
                     <p className="text-[10px] text-slate-400 truncate">{currentUser.email || ''}</p>
                     <span className="inline-block mt-1 text-[9px] font-bold px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-300">
-                      {currentUser.role === 'admin' ? '👑 Admin Account' : currentUser.role === 'interpreter' ? '🎧 Certified Linguist' : '💳 Client / Payer Account'}
+                      {currentUser?.role === 'admin' ? '👑 Admin Account' : currentUser?.role === 'interpreter' ? '🎧 Certified Linguist' : '💳 Client / Payer Account'}
                     </span>
                   </div>
 
                   <button
                     onClick={() => {
-                      setCurrentView(currentUser.role === 'admin' ? 'admin' : currentUser.role === 'interpreter' ? 'interpreter' : 'host');
+                      setCurrentView(currentUser?.role === 'admin' ? 'admin' : currentUser?.role === 'interpreter' ? 'interpreter' : 'host');
                       setShowUserMenu(false);
                     }}
                     className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-200 flex items-center gap-2 transition"
