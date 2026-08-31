@@ -162,6 +162,11 @@ let store = {
   wallets: { ...SEED_WALLETS }
 };
 
+import { MongoClient } from 'mongodb';
+
+let db = null;
+const MONGODB_URI = process.env.MONGODB_URI;
+
 // Load existing store if available
 function loadStore() {
   try {
@@ -206,15 +211,81 @@ function loadStore() {
   }
 }
 
-function saveStore() {
+async function initMongo() {
+  if (!MONGODB_URI) {
+    console.log('[Database] Running in Local Persistent Mode (store.json). To activate 24/7 Cloud DB, add MONGODB_URI in Render environment.');
+    return;
+  }
+  try {
+    const client = new MongoClient(MONGODB_URI);
+    await client.connect();
+    db = client.db('linguabridge');
+    console.log('✅ [MongoDB Atlas Connected Successfully] Permanent 24/7 Cloud Database Active!');
+
+    // Sync Users from MongoDB
+    const mongoUsers = await db.collection('users').find({}).toArray();
+    if (mongoUsers.length > 0) {
+      store.users = mongoUsers.map(({ _id, ...u }) => u);
+    } else {
+      for (const u of store.users) {
+        await db.collection('users').updateOne({ id: u.id }, { $set: u }, { upsert: true }).catch(() => {});
+      }
+    }
+
+    // Sync Wallets from MongoDB
+    const mongoWallets = await db.collection('wallets').find({}).toArray();
+    if (mongoWallets.length > 0) {
+      mongoWallets.forEach(({ _id, ...w }) => {
+        if (w.userId) store.wallets[w.userId] = w;
+      });
+    } else {
+      for (const uId of Object.keys(store.wallets)) {
+        await db.collection('wallets').updateOne({ userId: uId }, { $set: store.wallets[uId] }, { upsert: true }).catch(() => {});
+      }
+    }
+
+    // Sync Appointments & Call Logs
+    const mongoAppointments = await db.collection('appointments').find({}).toArray();
+    if (mongoAppointments.length > 0) {
+      store.appointments = mongoAppointments.map(({ _id, ...a }) => a);
+    }
+
+    const mongoCallLogs = await db.collection('call_logs').find({}).toArray();
+    if (mongoCallLogs.length > 0) {
+      store.callLogs = mongoCallLogs.map(({ _id, ...c }) => c);
+    }
+
+    store.interpreters = store.users.filter(u => u.role === 'interpreter');
+    console.log(`[MongoDB Sync Complete] Real Users: ${store.users.length}, Wallets: ${Object.keys(store.wallets).length}, Appointments: ${store.appointments.length}`);
+  } catch (err) {
+    console.error('❌ [MongoDB Connection Warning]:', err.message);
+  }
+}
+
+async function saveStore() {
   try {
     fs.writeFileSync(STORE_FILE, JSON.stringify(store, null, 2), 'utf8');
+    if (db) {
+      for (const u of store.users) {
+        await db.collection('users').updateOne({ id: u.id }, { $set: u }, { upsert: true }).catch(() => {});
+      }
+      for (const uId of Object.keys(store.wallets)) {
+        await db.collection('wallets').updateOne({ userId: uId }, { $set: store.wallets[uId] }, { upsert: true }).catch(() => {});
+      }
+      for (const a of store.appointments) {
+        await db.collection('appointments').updateOne({ id: a.id }, { $set: a }, { upsert: true }).catch(() => {});
+      }
+      for (const c of store.callLogs) {
+        await db.collection('call_logs').updateOne({ id: c.id }, { $set: c }, { upsert: true }).catch(() => {});
+      }
+    }
   } catch (err) {
-    console.error('Error saving store.json:', err);
+    console.error('Error saving store:', err);
   }
 }
 
 loadStore();
+initMongo();
 
 // Comprehensive Glossary Reference (Multilingual)
 const glossary = [
