@@ -28,7 +28,9 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
   const [phone, setPhone] = useState('');
   const [country, setCountry] = useState('United States');
   const [primaryLang, setPrimaryLang] = useState('Spanish');
+  const [customPrimaryLang, setCustomPrimaryLang] = useState('');
   const [selectedLanguages, setSelectedLanguages] = useState(['Spanish', 'English']);
+  const [customWorkingLangInput, setCustomWorkingLangInput] = useState('');
   const [selectedSpecialties, setSelectedSpecialties] = useState(['Medical / Healthcare']);
   const [certificationsText, setCertificationsText] = useState('');
   const [experienceYears, setExperienceYears] = useState(3);
@@ -52,6 +54,21 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
       }
     } else {
       setSelectedLanguages(prev => [...prev, langName]);
+    }
+  };
+
+  const handleAddCustomWorkingLang = (e) => {
+    if (e) e.preventDefault();
+    const trimmed = customWorkingLangInput.trim();
+    if (trimmed && !selectedLanguages.some(l => l.toLowerCase() === trimmed.toLowerCase())) {
+      setSelectedLanguages(prev => [...prev, trimmed]);
+      setCustomWorkingLangInput('');
+    }
+  };
+
+  const handleRemoveCustomLang = (langName) => {
+    if (selectedLanguages.length > 1) {
+      setSelectedLanguages(prev => prev.filter(l => l !== langName));
     }
   };
 
@@ -96,22 +113,37 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
       return;
     }
 
+    const resolvedPrimary = primaryLang === 'Other' ? (customPrimaryLang.trim() || 'Custom Language') : primaryLang;
+
+    if (primaryLang === 'Other' && !customPrimaryLang.trim()) {
+      setErrorMessage('Please specify your custom primary language.');
+      return;
+    }
+
     setIsSubmitting(true);
+
+    let finalLanguages = [...selectedLanguages];
+    if (resolvedPrimary && !finalLanguages.some(l => l.toLowerCase() === resolvedPrimary.toLowerCase())) {
+      finalLanguages.push(resolvedPrimary);
+    }
+    if (!finalLanguages.some(l => l.toLowerCase() === 'english')) {
+      finalLanguages.push('English');
+    }
 
     const payload = {
       name: fullName.trim(),
       email: email.trim().toLowerCase(),
       phone: phone.trim(),
       country: country.trim(),
-      primaryLang,
-      languages: selectedLanguages.includes('English') ? selectedLanguages : [...selectedLanguages, 'English'],
+      primaryLang: resolvedPrimary,
+      languages: finalLanguages,
       specialties: selectedSpecialties,
       certifications: certificationsText 
         ? certificationsText.split(',').map(c => c.trim()).filter(Boolean)
         : ['Certified Professional Linguist'],
       experienceYears: parseInt(experienceYears) || 1,
       hourlyRate: parseInt(hourlyRate) || 5,
-      bio: bio.trim() || `Professional ${primaryLang} interpreter with ${experienceYears} years experience.`,
+      bio: bio.trim() || `Professional ${resolvedPrimary} interpreter with ${experienceYears} years experience.`,
       cvFileName: cvFile ? cvFile.name : 'Resume_CV_Submitted.pdf',
       cvFileData: 'simulated_cv_attachment_data',
       docFileName: docFile ? docFile.name : 'Certification_Proof.pdf',
@@ -145,6 +177,8 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
     setFullName('');
     setEmail('');
     setPhone('');
+    setCustomPrimaryLang('');
+    setCustomWorkingLangInput('');
     setCvFile(null);
     setDocFile(null);
     setErrorMessage('');
@@ -189,7 +223,9 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
               </div>
               <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
                 <span className="text-slate-400">Primary Language:</span>
-                <span className="font-bold text-brand-300">{primaryLang}</span>
+                <span className="font-bold text-brand-300">
+                  {primaryLang === 'Other' ? (customPrimaryLang || 'Custom Language') : primaryLang}
+                </span>
               </div>
               <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
                 <span className="text-slate-400">CV Attached:</span>
@@ -306,26 +342,58 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-300 block mb-1.5">Primary Target Language</label>
+                  <label className="text-[11px] font-semibold text-slate-300 block mb-1.5">Primary Target Language *</label>
                   <select
                     value={primaryLang}
                     onChange={(e) => {
-                      setPrimaryLang(e.target.value);
-                      if (!selectedLanguages.includes(e.target.value)) {
-                        setSelectedLanguages(prev => [...prev, e.target.value]);
+                      const val = e.target.value;
+                      setPrimaryLang(val);
+                      if (val !== 'Other' && !selectedLanguages.includes(val)) {
+                        setSelectedLanguages(prev => [...prev, val]);
                       }
                     }}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-brand-500"
                   >
+                    <option value="English">🇺🇸 English (English)</option>
                     {LANGUAGES.map(l => (
                       <option key={l.code} value={l.name}>{l.flag} {l.name} ({l.nativeName})</option>
                     ))}
+                    <option value="Other">🌐 Other / Custom Language...</option>
                   </select>
+
+                  {primaryLang === 'Other' && (
+                    <div className="mt-2">
+                      <input
+                        type="text"
+                        required
+                        placeholder="Type custom primary language (e.g. Pashto, Somali, Bengali...)"
+                        value={customPrimaryLang}
+                        onChange={(e) => setCustomPrimaryLang(e.target.value)}
+                        className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-brand-500 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-300 block mb-1.5">All Working Languages (Click to toggle)</label>
-                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-2 bg-slate-950/80 rounded-xl border border-slate-800">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-[11px] font-semibold text-slate-300">
+                      All Working Languages ({selectedLanguages.length} selected)
+                    </label>
+                    <span className="text-[10px] text-slate-400">Click to toggle</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-2 bg-slate-950/80 rounded-xl border border-slate-800 mb-2">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleLang('English')}
+                      className={`px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 transition ${
+                        selectedLanguages.includes('English') ? 'bg-brand-600 text-white shadow' : 'bg-slate-900 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <span>🇺🇸</span>
+                      <span>English</span>
+                      {selectedLanguages.includes('English') && <Check className="w-3 h-3 ml-0.5" />}
+                    </button>
                     {LANGUAGES.map(l => {
                       const isSel = selectedLanguages.includes(l.name);
                       return (
@@ -343,6 +411,49 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
                         </button>
                       );
                     })}
+
+                    {/* Custom added languages list with remove icon */}
+                    {selectedLanguages.filter(lang => lang !== 'English' && !LANGUAGES.some(l => l.name === lang)).map(customLang => (
+                      <span
+                        key={customLang}
+                        className="px-2 py-1 rounded-lg text-[10px] font-bold bg-indigo-600/90 text-white shadow flex items-center gap-1"
+                      >
+                        <span>🌐</span>
+                        <span>{customLang}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveCustomLang(customLang)}
+                          className="hover:text-red-300 transition ml-0.5 p-0.5"
+                          title="Remove custom language"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Add Custom Working Language Input */}
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      placeholder="Add another language (e.g. Pashto, Somali, Kurdish...)"
+                      value={customWorkingLangInput}
+                      onChange={(e) => setCustomWorkingLangInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddCustomWorkingLang();
+                        }
+                      }}
+                      className="flex-1 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddCustomWorkingLang}
+                      className="px-3 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs transition flex items-center gap-1 shrink-0 shadow"
+                    >
+                      <span>+ Add</span>
+                    </button>
                   </div>
                 </div>
               </div>

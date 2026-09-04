@@ -14,6 +14,31 @@ import AuthModal from './components/AuthModal';
 import InterpreterApplicationModal from './components/InterpreterApplicationModal';
 
 export default function App() {
+  // Theme state ('dark' or 'light')
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('linguabridge_theme') || 'dark';
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'light') {
+      root.classList.add('light');
+      root.classList.remove('dark');
+      document.body.classList.add('light-theme');
+      document.body.classList.remove('dark-theme');
+    } else {
+      root.classList.add('dark');
+      root.classList.remove('light');
+      document.body.classList.add('dark-theme');
+      document.body.classList.remove('light-theme');
+    }
+    localStorage.setItem('linguabridge_theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  };
+
   // Navigation & Role states
   const [currentRole, setCurrentRole] = useState('host'); // 'host', 'interpreter', 'guest', 'admin'
   const [currentView, setCurrentView] = useState('landing'); // 'landing', 'host', 'interpreter', 'guest', 'admin', 'room', 'split-demo'
@@ -169,6 +194,8 @@ export default function App() {
           currentView={currentView}
           setCurrentView={setCurrentView}
           currentUser={currentUser}
+          theme={theme}
+          onToggleTheme={toggleTheme}
           onOpenAuth={handleOpenAuth}
           onOpenInterpreterApplication={() => setIsInterpreterAppOpen(true)}
           onLogout={handleLogout}

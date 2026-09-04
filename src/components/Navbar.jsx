@@ -16,7 +16,9 @@ import {
   ChevronDown,
   Zap,
   CreditCard,
-  CheckCircle2
+  CheckCircle2,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 export default function Navbar({ 
@@ -25,6 +27,8 @@ export default function Navbar({
   currentView, 
   setCurrentView,
   currentUser,
+  theme = 'dark',
+  onToggleTheme,
   onOpenAuth,
   onLogout,
   onOpenGlossary,
@@ -180,6 +184,27 @@ export default function Navbar({
         {/* Right Tools & Auth Suite */}
         <div className="flex items-center gap-2 shrink-0">
           
+          {/* Dark / Light Theme Toggle Button */}
+          <button
+            type="button"
+            onClick={onToggleTheme}
+            title={theme === 'light' ? 'Switch to Dark Theme' : 'Switch to Light Theme'}
+            aria-label="Toggle Dark / Light Theme"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium border border-slate-700 transition"
+          >
+            {theme === 'light' ? (
+              <>
+                <Moon className="w-3.5 h-3.5 text-indigo-400" />
+                <span className="hidden xl:inline">Dark</span>
+              </>
+            ) : (
+              <>
+                <Sun className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden xl:inline">Light</span>
+              </>
+            )}
+          </button>
+
           {/* Terminology Glossary button */}
           <button
             onClick={onOpenGlossary}
