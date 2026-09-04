@@ -12,6 +12,7 @@ import ScheduleModal from './components/ScheduleModal';
 import GlossaryModal from './components/GlossaryModal';
 import AuthModal from './components/AuthModal';
 import InterpreterApplicationModal from './components/InterpreterApplicationModal';
+import AppointmentNotificationManager from './components/AppointmentNotificationManager';
 
 export default function App() {
   // Theme state ('dark' or 'light')
@@ -321,6 +322,13 @@ export default function App() {
       <GlossaryModal
         isOpen={isGlossaryOpen}
         onClose={() => setIsGlossaryOpen(false)}
+      />
+
+      {/* Global 10-Minute Reminders & Multi-Party Appointment Notifications */}
+      <AppointmentNotificationManager
+        currentUser={currentUser}
+        appointments={appointments}
+        onStartCall={handleStartCall}
       />
 
     </div>

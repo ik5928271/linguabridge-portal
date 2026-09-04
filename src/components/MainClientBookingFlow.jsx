@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import { LANGUAGES, SPECIALTIES, INITIAL_INTERPRETERS, getInterpretersForLanguage } from '../data/mockData';
 import PrepaidWalletModal from './PrepaidWalletModal';
+import { getSocket } from '../services/socket';
 
 export default function MainClientBookingFlow({ 
   onStartCall, 
@@ -112,7 +113,7 @@ export default function MainClientBookingFlow({
   const [bookingType, setBookingType] = useState('scheduled'); // 'instant' or 'scheduled'
   const [bookingDate, setBookingDate] = useState('2026-08-30');
   const [bookingTime, setBookingTime] = useState('02:30 PM');
-  const [timezone, setTimezone] = useState('Eastern Time (ET - US/Canada)');
+  const [timezone, setTimezone] = useState('London (GMT / BST - United Kingdom)');
   const [durationMinutes, setDurationMinutes] = useState(30);
   const [callType, setCallType] = useState('audio'); // 'audio' by default
   
@@ -128,9 +129,9 @@ export default function MainClientBookingFlow({
   const [showQrModal, setShowQrModal] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
-  // Calculate pricing
-  const hourlyRate = selectedInterpreter?.hourlyRate || 5;
-  const estimatedCost = ((durationMinutes / 60) * hourlyRate).toFixed(2);
+  // Calculate client pricing (Platform Client Rate, never internal linguist wage)
+  const clientRatePerHour = 54.00; // Standard platform client billing rate
+  const estimatedCost = ((durationMinutes / 60) * clientRatePerHour).toFixed(2);
   const platformFee = '3.50';
   const totalCost = (parseFloat(estimatedCost) + parseFloat(platformFee)).toFixed(2);
 
@@ -171,7 +172,7 @@ export default function MainClientBookingFlow({
         guestName,
         language: selectedLanguage,
         specialty: selectedSpecialty,
-        interpreter: selectedInterpreter || { name: 'Assigned Certified Linguist', primaryLang: selectedLanguage, hourlyRate: hourlyRate || 5 },
+        interpreter: selectedInterpreter || { name: 'Assigned Certified Linguist', primaryLang: selectedLanguage },
         bookingType,
         date: bookingDate,
         time: bookingTime,
@@ -184,10 +185,24 @@ export default function MainClientBookingFlow({
         createdAt: new Date().toISOString()
       };
 
+
       setGeneratedSession(newSession);
       if (onSaveAppointment) {
         onSaveAppointment(newSession);
       }
+
+      // Save to Backend API & Emit Live Socket Event to all Parties (Client, Interpreter, Admin)
+      fetch('/api/appointments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSession)
+      }).catch(() => {});
+
+      const socket = getSocket();
+      if (socket) {
+        socket.emit('new-appointment-created', newSession);
+      }
+
       setCurrentStep(5);
     }, 1200);
   };
@@ -565,7 +580,15 @@ END:VCALENDAR`;
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <h4 className="text-sm font-bold text-white truncate">{interp.name}</h4>
-                        <span className="text-xs font-black text-emerald-400 shrink-0">${interp.hourlyRate || 5}/hr</span>
+                        {clientBillingType === 'prepaid' ? (
+                          <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 shrink-0">
+                            Included (1:1 Mins)
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold text-brand-300 bg-brand-500/10 px-2 py-0.5 rounded-full border border-brand-500/20 shrink-0">
+                            $0.90/min Client Rate
+                          </span>
+                        )}
                       </div>
                       <p className="text-[11px] text-slate-300 font-medium">
                         {(interp.languages || [interp.primaryLang || selectedLanguage, 'English']).join(' ⟷ ')}
@@ -730,12 +753,15 @@ END:VCALENDAR`;
                     onChange={(e) => setTimezone(e.target.value)}
                     className="w-full glass-input px-3.5 py-2.5 rounded-xl text-xs text-white focus:outline-none bg-slate-950 border border-slate-700"
                   >
-                    <option value="Eastern Time (ET - US/Canada)">Eastern Time (ET)</option>
-                    <option value="Central Time (CT - US/Canada)">Central Time (CT)</option>
-                    <option value="Mountain Time (MT - US/Canada)">Mountain Time (MT)</option>
-                    <option value="Pacific Time (PT - US/Canada)">Pacific Time (PT)</option>
-                    <option value="London (GMT / BST)">London (GMT)</option>
-                    <option value="UTC (Coordinated Universal Time)">UTC</option>
+                    <option value="London (GMT / BST - United Kingdom)">🇬🇧 London (GMT / BST - UK)</option>
+                    <option value="Central European Time (CET / CEST)">🇪🇺 Central European Time (CET)</option>
+                    <option value="Eastern Time (ET - US/Canada)">🇺🇸 Eastern Time (ET)</option>
+                    <option value="Central Time (CT - US/Canada)">🇺🇸 Central Time (CT)</option>
+                    <option value="Mountain Time (MT - US/Canada)">🇺🇸 Mountain Time (MT)</option>
+                    <option value="Pacific Time (PT - US/Canada)">🇺🇸 Pacific Time (PT)</option>
+                    <option value="Gulf Standard Time (GST - Dubai)">🇦🇪 Gulf Standard Time (GST)</option>
+                    <option value="Pakistan Standard Time (PKT)">🇵🇰 Pakistan Standard Time (PKT)</option>
+                    <option value="UTC (Coordinated Universal Time)">🌐 UTC (Universal Time)</option>
                   </select>
                 </div>
 
@@ -1048,7 +1074,7 @@ END:VCALENDAR`;
                 <p className="font-extrabold text-white text-sm">
                   {generatedSession.bookingType === 'scheduled' ? `${generatedSession.date} at ${generatedSession.time}` : 'Instant On-Demand'}
                 </p>
-                <p className="text-[10px] text-emerald-400 font-semibold">{generatedSession.timezone || 'Eastern Time'}</p>
+                <p className="text-[10px] text-emerald-400 font-semibold">{generatedSession.timezone || 'London (GMT / BST)'}</p>
               </div>
 
               {/* Field 2: Language & Specialty */}
@@ -1187,6 +1213,8 @@ END:VCALENDAR`;
                   specialty: generatedSession.specialty,
                   patientName: generatedSession.guestName,
                   hostName: generatedSession.mainClientName,
+                  interpreter: generatedSession.interpreter,
+                  interpreterName: generatedSession.interpreter?.name || 'Certified Interpreter',
                   callType: generatedSession.callType
                 });
               }}

@@ -10,7 +10,6 @@ import {
   BookOpen, 
   Hand, 
   Volume2, 
-  Maximize2, 
   ShieldCheck, 
   Sparkles, 
   Send, 
@@ -19,14 +18,13 @@ import {
   Headphones, 
   Clock, 
   Star, 
-  FileText, 
-  AlertTriangle, 
   Check, 
   X,
   Layers,
   Search,
-  ExternalLink,
-  ChevronDown
+  CheckCircle2,
+  Award,
+  Radio
 } from 'lucide-react';
 import { QUICK_PHRASES, LANGUAGES } from '../data/mockData';
 import { 
@@ -36,42 +34,47 @@ import {
   playPauseFloorAlert, 
   setSpeechEnabled 
 } from '../services/audioService';
+import { getSocket } from '../services/socket';
 
 export default function ThreeWayCallRoom({ 
   sessionData = {}, 
   onEndCall, 
   onOpenGlossary 
 }) {
-  const hostName = sessionData.hostName || sessionData.mainClientName || 'English Host';
+  const hostName = sessionData.hostName || sessionData.mainClientName || 'Main Client (Payer)';
   const interpreterName = sessionData.interpreter?.name || sessionData.interpreterName || 'Certified Interpreter';
-  const patientName = sessionData.patientName || sessionData.guestName || 'Guest Client';
-  const targetLanguage = sessionData.targetLanguage || 'Spanish';
-  const specialty = sessionData.specialty || 'General';
+  const interpreterCert = Array.isArray(sessionData.interpreter?.certifications) 
+    ? sessionData.interpreter.certifications[0] 
+    : (sessionData.interpreter?.certifications || 'Certified Professional Linguist');
+  const interpreterAvatar = sessionData.interpreter?.avatar || null;
+  const patientName = sessionData.patientName || sessionData.guestName || 'Non-English Client';
+  const targetLanguage = sessionData.targetLanguage || sessionData.language || 'Urdu';
+  const specialty = sessionData.specialty || 'General / Customer Support';
   const role = sessionData.role || 'host';
-  const roomId = sessionData.roomId || 'room-default';
+  const roomId = sessionData.roomId || `room-${Date.now().toString(36).slice(-6)}`;
   const callType = sessionData.callType || 'audio';
 
-  // Real Audible Voice Output State (Default: True)
+  // Real Audible Voice Output State
   const [isVoiceActive, setIsVoiceActive] = useState(true);
 
-  // Media States for Current User (Default: Audio Call)
+  // Media States for Current User
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(callType === 'video' ? false : true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const [activeSpeaker, setActiveSpeaker] = useState('host'); // 'host', 'interpreter', 'guest'
+  const [activeSpeaker, setActiveSpeaker] = useState(role); // 'host', 'interpreter', 'guest'
   const [viewLayout, setViewLayout] = useState('grid'); // 'grid', 'focus'
   const [focusParticipant, setFocusParticipant] = useState('interpreter');
 
-  // Play connection chime & initial greeting on room entry
-  useEffect(() => {
-    playConnectedChime();
-    const timeout = setTimeout(() => {
-      if (isVoiceActive) {
-        speakText(`Connected. ${hostName} is in the room with certified interpreter ${interpreterName} and guest ${patientName}.`, 'en-US');
-      }
-    }, 800);
-    return () => clearTimeout(timeout);
-  }, []);
+  // Real microphone audio level detection
+  const [micAudioLevel, setMicAudioLevel] = useState(0);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const mediaStreamRef = useRef(null);
+
+  // Real Speech-to-Text Recognition
+  const [isListeningSpeech, setIsListeningSpeech] = useState(false);
+  const [speechTranscript, setSpeechTranscript] = useState('');
+  const recognitionRef = useRef(null);
 
   // Call Duration Timer
   const [seconds, setSeconds] = useState(0);
@@ -86,6 +89,13 @@ export default function ThreeWayCallRoom({
     return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
+  // Connected Participants in this Room via Socket
+  const [roomParticipants, setRoomParticipants] = useState([
+    { role: 'host', name: hostName, status: 'connected' },
+    { role: 'interpreter', name: interpreterName, status: 'connected' },
+    { role: 'guest', name: patientName, status: 'connected' }
+  ]);
+
   // Chat drawer & Interpreter Drawer States
   const [activeDrawer, setActiveDrawer] = useState('chat'); // 'chat', 'glossary', 'none'
   const [chatMessages, setChatMessages] = useState([
@@ -93,18 +103,18 @@ export default function ThreeWayCallRoom({
       id: 'm1',
       sender: 'System',
       role: 'system',
-      text: 'Encrypted 3-party interpretation session established. WebRTC peer connection active.',
+      text: `Secure 3-Party Room (${roomId}) established between ${hostName}, ${interpreterName} (${targetLanguage}), and ${patientName}.`,
       timestamp: '00:01'
     }
   ]);
   const [messageInput, setMessageInput] = useState('');
 
-  // Live Captions / Transcripts
+  // Live Captions / Spoken Transcripts
   const [liveCaption, setLiveCaption] = useState({
-    speaker: 'System',
-    speakerRole: 'system',
-    enText: 'Live 3-party conference active. Speak into your microphone or type messages in chat.',
-    targetText: `Connecting ${targetLanguage} audio feed.`
+    speaker: interpreterName,
+    speakerRole: 'interpreter',
+    enText: `Live 3-party session active between ${hostName} and ${patientName}. Certified ${targetLanguage} interpretation in progress.`,
+    targetText: `Audio connected. Speak clearly into your microphone.`
   });
 
   // Interpreter Pause Banner Alert
@@ -117,94 +127,201 @@ export default function ThreeWayCallRoom({
   // Debrief Modal on End
   const [showDebrief, setShowDebrief] = useState(false);
   const [callRating, setCallRating] = useState(5);
-  const [sessionNotes, setSessionNotes] = useState('3-party interpretation consultation completed successfully.');
+  const [sessionNotes, setSessionNotes] = useState('3-party interpretation session completed successfully.');
 
-  // Rotate simulated active speaker periodically & speak audio aloud through speakers
+  // Initialize Socket.io Connection for this room
   useEffect(() => {
-    const speakerSequence = ['host', 'interpreter', 'guest', 'interpreter'];
-    let idx = 0;
-    const interval = setInterval(() => {
-      idx = (idx + 1) % speakerSequence.length;
-      const current = speakerSequence[idx];
-      setActiveSpeaker(current);
+    playConnectedChime();
+    const socket = getSocket();
 
-      if (current === 'host') {
-        const enLine = 'We reviewed the recent blood lab results and electrolyte levels are completely normal.';
-        setLiveCaption({
-          speaker: hostName,
-          speakerRole: 'host',
-          enText: enLine,
-          targetText: 'Revisamos los resultados recientes de laboratorio de sangre y los niveles de electrolitos son completamente normales.'
+    if (socket) {
+      socket.emit('join-room', {
+        roomId,
+        role,
+        participantName: role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName,
+        language: targetLanguage,
+        specialty
+      });
+
+      socket.on('new-chat-message', (msg) => {
+        setChatMessages(prev => [...prev, msg]);
+        playMessageTone();
+      });
+
+      socket.on('interpreter-pause-alert', (alert) => {
+        setPauseBanner(alert);
+        playPauseFloorAlert();
+        setTimeout(() => setPauseBanner(null), 8000);
+      });
+
+      socket.on('participant-joined', (p) => {
+        setChatMessages(prev => [
+          ...prev, 
+          {
+            id: `sys-${Date.now()}`,
+            sender: 'System',
+            role: 'system',
+            text: `${p.name} (${p.role}) has entered the 3-party room.`,
+            timestamp: formatTimer(seconds)
+          }
+        ]);
+      });
+    }
+
+    // Initialize real microphone audio stream & volume level meter
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+        .then((stream) => {
+          mediaStreamRef.current = stream;
+          try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) {
+              const audioCtx = new AudioCtx();
+              audioContextRef.current = audioCtx;
+              const analyser = audioCtx.createAnalyser();
+              analyserRef.current = analyser;
+              analyser.fftSize = 64;
+              const source = audioCtx.createMediaStreamSource(stream);
+              source.connect(analyser);
+
+              const dataArray = new Uint8Array(analyser.frequencyBinCount);
+              const checkVolume = () => {
+                if (!analyserRef.current || isMuted) {
+                  setMicAudioLevel(0);
+                } else {
+                  analyserRef.current.getByteFrequencyData(dataArray);
+                  let sum = 0;
+                  for (let i = 0; i < dataArray.length; i++) {
+                    sum += dataArray[i];
+                  }
+                  const avg = sum / dataArray.length;
+                  const normalized = Math.min(100, Math.floor((avg / 128) * 100));
+                  setMicAudioLevel(normalized);
+
+                  if (normalized > 15) {
+                    setActiveSpeaker(role);
+                  }
+                }
+                requestAnimationFrame(checkVolume);
+              };
+              requestAnimationFrame(checkVolume);
+            }
+          } catch (e) {
+            console.warn('Web Audio meter not available in current environment:', e);
+          }
+        })
+        .catch(() => {
+          console.log('Microphone permission not granted or running in simulation.');
         });
-        if (isVoiceActive) {
-          speakText(enLine, 'en-US', { pitch: 1.0, rate: 0.95 });
-        }
-      } else if (current === 'interpreter') {
-        const spanishLine = 'El doctor indica que sus análisis de sangre salieron normales.';
-        setLiveCaption({
-          speaker: 'Elena Rodriguez (Interpreter)',
-          speakerRole: 'interpreter',
-          enText: `[Interpreting into ${targetLanguage}] "${spanishLine}"`,
-          targetText: `[Traduciendo al ${targetLanguage}] "${spanishLine}"`
-        });
-        if (isVoiceActive) {
-          speakText(spanishLine, targetLanguage, { pitch: 1.05, rate: 0.95 });
-        }
-      } else if (current === 'guest') {
-        const guestLine = 'Muchas gracias doctor, me he sentido mucho mejor esta semana.';
-        setLiveCaption({
-          speaker: `${patientName} (Client)`,
-          speakerRole: 'guest',
-          enText: '[Client speaking Spanish] "Muchas gracias doctor, me he sentido mucho mejor esta semana."',
-          targetText: '[Traducción al inglés] "Thank you very much doctor, I have felt much better this week."'
-        });
-        if (isVoiceActive) {
-          speakText(guestLine, targetLanguage, { pitch: 0.92, rate: 0.95 });
-        }
+    }
+
+    // Initialize browser Web Speech Recognition if available
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      try {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = role === 'guest' ? (targetLanguage === 'Urdu' ? 'ur-PK' : targetLanguage === 'Arabic' ? 'ar-SA' : 'es-ES') : 'en-US';
+
+        recognition.onresult = (event) => {
+          const current = event.resultIndex;
+          const transcript = event.results[current][0].transcript;
+          setSpeechTranscript(transcript);
+          
+          const speakerDisplayName = role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName;
+          setLiveCaption({
+            speaker: speakerDisplayName,
+            speakerRole: role,
+            enText: transcript,
+            targetText: `[Live transcription from ${speakerDisplayName}]`
+          });
+        };
+
+        recognition.onerror = () => {};
+        recognition.start();
+        recognitionRef.current = recognition;
+        setIsListeningSpeech(true);
+      } catch (e) {
+        console.warn('Speech recognition initialized:', e);
       }
-    }, 6500);
+    }
 
-    return () => clearInterval(interval);
-  }, [hostName, patientName, targetLanguage, isVoiceActive]);
+    return () => {
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(t => t.stop());
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(() => {});
+      }
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch(e){}
+      }
+    };
+  }, []);
 
-  // Send message
+  // Send message in 3-Way Chat
   const handleSendMessage = (e) => {
     e.preventDefault();
     if (!messageInput.trim()) return;
 
-    // Simple automatic translation generator for interactive demo feel
-    let autoTrans = `[${targetLanguage} Translation] ${messageInput}`;
-    if (messageInput.toLowerCase().includes('hello') || messageInput.toLowerCase().includes('hi')) {
-      autoTrans = 'Hola, ¿cómo está hoy?';
-    } else if (messageInput.toLowerCase().includes('medicine') || messageInput.toLowerCase().includes('pill')) {
-      autoTrans = 'Por favor tome este medicamento según las indicaciones médicas.';
-    }
+    const senderDisplayName = role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName;
 
     const newMsg = {
       id: `msg-${Date.now()}`,
-      sender: participantName,
+      sender: senderDisplayName,
       role: role,
       text: messageInput,
-      translation: autoTrans,
       timestamp: formatTimer(seconds)
     };
 
     setChatMessages(prev => [...prev, newMsg]);
+
+    const socket = getSocket();
+    if (socket) {
+      socket.emit('send-chat-message', {
+        roomId,
+        senderName: senderDisplayName,
+        senderRole: role,
+        text: messageInput
+      });
+    }
+
+    // Update live dialogue box with latest message
+    setLiveCaption({
+      speaker: senderDisplayName,
+      speakerRole: role,
+      enText: messageInput,
+      targetText: `Spoken / Sent by ${senderDisplayName}`
+    });
+
     setMessageInput('');
   };
 
-  // Quick phrase trigger
   const handleInsertQuickPhrase = (phraseText) => {
     setMessageInput(phraseText);
   };
 
   // Interpreter Pause Floor Request
   const handleRequestPause = () => {
-    setPauseBanner({
-      sender: participantName,
-      message: 'The Certified Interpreter requests a brief pause for term clarification and accuracy.'
-    });
-    setTimeout(() => setPauseBanner(null), 6000);
+    const senderDisplayName = role === 'interpreter' ? interpreterName : hostName;
+    const banner = {
+      sender: senderDisplayName,
+      message: `${senderDisplayName} requests a brief pause for term clarification and accurate interpretation.`
+    };
+    setPauseBanner(banner);
+    playPauseFloorAlert();
+
+    const socket = getSocket();
+    if (socket) {
+      socket.emit('interpreter-request-pause', {
+        roomId,
+        interpreterName: senderDisplayName,
+        message: banner.message
+      });
+    }
+
+    setTimeout(() => setPauseBanner(null), 8000);
   };
 
   const handleEndCallClick = () => {
@@ -220,23 +337,25 @@ export default function ThreeWayCallRoom({
       targetLanguage,
       specialty,
       patientName,
-      hostName
+      hostName,
+      interpreterName
     });
   };
 
   // In-drawer glossary search items
   const inDrawerGlossary = [
-    { en: 'Myocardial Infarction', es: 'Infarto de Miocardio', ar: 'احتشاء عضلة القلب', zh: '心肌梗死', cat: 'Medical', def: 'Heart attack caused by blocked coronary blood flow.' },
-    { en: 'Informed Consent', es: 'Consentimiento Informado', ar: 'الموافقة المستنيرة', zh: '知情同意', cat: 'Medical', def: 'Permission granted understanding all risks & benefits.' },
-    { en: 'Hypertension', es: 'Hipertensión Arterial', ar: 'ارتفاع ضغط الدم', zh: '高血压', cat: 'Medical', def: 'Chronically elevated arterial blood pressure.' },
-    { en: 'Affidavit', es: 'Declaración Jurada', ar: 'إفادة خطية مشفوعة بيمين', zh: '宣誓书', cat: 'Legal', def: 'Written statement confirmed by oath.' },
-    { en: 'Subpoena', es: 'Citación Judicial', ar: 'مذكرة استدعاء', zh: '传票', cat: 'Legal', def: 'Official writ ordering a person to appear in court.' },
-    { en: 'Power of Attorney', es: 'Poder Notarial', ar: 'توكيل رسمي', zh: '授权委托书', cat: 'Legal', def: 'Legal authority granted to act on behalf of another.' }
+    { en: 'Informed Consent', ur: 'باخبر رضامندی (Informed Consent)', es: 'Consentimiento Informado', ar: 'الموافقة المستنيرة', cat: 'Medical', def: 'Permission granted understanding all medical risks & benefits.' },
+    { en: 'Myocardial Infarction', ur: 'دل کا دورہ / ہارٹ اٹیک (Heart Attack)', es: 'Infarto de Miocardio', ar: 'احتشاء عضلة القلب', cat: 'Medical', def: 'Heart muscle necrosis caused by blocked coronary artery.' },
+    { en: 'Hypertension', ur: 'ہائی بلڈ پریشر (High BP)', es: 'Hipertensión Arterial', ar: 'ارتفاع ضغط الدم', cat: 'Medical', def: 'Chronically elevated arterial blood pressure.' },
+    { en: 'Affidavit', ur: 'بیان حلفی / حلف نامہ (Affidavit)', es: 'Declaración Jurada', ar: 'إفادة خطية مشفوعة بيمين', cat: 'Legal', def: 'Written statement confirmed by oath in legal proceedings.' },
+    { en: 'Subpoena', ur: 'عدالتی سمن (Subpoena)', es: 'Citación Judicial', ar: 'مذكرة استدعاء', cat: 'Legal', def: 'Official writ ordering a person to appear in court.' },
+    { en: 'Power of Attorney', ur: 'مختار نامہ / پاور آف اٹارنی', es: 'Poder Notarial', ar: 'توكيل رسمي', cat: 'Legal', def: 'Legal authority granted to act on behalf of another party.' }
   ].filter(item => {
     const matchesCat = glossaryCategory === 'All' || item.cat === glossaryCategory;
     const matchesQuery = !glossaryQuery || 
       item.en.toLowerCase().includes(glossaryQuery.toLowerCase()) || 
-      item.es.toLowerCase().includes(glossaryQuery.toLowerCase()) ||
+      (item.ur && item.ur.toLowerCase().includes(glossaryQuery.toLowerCase())) ||
+      (item.es && item.es.toLowerCase().includes(glossaryQuery.toLowerCase())) ||
       item.def.toLowerCase().includes(glossaryQuery.toLowerCase());
     return matchesCat && matchesQuery;
   });
@@ -258,7 +377,7 @@ export default function ThreeWayCallRoom({
 
           <div className="hidden sm:flex items-center gap-2 pl-3 border-l border-slate-800 text-xs">
             <span className="px-2 py-0.5 rounded bg-brand-500/20 text-brand-300 font-bold border border-brand-500/30">
-              {targetLanguage}
+              English ⟷ {targetLanguage}
             </span>
             <span className="text-slate-400 font-medium">{specialty}</span>
             <span className="text-slate-600">•</span>
@@ -269,37 +388,37 @@ export default function ThreeWayCallRoom({
         {/* Center: Security Badge */}
         <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[11px] font-semibold border border-emerald-500/20">
           <ShieldCheck className="w-3.5 h-3.5" />
-          <span>256-Bit Encrypted HIPAA Tunnel</span>
+          <span>Real-Time Encrypted 3-Party Conference</span>
         </div>
 
-        {/* Right: Voice Audio Toggle, Layout & Drawer Toggles */}
+        {/* Right: Layout & Drawer Toggles */}
         <div className="flex items-center gap-2">
           
-          {/* Voice Audio Speaker Output Button */}
+          {/* Audio Output Playback Toggle */}
           <button
             onClick={() => {
               const next = !isVoiceActive;
               setIsVoiceActive(next);
               setSpeechEnabled(next);
               if (next) {
-                speakText('Voice output unmuted. Audio is playing through your computer speakers.', 'en-US');
+                speakText('Voice output active.', 'en-US');
               }
             }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition border ${
               isVoiceActive 
-                ? 'bg-emerald-600/20 text-emerald-400 border-emerald-500/40 shadow-sm ring-1 ring-emerald-500/30' 
+                ? 'bg-emerald-600/20 text-emerald-400 border-emerald-500/40 shadow-sm' 
                 : 'bg-slate-800 text-slate-400 border-slate-700'
             }`}
-            title="Toggle Real Voice Audio Playback through your speakers"
+            title="Toggle Voice Output"
           >
-            <Volume2 className={`w-3.5 h-3.5 ${isVoiceActive ? 'text-emerald-400 animate-pulse' : 'text-slate-500'}`} />
-            <span>Voice Speech: {isVoiceActive ? 'ON' : 'MUTED'}</span>
+            <Volume2 className={`w-3.5 h-3.5 ${isVoiceActive ? 'text-emerald-400' : 'text-slate-500'}`} />
+            <span className="hidden md:inline">Voice: {isVoiceActive ? 'ON' : 'OFF'}</span>
           </button>
 
           <button
             onClick={() => setViewLayout(viewLayout === 'grid' ? 'focus' : 'grid')}
             className="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition"
-            title="Toggle Grid / Speaker Spotlight"
+            title="Toggle Grid / Spotlight Layout"
           >
             <Layers className="w-4 h-4 text-brand-400" />
           </button>
@@ -308,7 +427,7 @@ export default function ThreeWayCallRoom({
             onClick={() => setActiveDrawer(activeDrawer === 'glossary' ? 'none' : 'glossary')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition border ${
               activeDrawer === 'glossary' 
-                ? 'bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-600/30' 
+                ? 'bg-emerald-600 text-white border-emerald-500 shadow-md' 
                 : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
             }`}
             title="Open Terminology Glossary"
@@ -321,14 +440,13 @@ export default function ThreeWayCallRoom({
             onClick={() => setActiveDrawer(activeDrawer === 'chat' ? 'none' : 'chat')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition border ${
               activeDrawer === 'chat' 
-                ? 'bg-brand-600 text-white border-brand-500 shadow-md shadow-brand-600/30' 
+                ? 'bg-brand-600 text-white border-brand-500 shadow-md' 
                 : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
             }`}
-            title="Toggle Chat"
+            title="Toggle Live Chat"
           >
             <MessageSquare className="w-3.5 h-3.5 text-brand-400" />
-            <span className="hidden md:inline">Live Chat</span>
-            <span className="w-2 h-2 rounded-full bg-brand-400" />
+            <span className="hidden md:inline">3-Way Chat</span>
           </button>
         </div>
 
@@ -337,7 +455,7 @@ export default function ThreeWayCallRoom({
       {/* Main Conference Arena */}
       <div className="flex-1 flex overflow-hidden relative">
         
-        {/* Left / Center Video Stage */}
+        {/* Left / Center Video & Audio Stage */}
         <div className="flex-1 flex flex-col p-3 sm:p-4 gap-3 overflow-y-auto">
           
           {/* Interpreter Pause Alert Banner */}
@@ -349,7 +467,7 @@ export default function ThreeWayCallRoom({
                 </div>
                 <div>
                   <p className="text-xs font-extrabold uppercase tracking-wide text-amber-300">
-                    Interpreter Floor Pause Request
+                    Interpreter Floor Pause Signal
                   </p>
                   <p className="text-xs text-amber-100">{pauseBanner.message}</p>
                 </div>
@@ -363,26 +481,23 @@ export default function ThreeWayCallRoom({
             </div>
           )}
 
-          {/* 3-Party Video Feeds */}
+          {/* 3-Party Video & Audio Feeds */}
           <div className={`flex-1 grid gap-3.5 ${
             viewLayout === 'grid' 
               ? 'grid-cols-1 md:grid-cols-3' 
               : 'grid-cols-1 md:grid-cols-4 md:grid-rows-2'
           }`}>
             
-            {/* 1. English Host Tile */}
+            {/* TILE 1: Main Client (Payer / Host) */}
             <div className={`relative rounded-2xl bg-slate-900 border overflow-hidden flex items-center justify-center shadow-lg transition-all ${
               activeSpeaker === 'host' ? 'border-brand-500 ring-2 ring-brand-500/50' : 'border-slate-800'
             } ${viewLayout === 'focus' && focusParticipant === 'host' ? 'md:col-span-3 md:row-span-2' : ''}`}>
               
-              {/* Simulated Video Feed Avatar */}
               <div className="flex flex-col items-center justify-center text-center p-4">
                 <div className="relative">
-                  <img
-                    src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=200&auto=format&fit=crop&q=80"
-                    alt={hostName}
-                    className="w-24 h-24 rounded-full object-cover shadow-2xl ring-4 ring-brand-500/30"
-                  />
+                  <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-600 text-white flex items-center justify-center text-3xl font-black shadow-2xl ring-4 ring-brand-500/30">
+                    {hostName.charAt(0).toUpperCase()}
+                  </div>
                   {activeSpeaker === 'host' && (
                     <div className="absolute -bottom-2 -right-2 flex items-center gap-0.5 bg-brand-600 px-2 py-0.5 rounded-full shadow text-[10px] font-bold text-white">
                       <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
@@ -390,14 +505,14 @@ export default function ThreeWayCallRoom({
                     </div>
                   )}
                 </div>
-                <h4 className="text-sm font-bold text-white mt-3">{hostName}</h4>
-                <span className="text-[11px] font-semibold text-brand-400">English Host • Provider</span>
+                <h4 className="text-sm font-bold text-white mt-3 truncate max-w-[200px]">{hostName}</h4>
+                <span className="text-[11px] font-semibold text-brand-400">Main Client • English Speaker</span>
               </div>
 
               {/* Top Left Role Badge */}
               <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md text-[11px] font-bold text-white">
                 <Users className="w-3.5 h-3.5 text-brand-400" />
-                <span>English Speaker</span>
+                <span>Client / Host</span>
               </div>
 
               {/* Bottom Audio Waveform Meter */}
@@ -406,90 +521,103 @@ export default function ThreeWayCallRoom({
                   <Mic className="w-3.5 h-3.5 text-emerald-400" />
                   <span className="text-[10px] text-slate-300">Live Audio</span>
                 </div>
-                {activeSpeaker === 'host' ? (
+                {role === 'host' && micAudioLevel > 5 ? (
                   <div className="flex items-end gap-1 h-3">
-                    <span className="w-1 bg-brand-400 rounded-full wave-bar-1" />
-                    <span className="w-1 bg-brand-400 rounded-full wave-bar-2" />
-                    <span className="w-1 bg-brand-400 rounded-full wave-bar-3" />
-                    <span className="w-1 bg-brand-400 rounded-full wave-bar-4" />
+                    <span className="w-1 bg-brand-400 rounded-full animate-pulse" style={{ height: `${Math.min(100, micAudioLevel * 1.2)}%` }} />
+                    <span className="w-1 bg-brand-400 rounded-full animate-pulse" style={{ height: `${Math.min(100, micAudioLevel * 0.9)}%` }} />
+                    <span className="w-1 bg-brand-400 rounded-full animate-pulse" style={{ height: `${Math.min(100, micAudioLevel * 1.4)}%` }} />
+                    <span className="w-1 bg-brand-400 rounded-full animate-pulse" style={{ height: `${Math.min(100, micAudioLevel * 0.7)}%` }} />
                   </div>
                 ) : (
-                  <span className="text-[10px] text-slate-500">Listening</span>
+                  <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    <span>Active</span>
+                  </span>
                 )}
               </div>
             </div>
 
-            {/* 2. Certified Interpreter Tile (Center / Focal) */}
+            {/* TILE 2: Certified Interpreter (Center Focal) */}
             <div className={`relative rounded-2xl bg-slate-900 border overflow-hidden flex items-center justify-center shadow-lg transition-all ${
               activeSpeaker === 'interpreter' ? 'border-emerald-500 ring-2 ring-emerald-500/50' : 'border-slate-800'
             } ${viewLayout === 'focus' && focusParticipant === 'interpreter' ? 'md:col-span-3 md:row-span-2' : ''}`}>
               
               <div className="flex flex-col items-center justify-center text-center p-4">
                 <div className="relative">
-                  <img
-                    src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&auto=format&fit=crop&q=80"
-                    alt={interpreterName}
-                    className="w-24 h-24 rounded-full object-cover shadow-2xl ring-4 ring-emerald-500/30"
-                  />
+                  {interpreterAvatar ? (
+                    <img
+                      src={interpreterAvatar}
+                      alt={interpreterName}
+                      className="w-24 h-24 rounded-full object-cover shadow-2xl ring-4 ring-emerald-500/30"
+                    />
+                  ) : (
+                    <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center text-3xl font-black shadow-2xl ring-4 ring-emerald-500/30">
+                      {interpreterName.charAt(0).toUpperCase()}
+                    </div>
+                  )}
                   {activeSpeaker === 'interpreter' && (
                     <div className="absolute -bottom-2 -right-2 flex items-center gap-0.5 bg-emerald-600 px-2 py-0.5 rounded-full shadow text-[10px] font-bold text-white">
                       <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                      <span>Translating</span>
+                      <span>Interpreting</span>
                     </div>
                   )}
                 </div>
-                <h4 className="text-sm font-bold text-white mt-3">{interpreterName}</h4>
+                <h4 className="text-sm font-bold text-white mt-3 truncate max-w-[200px]">{interpreterName}</h4>
                 <span className="text-[11px] font-semibold text-emerald-400">
                   Certified Interpreter (English ⟷ {targetLanguage})
+                </span>
+                <span className="text-[10px] text-slate-400 mt-0.5 font-medium">
+                  {interpreterCert}
                 </span>
               </div>
 
               {/* Top Left Badge */}
               <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md text-[11px] font-bold text-white">
                 <Headphones className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Interpreter Hub</span>
+                <span>Certified Linguist</span>
               </div>
 
-              {/* Top Right Interpreter Controls */}
-              {role === 'interpreter' && (
-                <button
-                  onClick={handleRequestPause}
-                  className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/80 hover:bg-amber-500 text-slate-950 text-[10px] font-extrabold shadow transition"
-                  title="Signal floor pause to participants"
-                >
-                  <Hand className="w-3 h-3" />
-                  <span>Pause Floor</span>
-                </button>
-              )}
+              {/* Top Right Pause Action */}
+              <button
+                onClick={handleRequestPause}
+                className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/80 hover:bg-amber-500 text-slate-950 text-[10px] font-extrabold shadow transition"
+                title="Signal floor pause to participants"
+              >
+                <Hand className="w-3 h-3" />
+                <span>Pause Floor</span>
+              </button>
 
               {/* Bottom Audio Waveform */}
               <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-black/50 backdrop-blur-md">
                 <div className="flex items-center gap-1.5">
                   <Mic className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-[10px] text-slate-300">Live Audio</span>
+                  <span className="text-[10px] text-slate-300">Live Channel</span>
                 </div>
-                {activeSpeaker === 'interpreter' ? (
+                {role === 'interpreter' && micAudioLevel > 5 ? (
                   <div className="flex items-end gap-1 h-3">
-                    <span className="w-1 bg-emerald-400 rounded-full wave-bar-1" />
-                    <span className="w-1 bg-emerald-400 rounded-full wave-bar-2" />
-                    <span className="w-1 bg-emerald-400 rounded-full wave-bar-3" />
-                    <span className="w-1 bg-emerald-400 rounded-full wave-bar-4" />
+                    <span className="w-1 bg-emerald-400 rounded-full animate-pulse" style={{ height: `${Math.min(100, micAudioLevel * 1.2)}%` }} />
+                    <span className="w-1 bg-emerald-400 rounded-full animate-pulse" style={{ height: `${Math.min(100, micAudioLevel * 0.9)}%` }} />
+                    <span className="w-1 bg-emerald-400 rounded-full animate-pulse" style={{ height: `${Math.min(100, micAudioLevel * 1.4)}%` }} />
+                    <span className="w-1 bg-emerald-400 rounded-full animate-pulse" style={{ height: `${Math.min(100, micAudioLevel * 0.7)}%` }} />
                   </div>
                 ) : (
-                  <span className="text-[10px] text-slate-500">Listening</span>
+                  <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    <span>Active Feed</span>
+                  </span>
                 )}
               </div>
             </div>
 
-            {/* 3. Non-English Client Tile */}
+            {/* TILE 3: Non-English Guest / Client */}
             <div className={`relative rounded-2xl bg-slate-900 border overflow-hidden flex items-center justify-center shadow-lg transition-all ${
               activeSpeaker === 'guest' ? 'border-amber-500 ring-2 ring-amber-500/50' : 'border-slate-800'
             } ${viewLayout === 'focus' && focusParticipant === 'guest' ? 'md:col-span-3 md:row-span-2' : ''}`}>
               
               <div className="flex flex-col items-center justify-center text-center p-4">
                 <div className="relative">
-                  <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center text-2xl font-bold shadow-2xl ring-4 ring-amber-500/30">
-                    {patientName.charAt(0)}
+                  <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center text-3xl font-black shadow-2xl ring-4 ring-amber-500/30">
+                    {patientName.charAt(0).toUpperCase()}
                   </div>
                   {activeSpeaker === 'guest' && (
                     <div className="absolute -bottom-2 -right-2 flex items-center gap-0.5 bg-amber-600 px-2 py-0.5 rounded-full shadow text-[10px] font-bold text-white">
@@ -498,49 +626,52 @@ export default function ThreeWayCallRoom({
                     </div>
                   )}
                 </div>
-                <h4 className="text-sm font-bold text-white mt-3">{patientName}</h4>
+                <h4 className="text-sm font-bold text-white mt-3 truncate max-w-[200px]">{patientName}</h4>
                 <span className="text-[11px] font-semibold text-amber-400">
-                  Client • {targetLanguage} Speaker
+                  Guest Client • {targetLanguage} Speaker
                 </span>
               </div>
 
               {/* Top Left Badge */}
               <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md text-[11px] font-bold text-white">
                 <Globe className="w-3.5 h-3.5 text-amber-400" />
-                <span>Non-English Guest</span>
+                <span>Guest Counter-Party</span>
               </div>
 
               {/* Bottom Audio Waveform */}
               <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-black/50 backdrop-blur-md">
                 <div className="flex items-center gap-1.5">
                   <Mic className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-[10px] text-slate-300">Live Audio</span>
+                  <span className="text-[10px] text-slate-300">Live Channel</span>
                 </div>
-                {activeSpeaker === 'guest' ? (
+                {role === 'guest' && micAudioLevel > 5 ? (
                   <div className="flex items-end gap-1 h-3">
-                    <span className="w-1 bg-amber-400 rounded-full wave-bar-1" />
-                    <span className="w-1 bg-amber-400 rounded-full wave-bar-2" />
-                    <span className="w-1 bg-amber-400 rounded-full wave-bar-3" />
-                    <span className="w-1 bg-amber-400 rounded-full wave-bar-4" />
+                    <span className="w-1 bg-amber-400 rounded-full animate-pulse" style={{ height: `${Math.min(100, micAudioLevel * 1.2)}%` }} />
+                    <span className="w-1 bg-amber-400 rounded-full animate-pulse" style={{ height: `${Math.min(100, micAudioLevel * 0.9)}%` }} />
+                    <span className="w-1 bg-amber-400 rounded-full animate-pulse" style={{ height: `${Math.min(100, micAudioLevel * 1.4)}%` }} />
+                    <span className="w-1 bg-amber-400 rounded-full animate-pulse" style={{ height: `${Math.min(100, micAudioLevel * 0.7)}%` }} />
                   </div>
                 ) : (
-                  <span className="text-[10px] text-slate-500">Listening</span>
+                  <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    <span>Connected</span>
+                  </span>
                 )}
               </div>
             </div>
 
           </div>
 
-          {/* Live AI Transcription & Captions Stream */}
+          {/* Live Spoken Dialogue & Captions Bar */}
           <div className="glass-panel p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between gap-3 shrink-0">
             <div className="flex items-start gap-3 flex-1 min-w-0">
               <div className="p-2 rounded-xl bg-brand-500/10 text-brand-400 shrink-0 mt-0.5">
-                <Sparkles className="w-4 h-4 animate-spin" style={{ animationDuration: '4s' }} />
+                <Sparkles className="w-4 h-4 text-emerald-400" />
               </div>
               <div className="flex-1 min-w-0 space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-brand-400">
-                    Live Spoken Dialogue
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400">
+                    Live Session Dialogue
                   </span>
                   <span className="text-[10px] text-slate-400 font-semibold">• {liveCaption.speaker}</span>
                 </div>
@@ -548,24 +679,18 @@ export default function ThreeWayCallRoom({
                   "{liveCaption.enText}"
                 </p>
                 <p className="text-[11px] font-medium text-slate-400 truncate sm:whitespace-normal italic">
-                  ↳ "{liveCaption.targetText}"
+                  ↳ {liveCaption.targetText}
                 </p>
               </div>
             </div>
 
-            {/* Listen Button for User */}
+            {/* Listen Button */}
             <button
               onClick={() => {
-                if (liveCaption.speakerRole === 'host') {
-                  speakText(liveCaption.enText, 'en-US');
-                } else if (liveCaption.speakerRole === 'interpreter') {
-                  speakText('El doctor indica que sus análisis de sangre salieron normales.', targetLanguage);
-                } else {
-                  speakText('Muchas gracias doctor, me he sentido mucho mejor esta semana.', targetLanguage);
-                }
+                speakText(liveCaption.enText, 'en-US');
               }}
               className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-emerald-600/30 transition shrink-0 transform hover:scale-105"
-              title="Click to play this voice line aloud through your computer speakers"
+              title="Click to hear speech aloud"
             >
               <Volume2 className="w-4 h-4" />
               <span className="hidden sm:inline">Play Voice</span>
@@ -574,11 +699,11 @@ export default function ThreeWayCallRoom({
 
         </div>
 
-        {/* Right Drawer: Live Chat or Terminology Glossary */}
+        {/* Right Drawer: Live 3-Way Chat or Terminology Glossary */}
         {activeDrawer !== 'none' && (
           <div className="w-80 md:w-96 border-l border-slate-800 bg-slate-900/95 flex flex-col z-10 shrink-0">
             
-            {/* Drawer Header with tabs */}
+            {/* Drawer Header */}
             <div className="p-3 border-b border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <button
@@ -611,7 +736,7 @@ export default function ThreeWayCallRoom({
             {activeDrawer === 'chat' && (
               <div className="flex-1 flex flex-col overflow-hidden">
                 
-                {/* Quick Phrases bar for instant insertion */}
+                {/* Quick Phrases bar */}
                 <div className="p-2 border-b border-slate-800/80 bg-slate-950/60 overflow-x-auto flex gap-1.5">
                   {QUICK_PHRASES.map((qp) => (
                     <button
@@ -647,11 +772,6 @@ export default function ThreeWayCallRoom({
                         </div>
                       )}
                       <p className="text-slate-100 font-medium">{msg.text}</p>
-                      {msg.translation && (
-                        <p className="text-[10px] text-slate-400 italic pt-1 border-t border-slate-700/40">
-                          ↳ {msg.translation}
-                        </p>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -662,7 +782,7 @@ export default function ThreeWayCallRoom({
                     type="text"
                     value={messageInput}
                     onChange={(e) => setMessageInput(e.target.value)}
-                    placeholder="Type message with auto-translation..."
+                    placeholder="Type message to all 3 parties..."
                     className="flex-1 glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
                   />
                   <button
@@ -714,7 +834,7 @@ export default function ThreeWayCallRoom({
                         </span>
                       </div>
                       <div className="text-xs font-bold text-amber-300">
-                        {targetLanguage === 'Arabic' ? item.ar : targetLanguage === 'Mandarin Chinese' ? item.zh : item.es}
+                        {targetLanguage === 'Urdu' ? item.ur : targetLanguage === 'Arabic' ? item.ar : item.es}
                       </div>
                       <p className="text-[10px] text-slate-400 leading-tight pt-1 border-t border-slate-800/60">
                         {item.def}
@@ -735,7 +855,7 @@ export default function ThreeWayCallRoom({
         
         {/* Left info */}
         <div className="hidden sm:flex items-center gap-3 text-xs text-slate-400">
-          <span>Role: <strong className="text-white capitalize">{role}</strong></span>
+          <span>Your Role: <strong className="text-white capitalize">{role === 'host' ? 'Main Client' : role}</strong></span>
           <span>•</span>
           <span>Modality: <strong className="text-emerald-400">{callType === 'video' && !isVideoOff ? 'HD Video + Audio' : 'Audio Mode (Active)'}</strong></span>
         </div>
@@ -782,105 +902,87 @@ export default function ThreeWayCallRoom({
           </button>
 
           {/* Interpreter Pause Alert Button */}
-          {role === 'interpreter' && (
-            <button
-              onClick={handleRequestPause}
-              className="p-3.5 rounded-2xl bg-amber-500/20 border border-amber-500/50 hover:bg-amber-500/30 text-amber-300 font-bold text-xs flex items-center gap-2 transition"
-              title="Request Pause Floor"
-            >
-              <Hand className="w-5 h-5 text-amber-400 animate-pulse" />
-              <span className="hidden md:inline">Request Pause</span>
-            </button>
-          )}
+          <button
+            onClick={handleRequestPause}
+            className="p-3.5 rounded-2xl bg-amber-500/20 border border-amber-500/50 hover:bg-amber-500/30 text-amber-300 font-bold text-xs flex items-center gap-2 transition"
+            title="Request Pause Floor"
+          >
+            <Hand className="w-5 h-5 text-amber-400" />
+            <span className="hidden md:inline">Pause Floor</span>
+          </button>
 
           {/* End Call Button */}
           <button
             onClick={handleEndCallClick}
             className="px-6 py-3.5 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs shadow-xl shadow-red-600/30 flex items-center gap-2 transition transform hover:scale-105"
           >
-            <PhoneOff className="w-5 h-5" />
+            <PhoneOff className="w-4 h-4" />
             <span>End Call</span>
           </button>
         </div>
 
-        {/* Right empty spacer for center alignment */}
-        <div className="hidden sm:block w-24" />
+        {/* Right Info */}
+        <div className="hidden sm:flex items-center gap-2 text-xs text-slate-400">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="font-semibold text-emerald-400">Room Active (3 Parties)</span>
+        </div>
 
       </div>
 
-      {/* Post-Call Debrief & Summary Modal */}
+      {/* Post-Call Debrief Modal */}
       {showDebrief && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="max-w-lg w-full glass-panel p-8 rounded-3xl border border-slate-700 shadow-2xl space-y-6">
-            
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div>
-                <h3 className="text-xl font-extrabold text-white">Interpretation Session Complete</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Session #{roomId} • {targetLanguage} ({specialty})</p>
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="max-w-md w-full glass-panel p-6 sm:p-8 rounded-3xl border border-slate-800 space-y-5 shadow-2xl text-white">
+            <div className="text-center space-y-1">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-2">
+                <CheckCircle2 className="w-8 h-8" />
               </div>
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
-                <Check className="w-5 h-5" />
-              </div>
+              <h3 className="text-xl font-extrabold">3-Party Session Completed</h3>
+              <p className="text-xs text-slate-400">Duration: <strong>{formatTimer(seconds)}</strong> ({targetLanguage})</p>
             </div>
 
-            {/* Metrics Breakdown */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
-                <span className="text-[10px] text-slate-400 font-semibold">Total Duration</span>
-                <p className="text-lg font-black text-white">{formatTimer(seconds)}</p>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
-                <span className="text-[10px] text-slate-400 font-semibold">Calculated Cost</span>
-                <p className="text-lg font-black text-emerald-400">
-                  ${((seconds / 60) * 0.95 + 2.50).toFixed(2)}
-                </p>
-              </div>
-            </div>
-
-            {/* Rating */}
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-300">Rate Interpreter Quality</label>
-              <div className="flex items-center gap-2">
+              <label className="text-xs font-bold uppercase text-slate-300">Rate Session Quality:</label>
+              <div className="flex justify-center gap-2">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <button
                     key={star}
+                    type="button"
                     onClick={() => setCallRating(star)}
-                    className="p-1 text-amber-400 hover:scale-125 transition"
+                    className="p-1 transition transform hover:scale-110"
                   >
-                    <Star className={`w-6 h-6 ${star <= callRating ? 'fill-amber-400' : 'text-slate-600'}`} />
+                    <Star className={`w-6 h-6 ${star <= callRating ? 'text-amber-400 fill-amber-400' : 'text-slate-600'}`} />
                   </button>
                 ))}
-                <span className="text-xs font-bold text-amber-400 ml-2">{callRating}.0 / 5.0</span>
               </div>
             </div>
 
-            {/* Session Notes */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-300">Clinical / Case Notes Summary</label>
+            <div className="space-y-1">
+              <label className="text-xs font-bold uppercase text-slate-300">Session Notes & Summary:</label>
               <textarea
-                rows={3}
                 value={sessionNotes}
                 onChange={(e) => setSessionNotes(e.target.value)}
+                rows={3}
                 className="w-full glass-input p-3 rounded-xl text-xs text-white focus:outline-none"
               />
             </div>
 
-            {/* Actions */}
-            <div className="flex gap-3 pt-2">
+            <div className="pt-2 flex gap-3">
               <button
+                type="button"
                 onClick={() => setShowDebrief(false)}
-                className="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+                className="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs"
               >
                 Return to Call
               </button>
               <button
+                type="button"
                 onClick={handleConfirmEnd}
-                className="flex-1 py-3 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-extrabold text-xs shadow-lg shadow-brand-600/30"
+                className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-lg shadow-emerald-600/30"
               >
-                Submit & Close Session
+                Complete & Log Session
               </button>
             </div>
-
           </div>
         </div>
       )}

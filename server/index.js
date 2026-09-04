@@ -1259,6 +1259,11 @@ io.on('connection', (socket) => {
     socket.userLang = language;
   });
 
+  // Re-broadcast appointment creation event to all parties (Client, Interpreter, Admin)
+  socket.on('new-appointment-created', (appointmentData) => {
+    io.emit('new-appointment-created', appointmentData);
+  });
+
   // Host initiates On-Demand Dispatch Request
   socket.on('request-interpreter-dispatch', (dispatchData) => {
     const dispatchId = `disp-${Date.now()}`;
