@@ -212,6 +212,7 @@ export default function App() {
 
         {currentView === 'interpreter' && (
           <InterpreterDashboard
+            currentUser={currentUser}
             onAcceptIncomingCall={handleStartCall}
             onOpenGlossary={() => setIsGlossaryOpen(true)}
             onOpenSchedule={() => setIsScheduleOpen(true)}

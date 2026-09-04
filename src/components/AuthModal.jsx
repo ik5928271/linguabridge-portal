@@ -38,6 +38,7 @@ export default function AuthModal({
   const [orgName, setOrgName] = useState('');
   const [specialty, setSpecialty] = useState('Medical / Healthcare');
   const [primaryLang, setPrimaryLang] = useState('Spanish');
+  const [certifications, setCertifications] = useState('Certified Professional Linguist');
   const handleSignInSubmit = (e) => {
     e.preventDefault();
     const cleanEmail = signInEmail.toLowerCase().trim();

@@ -23,20 +23,23 @@ export default function InterpreterDashboard({
   onAcceptIncomingCall, 
   onOpenGlossary,
   onOpenSchedule,
-  interpreter = {
-    id: 'int-1',
-    name: 'Elena Rodriguez, CCHI',
-    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
-    primaryLang: 'Spanish',
-    languages: ['Spanish (Español)', 'English'],
-    specialties: ['Medical / Healthcare', 'Legal / Court', 'General'],
-    status: 'online',
-    rating: 4.98,
-    totalCalls: 1420,
-    hourlyRate: 55,
-    certifications: ['Certified Healthcare Interpreter (CCHI)', 'State Court Certified']
-  }
+  currentUser,
+  interpreter: propInterpreter
 }) {
+  const interpreter = {
+    id: currentUser?.id || propInterpreter?.id || 'int-1',
+    name: currentUser?.name || propInterpreter?.name || 'Elena Rodriguez, CCHI',
+    avatar: currentUser?.avatar || propInterpreter?.avatar || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+    primaryLang: currentUser?.primaryLang || propInterpreter?.primaryLang || 'Spanish',
+    languages: Array.isArray(currentUser?.languages) ? currentUser.languages : (currentUser?.primaryLang ? [currentUser.primaryLang, 'English'] : (propInterpreter?.languages || ['Spanish', 'English'])),
+    specialties: Array.isArray(currentUser?.specialties) ? currentUser.specialties : (currentUser?.specialty ? [currentUser.specialty] : (propInterpreter?.specialties || ['General / Customer Support'])),
+    status: currentUser?.status || propInterpreter?.status || 'online',
+    rating: currentUser?.rating || propInterpreter?.rating || 4.98,
+    totalCalls: currentUser?.totalCalls || propInterpreter?.totalCalls || 1420,
+    hourlyRate: currentUser?.hourlyRate || propInterpreter?.hourlyRate || 5,
+    certifications: Array.isArray(currentUser?.certifications) ? currentUser.certifications : (currentUser?.certifications ? [currentUser.certifications] : (propInterpreter?.certifications || ['Certified Professional Linguist']))
+  };
+
   const [isOnline, setIsOnline] = useState(true);
   const [incomingCall, setIncomingCall] = useState(null);
   const [countdown, setCountdown] = useState(30);
@@ -117,7 +120,7 @@ export default function InterpreterDashboard({
               </span>
             </div>
             <p className="text-xs text-slate-300 font-medium mt-0.5">
-              {interpreter.languages.join(' ⟷ ')} • {interpreter.certifications[0]}
+              {(interpreter.languages || ['Spanish', 'English']).join(' ⟷ ')} • {Array.isArray(interpreter.certifications) ? interpreter.certifications[0] : (interpreter.certifications || 'Certified Professional Linguist')}
             </p>
             <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-400">
               <span className="flex items-center gap-1 text-amber-400 font-bold">
