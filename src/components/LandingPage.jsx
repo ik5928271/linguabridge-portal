@@ -412,9 +412,9 @@ export default function LandingPage({
       {/* 6. TRANSPARENT PRICING & ESTIMATOR */}
       <section id="pricing" className="max-w-7xl mx-auto px-4 space-y-12">
         <div className="text-center max-w-2xl mx-auto">
-          <span className="text-xs font-bold uppercase tracking-widest text-emerald-400">Simple Transparent Rates</span>
+          <span className="text-xs font-bold uppercase tracking-widest text-emerald-400">Custom & Transparent Pricing</span>
           <h2 className="text-3xl sm:text-4xl font-extrabold text-white mt-1">Pay Only For What You Use</h2>
-          <p className="text-slate-400 text-sm mt-2">No setup fees, no monthly minimums, and second-by-second billing.</p>
+          <p className="text-slate-400 text-sm mt-2">No setup fees, no monthly minimums. Inquire for custom volume rates, prepaid minute packages, and corporate invoicing.</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -426,9 +426,9 @@ export default function LandingPage({
                 Prepaid Wallet (Charged Before Service)
               </span>
               <h3 className="text-2xl font-black text-white">Prepaid Minute Packs</h3>
-              <div className="flex items-baseline gap-1">
-                <span className="text-4xl font-black text-white">$54</span>
-                <span className="text-slate-400 text-xs font-semibold">/ 60 mins ($0.90/min)</span>
+              <div className="space-y-1">
+                <div className="text-3xl font-black text-emerald-400">Custom Rates</div>
+                <div className="text-slate-400 text-xs font-semibold">Pricing upon inquiry • Second-by-second billing</div>
               </div>
               <p className="text-xs text-slate-300">
                 Pay in advance, receive instant minute credits in your live wallet. Deducts second-by-second during calls with zero overage surprises.
@@ -452,9 +452,9 @@ export default function LandingPage({
 
             <button
               onClick={() => onOpenAuth('signup')}
-              className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-lg shadow-emerald-600/25"
+              className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold transition shadow-lg shadow-emerald-600/25"
             >
-              Get Started with Prepaid
+              Inquire for Prepaid Rates
             </button>
           </div>
 
@@ -466,12 +466,12 @@ export default function LandingPage({
 
             <div className="space-y-4">
               <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-brand-500/20 text-brand-300">
-                Practice Bundle (Save 18%)
+                Practice Bundle (Volume Discount)
               </span>
               <h3 className="text-2xl font-black text-white">120 Min Minute Wallet</h3>
-              <div className="flex items-baseline gap-1">
-                <span className="text-4xl font-black text-white">$99</span>
-                <span className="text-slate-400 text-xs font-semibold">/ 120 mins ($0.82/min)</span>
+              <div className="space-y-1">
+                <div className="text-3xl font-black text-brand-300">Flexible Volume</div>
+                <div className="text-slate-400 text-xs font-semibold">Special package rates available on request</div>
               </div>
               <p className="text-xs text-slate-300">Popular choice for clinics, legal attorneys, and recurring consultations.</p>
               
@@ -493,9 +493,9 @@ export default function LandingPage({
 
             <button
               onClick={() => onOpenAuth('signup')}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-brand-500 to-indigo-600 hover:from-brand-600 hover:to-indigo-700 text-white text-xs font-extrabold shadow-lg shadow-brand-500/30 transition"
+              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-brand-500 to-indigo-600 hover:from-brand-600 hover:to-indigo-700 text-white text-xs font-extrabold shadow-lg shadow-brand-500/30 transition"
             >
-              Purchase 120 Min Pack
+              Ask for 120 Min Bundle Price
             </button>
           </div>
 
@@ -506,8 +506,9 @@ export default function LandingPage({
                 Hospital & Enterprise (Post-Paid)
               </span>
               <h3 className="text-2xl font-black text-white">Monthly Net 30 Invoicing</h3>
-              <div className="flex items-baseline gap-1">
-                <span className="text-3xl font-black text-purple-300">Billed After Delivery</span>
+              <div className="space-y-1">
+                <div className="text-3xl font-black text-purple-300">Billed After Delivery</div>
+                <div className="text-slate-400 text-xs font-semibold">Net 30 terms upon enterprise verification</div>
               </div>
               <p className="text-xs text-slate-300">
                 For verified hospitals, health networks, government agencies, and multi-department enterprises.
@@ -531,7 +532,7 @@ export default function LandingPage({
 
             <button
               onClick={() => onOpenAuth('signup')}
-              className="w-full py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition shadow-lg shadow-purple-600/25"
+              className="w-full py-3.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-extrabold transition shadow-lg shadow-purple-600/25"
             >
               Apply for Hospital Post-Paid
             </button>
