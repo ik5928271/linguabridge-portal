@@ -280,28 +280,22 @@ END:VCALENDAR`;
                 <Zap className="w-4 h-4" />
                 <span>Client Account Billing & Minute Ledger</span>
               </span>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                clientBillingType === 'postpaid_hospital' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-              }`}>
-                {clientBillingType === 'postpaid_hospital' ? 'Enterprise Post-Paid (Net 30 Invoicing)' : 'Prepaid Minutes Wallet (Active)'}
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                100% Prepaid Minutes (Advance Secured)
               </span>
             </div>
             <p className="text-xs text-slate-300 mt-1">
-              {clientBillingType === 'postpaid_hospital' 
-                ? 'Hospital / Enterprise Model: Delivered first and billed monthly with itemized department invoicing.'
-                : 'Standard Client Model: Minutes are charged in advance and deducted automatically during sessions.'}
+              Standard Client Model: All sessions require prepaid minutes in advance. Minutes are deducted 1:1 automatically upon booking.
             </p>
           </div>
 
-          {/* Billing Settlement Model Badge (Admin Controlled) */}
+          {/* Billing Settlement Model Badge */}
           <div className="flex items-center gap-2.5 bg-slate-900/90 px-3.5 py-2 rounded-2xl border border-slate-800 shrink-0">
-            <ShieldCheck className={`w-4 h-4 ${clientBillingType === 'postpaid_hospital' ? 'text-purple-400' : 'text-emerald-400'}`} />
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
             <div>
               <span className="text-[10px] text-slate-400 block font-semibold uppercase tracking-wider">Account Billing Model</span>
-              <span className={`text-xs font-bold ${
-                clientBillingType === 'postpaid_hospital' ? 'text-purple-300' : 'text-emerald-400'
-              }`}>
-                {clientBillingType === 'postpaid_hospital' ? 'Hospital Post-Paid (Net 30)' : 'Prepaid Minutes Wallet'}
+              <span className="text-xs font-bold text-emerald-400">
+                Prepaid Minutes Wallet (Active)
               </span>
             </div>
           </div>
@@ -911,66 +905,46 @@ END:VCALENDAR`;
         <div className="max-w-3xl mx-auto glass-panel p-6 sm:p-8 rounded-3xl border border-slate-800 space-y-6">
           <div className="border-b border-slate-800 pb-4">
             <h2 className="text-xl font-bold text-white">
-              {clientBillingType === 'prepaid' ? 'Step 4: Confirm Minute Deduction from Prepaid Wallet' : 'Step 4: Authorize Corporate Monthly Invoicing'}
+              Step 4: Confirm Minute Deduction from Prepaid Wallet
             </h2>
             <p className="text-xs text-slate-400 mt-1">
-              {clientBillingType === 'prepaid'
-                ? 'Standard Client: This session will be charged in advance by deducting minutes from your prepaid balance.'
-                : 'Hospital / Corporate Account: Delivered first and billed monthly Net 30.'}
+              Advance Payment Policy: This session will be secured in advance by deducting minutes from your prepaid balance.
             </p>
           </div>
 
           {/* Prepaid Balance Breakdown */}
-          {clientBillingType === 'prepaid' ? (
-            <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
-              <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800">
-                <span className="text-slate-400">Available Prepaid Balance:</span>
-                <span className="font-black text-emerald-400">{wallet?.minutesRemaining || 0} Minutes</span>
-              </div>
-              <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800">
-                <span className="text-slate-400">Minutes Required for this Session:</span>
-                <span className="font-bold text-white">{durationMinutes} Minutes</span>
-              </div>
-              <div className="flex items-center justify-between text-xs pt-1">
-                <span className="font-bold text-slate-300">Remaining Balance after Session:</span>
-                <span className={`font-black ${hasSufficientPrepaid ? 'text-emerald-300' : 'text-red-400'}`}>
-                  {(wallet?.minutesRemaining || 0) - durationMinutes} Minutes
-                </span>
-              </div>
+          <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+            <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800">
+              <span className="text-slate-400">Available Prepaid Balance:</span>
+              <span className="font-black text-emerald-400">{wallet?.minutesRemaining || 0} Minutes</span>
+            </div>
+            <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800">
+              <span className="text-slate-400">Minutes Required for this Session:</span>
+              <span className="font-bold text-white">{durationMinutes} Minutes</span>
+            </div>
+            <div className="flex items-center justify-between text-xs pt-1">
+              <span className="font-bold text-slate-300">Remaining Balance after Session:</span>
+              <span className={`font-black ${hasSufficientPrepaid ? 'text-emerald-300' : 'text-red-400'}`}>
+                {(wallet?.minutesRemaining || 0) - durationMinutes} Minutes
+              </span>
+            </div>
 
-              {!hasSufficientPrepaid && (
-                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-300 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-                    <span>Insufficient minutes in wallet ({wallet?.minutesRemaining || 0} min available). Please top up.</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsWalletModalOpen(true)}
-                    className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold text-[11px]"
-                  >
-                    Top-Up Now
-                  </button>
+            {!hasSufficientPrepaid && (
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-300 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                  <span>Insufficient minutes in wallet ({wallet?.minutesRemaining || 0} min available). Please top up to proceed.</span>
                 </div>
-              )}
-            </div>
-          ) : (
-            /* Hospital Post-Paid Summary */
-            <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 text-xs">
-              <div className="flex justify-between pb-2 border-b border-slate-800">
-                <span className="text-slate-400">Billing Account:</span>
-                <span className="font-bold text-white">Mercy General Hospital Corp Net 30 (#HOSP-8921)</span>
+                <button
+                  type="button"
+                  onClick={() => setIsWalletModalOpen(true)}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold text-[11px] shadow-lg shadow-emerald-600/30"
+                >
+                  Top-Up Now
+                </button>
               </div>
-              <div className="flex justify-between pb-2 border-b border-slate-800">
-                <span className="text-slate-400">Estimated Total Fee:</span>
-                <span className="font-bold text-emerald-400">\${totalCost}</span>
-              </div>
-              <div className="flex items-center gap-2 text-slate-400 text-[11px] pt-1">
-                <Building2 className="w-4 h-4 text-purple-400 shrink-0" />
-                <span>Session will be itemized on the monthly department consolidated invoice after completion.</span>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Session Details Recap */}
           <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800 space-y-2 text-xs">

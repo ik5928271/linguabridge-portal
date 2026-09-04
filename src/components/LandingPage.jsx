@@ -499,33 +499,33 @@ export default function LandingPage({
             </button>
           </div>
 
-          {/* Plan 3: Hospital & Enterprise Post-Paid (Charged After Delivery) */}
+          {/* Plan 3: Enterprise Bulk Prepaid Package (Advance Custom Volume) */}
           <div className="glass-panel p-8 rounded-3xl border border-slate-800 space-y-6 flex flex-col justify-between hover:border-purple-500/50 transition">
             <div className="space-y-4">
               <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20">
-                Hospital & Enterprise (Post-Paid)
+                Enterprise & Hospital (Bulk Volume)
               </span>
-              <h3 className="text-2xl font-black text-white">Monthly Net 30 Invoicing</h3>
+              <h3 className="text-2xl font-black text-white">Enterprise Bulk Prepaid</h3>
               <div className="space-y-1">
-                <div className="text-3xl font-black text-purple-300">Billed After Delivery</div>
-                <div className="text-slate-400 text-xs font-semibold">Net 30 terms upon enterprise verification</div>
+                <div className="text-3xl font-black text-purple-300">Custom Advance Pool</div>
+                <div className="text-slate-400 text-xs font-semibold">Volume tiered discounts for hospitals & firms</div>
               </div>
               <p className="text-xs text-slate-300">
-                For verified hospitals, health networks, government agencies, and multi-department enterprises.
+                For hospitals, legal departments, and global enterprises requiring dedicated interpreter pools with advance wallet allocation.
               </p>
               
               <ul className="space-y-2.5 text-xs text-slate-300 pt-4 border-t border-slate-800">
                 <li className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Unlimited monthly corporate credit line</span>
+                  <span>Custom pooled minute packages (500 to 5,000+ mins)</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Itemized department billing codes & EMR integration</span>
+                  <span>Itemized department billing codes & reporting</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>SAML SSO & Dedicated Interpreter Roster</span>
+                  <span>Dedicated certified interpreter roster</span>
                 </li>
               </ul>
             </div>
@@ -534,7 +534,7 @@ export default function LandingPage({
               onClick={() => onOpenAuth('signup')}
               className="w-full py-3.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-extrabold transition shadow-lg shadow-purple-600/25"
             >
-              Apply for Hospital Post-Paid
+              Inquire for Enterprise Bulk Rates
             </button>
           </div>
 
