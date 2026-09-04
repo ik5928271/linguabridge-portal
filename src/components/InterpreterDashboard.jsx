@@ -36,9 +36,13 @@ export default function InterpreterDashboard({
     status: currentUser?.status || propInterpreter?.status || 'online',
     rating: currentUser?.rating || propInterpreter?.rating || 4.98,
     totalCalls: currentUser?.totalCalls || propInterpreter?.totalCalls || 1420,
-    hourlyRate: currentUser?.hourlyRate || propInterpreter?.hourlyRate || 5,
+    employmentType: currentUser?.employmentType || propInterpreter?.employmentType || 'hourly',
+    hourlyRate: currentUser?.hourlyRate || propInterpreter?.hourlyRate || 8,
+    minuteRate: currentUser?.minuteRate !== undefined ? currentUser.minuteRate : (propInterpreter?.minuteRate !== undefined ? propInterpreter.minuteRate : 0.30),
+    monthlySalary: currentUser?.monthlySalary || propInterpreter?.monthlySalary || 1200,
     certifications: Array.isArray(currentUser?.certifications) ? currentUser.certifications : (currentUser?.certifications ? [currentUser.certifications] : (propInterpreter?.certifications || ['Certified Professional Linguist']))
   };
+
 
   const [isOnline, setIsOnline] = useState(true);
   const [incomingCall, setIncomingCall] = useState(null);
@@ -115,8 +119,14 @@ export default function InterpreterDashboard({
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl sm:text-2xl font-extrabold text-white">{interpreter.name}</h1>
-              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                Active Tier 1
+              <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
+                interpreter.employmentType === 'salary_base' 
+                  ? 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                  : interpreter.employmentType === 'per_minute'
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                    : 'bg-brand-500/10 text-brand-300 border-brand-500/20'
+              }`}>
+                {interpreter.employmentType === 'salary_base' ? '🏢 Full-Time Salaried' : interpreter.employmentType === 'per_minute' ? '⏱️ On-Demand Live Talk (2x)' : '💼 Scheduled Shift Linguist'}
               </span>
             </div>
             <p className="text-xs text-slate-300 font-medium mt-0.5">
@@ -130,7 +140,13 @@ export default function InterpreterDashboard({
               <span>•</span>
               <span>{interpreter.totalCalls} Lifetime Sessions</span>
               <span>•</span>
-              <span className="text-emerald-400 font-semibold">${interpreter.hourlyRate}/hr billing</span>
+              <span className="font-semibold text-emerald-400">
+                {interpreter.employmentType === 'salary_base' 
+                  ? `$${interpreter.monthlySalary || 1200}/mo Salary` 
+                  : interpreter.employmentType === 'per_minute' 
+                    ? `$${(interpreter.minuteRate || 0.30).toFixed(2)}/min Live Talk`
+                    : `$${interpreter.hourlyRate || 8}/hr Shift Billing`}
+              </span>
             </div>
           </div>
         </div>
@@ -188,9 +204,15 @@ export default function InterpreterDashboard({
 
         <div className="glass-panel p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
           <div>
-            <p className="text-xs text-slate-400 font-medium">Active Interpreting Time</p>
-            <p className="text-2xl font-black text-white mt-1">142 mins</p>
-            <p className="text-[11px] text-slate-400 mt-1">Target: 240 mins/shift</p>
+            <p className="text-xs text-slate-400 font-medium">
+              {interpreter.employmentType === 'salary_base' ? 'Shift Hours Accrued' : 'Active Interpreting Time'}
+            </p>
+            <p className="text-2xl font-black text-white mt-1">
+              {interpreter.employmentType === 'salary_base' ? '32.5 / 40 hrs' : '142 mins'}
+            </p>
+            <p className="text-[11px] text-slate-400 mt-1">
+              {interpreter.employmentType === 'salary_base' ? 'Dedicated Full-Time Roster' : 'Target: 240 mins/shift'}
+            </p>
           </div>
           <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
             <Clock className="w-6 h-6" />
@@ -199,15 +221,26 @@ export default function InterpreterDashboard({
 
         <div className="glass-panel p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
           <div>
-            <p className="text-xs text-slate-400 font-medium">Today's Estimated Earnings</p>
-            <p className="text-2xl font-black text-emerald-400 mt-1">$130.16</p>
-            <p className="text-[11px] text-slate-400 mt-1">Direct deposit ready</p>
+            <p className="text-xs text-slate-400 font-medium">
+              {interpreter.employmentType === 'salary_base' ? 'Monthly Fixed Salary' : "Today's Estimated Earnings"}
+            </p>
+            <p className="text-2xl font-black text-emerald-400 mt-1">
+              {interpreter.employmentType === 'salary_base' 
+                ? `$${interpreter.monthlySalary || 1200}.00`
+                : interpreter.employmentType === 'per_minute' 
+                  ? `$${(142 * (interpreter.minuteRate || 0.30)).toFixed(2)}`
+                  : `$${((142 / 60) * (interpreter.hourlyRate || 8)).toFixed(2)}`}
+            </p>
+            <p className="text-[11px] text-slate-400 mt-1">
+              {interpreter.employmentType === 'salary_base' ? 'Fixed Monthly Disbursal' : 'Direct deposit ready'}
+            </p>
           </div>
           <div className="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
             <Award className="w-6 h-6" />
           </div>
         </div>
       </div>
+
 
       {/* Quick Tools & Scheduled Sessions Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

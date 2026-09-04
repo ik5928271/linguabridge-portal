@@ -100,6 +100,23 @@ export default function App() {
       .then(res => res.json())
       .then(data => { if (Array.isArray(data)) setRegisteredInterpreters(data); })
       .catch(() => {});
+
+    // Track real-time visitor traffic & campaign sources
+    let sId = sessionStorage.getItem('lb_session_id');
+    if (!sId) {
+      sId = `sess-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
+      sessionStorage.setItem('lb_session_id', sId);
+    }
+
+    fetch('/api/analytics/track-visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        path: window.location.pathname + window.location.search,
+        referrer: document.referrer || 'Direct / Campaign Link',
+        sessionId: sId
+      })
+    }).catch(() => {});
   }, []);
 
   // Read URL query parameters for direct guest join links (e.g. ?view=guest&roomId=xyz&lang=es)

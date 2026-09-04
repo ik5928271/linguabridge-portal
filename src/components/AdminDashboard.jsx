@@ -31,14 +31,17 @@ import {
   Check,
   AlertCircle,
   Eye,
-  X
+  X,
+  Briefcase,
+  Building2
 } from 'lucide-react';
-import { LANGUAGES, SPECIALTIES } from '../data/mockData';
+import { LANGUAGES, SPECIALTIES, EMPLOYMENT_MODELS } from '../data/mockData';
 
 export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'users', 'applications', 'roster', 'billing'
   const [searchTerm, setSearchTerm] = useState('');
   const [userRoleFilter, setUserRoleFilter] = useState('all');
+  const [employmentFilter, setEmploymentFilter] = useState('all'); // 'all', 'salary_base', 'hourly', 'per_minute'
 
   // Dynamic user list
   const [usersList, setUsersList] = useState([
@@ -51,6 +54,8 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       org: 'IK Enterprises',
       primaryLang: 'All Languages',
       specialty: 'Master Operations & Platform Owner',
+      employmentType: 'salary_base',
+      monthlySalary: 5000,
       hourlyRate: 0,
       wallet: { totalPaid: 1000, totalMinutesPurchased: 9999, minutesRemaining: 9999, billingType: 'unlimited_owner' },
       createdAt: '2026-08-30'
@@ -62,13 +67,35 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   const [appFilter, setAppFilter] = useState('all'); // 'all', 'pending', 'approved', 'rejected'
   const [selectedAppForReview, setSelectedAppForReview] = useState(null);
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
-  const [reviewApprovedRate, setReviewApprovedRate] = useState(5);
+  const [reviewApprovedType, setReviewApprovedType] = useState('hourly'); // 'hourly', 'per_minute', 'salary_base'
+  const [reviewApprovedRate, setReviewApprovedRate] = useState(8);
+  const [reviewApprovedMinuteRate, setReviewApprovedMinuteRate] = useState(0.30);
+  const [reviewApprovedMonthlySalary, setReviewApprovedMonthlySalary] = useState(1200);
   const [reviewPassword, setReviewPassword] = useState('interp2026!');
   const [reviewNotes, setReviewNotes] = useState('');
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [emailDispatchModal, setEmailDispatchModal] = useState(null);
   const [docPreviewModal, setDocPreviewModal] = useState(null);
+
+  // Live Visitor Traffic & Funnel Analytics State
+  const [analyticsData, setAnalyticsData] = useState({
+    today: {
+      totalVisits: 0,
+      uniqueVisitors: 0,
+      interpreterApplications: 0,
+      clientSignups: 0,
+      dropOffs: 0,
+      conversionRate: '0.0%'
+    },
+    lifetime: {
+      totalVisits: 0,
+      totalApplications: 0,
+      totalClients: 0
+    },
+    recentVisits: [],
+    dailyHistory: []
+  });
 
   // Modal for creating new accounts
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -79,7 +106,10 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   const [formOrg, setFormOrg] = useState('');
   const [formLang, setFormLang] = useState('Spanish');
   const [formSpecialty, setFormSpecialty] = useState('Medical / Healthcare');
-  const [formHourlyRate, setFormHourlyRate] = useState(5);
+  const [formEmploymentType, setFormEmploymentType] = useState('hourly');
+  const [formHourlyRate, setFormHourlyRate] = useState(8);
+  const [formMinuteRate, setFormMinuteRate] = useState(0.30);
+  const [formMonthlySalary, setFormMonthlySalary] = useState(1200);
   const [formInitialMinutes, setFormInitialMinutes] = useState(120);
   const [formBillingType, setFormBillingType] = useState('prepaid');
 
@@ -92,12 +122,16 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   const [editRole, setEditRole] = useState('host');
   const [editLang, setEditLang] = useState('Spanish');
   const [editSpecialty, setEditSpecialty] = useState('Medical / Healthcare');
-  const [editHourlyRate, setEditHourlyRate] = useState(5);
+  const [editEmploymentType, setEditEmploymentType] = useState('hourly');
+  const [editHourlyRate, setEditHourlyRate] = useState(8);
+  const [editMinuteRate, setEditMinuteRate] = useState(0.30);
+  const [editMonthlySalary, setEditMonthlySalary] = useState(1200);
   const [editMinutes, setEditMinutes] = useState(60);
   const [editTotalPaid, setEditTotalPaid] = useState(0);
   const [editBillingType, setEditBillingType] = useState('prepaid');
 
-  // Fetch users & applications from backend
+
+  // Fetch users & applications & analytics from backend
   const fetchUsers = () => {
     fetch('/api/admin/users')
       .then(res => res.json())
@@ -120,17 +154,36 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       .catch(() => {});
   };
 
+  const fetchAnalytics = () => {
+    fetch('/api/admin/analytics')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.today) {
+          setAnalyticsData(data);
+        }
+      })
+      .catch(() => {});
+  };
+
   useEffect(() => {
     fetchUsers();
     fetchApplications();
+    fetchAnalytics();
     const timer = setInterval(() => {
       fetchApplications();
+      fetchAnalytics();
     }, 10000);
     return () => clearInterval(timer);
   }, []);
 
   const handleCreateAccount = (e) => {
     e.preventDefault();
+    const resolvedRateLabel = formEmploymentType === 'salary_base'
+      ? `$${parseInt(formMonthlySalary) || 1200}/mo (Salary Base)`
+      : formEmploymentType === 'per_minute'
+        ? `$${(parseFloat(formMinuteRate) || 0.30).toFixed(2)}/min (Live Talk)`
+        : `$${parseInt(formHourlyRate) || 8}/hr (Scheduled Shift)`;
+
     const payload = {
       name: formName,
       email: formEmail,
@@ -139,7 +192,11 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       org: formOrg || (newAccountRole === 'admin' ? 'IK Enterprises Operations' : newAccountRole === 'interpreter' ? 'Certified Linguist Pool' : 'IK Enterprises Client'),
       primaryLang: formLang,
       specialty: formSpecialty,
-      hourlyRate: parseInt(formHourlyRate) || 5,
+      employmentType: formEmploymentType,
+      hourlyRate: parseInt(formHourlyRate) || 8,
+      minuteRate: parseFloat(formMinuteRate) || 0.30,
+      monthlySalary: parseInt(formMonthlySalary) || 1200,
+      rateLabel: resolvedRateLabel,
       initialMinutes: parseInt(formInitialMinutes) !== undefined && !isNaN(parseInt(formInitialMinutes)) ? parseInt(formInitialMinutes) : 120,
       billingType: formBillingType
     };
@@ -157,7 +214,9 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
           setFormName('');
           setFormEmail('');
           setFormOrg('');
-          setFormHourlyRate(5);
+          setFormHourlyRate(8);
+          setFormMinuteRate(0.30);
+          setFormMonthlySalary(1200);
         }
       })
       .catch(() => {
@@ -179,7 +238,10 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
     setEditRole(u.role || 'host');
     setEditLang(u.primaryLang || 'Spanish');
     setEditSpecialty(u.specialty || 'General');
-    setEditHourlyRate(u.hourlyRate !== undefined ? u.hourlyRate : (u.interpreterProfile?.hourlyRate !== undefined ? u.interpreterProfile.hourlyRate : 5));
+    setEditEmploymentType(u.employmentType || (u.interpreterProfile?.employmentType || 'hourly'));
+    setEditHourlyRate(u.hourlyRate !== undefined ? u.hourlyRate : (u.interpreterProfile?.hourlyRate !== undefined ? u.interpreterProfile.hourlyRate : 8));
+    setEditMinuteRate(u.minuteRate !== undefined ? u.minuteRate : (u.interpreterProfile?.minuteRate !== undefined ? u.interpreterProfile.minuteRate : 0.30));
+    setEditMonthlySalary(u.monthlySalary !== undefined ? u.monthlySalary : (u.interpreterProfile?.monthlySalary !== undefined ? u.interpreterProfile.monthlySalary : 1200));
     setEditMinutes(u.wallet?.minutesRemaining !== undefined ? u.wallet.minutesRemaining : 60);
     setEditTotalPaid(u.wallet?.totalPaid !== undefined ? u.wallet.totalPaid : 0);
     setEditBillingType(u.wallet?.billingType || u.billingType || 'prepaid');
@@ -188,6 +250,12 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
 
   const handleSaveEdit = (e) => {
     e.preventDefault();
+    const resolvedRateLabel = editEmploymentType === 'salary_base'
+      ? `$${parseInt(editMonthlySalary) || 1200}/mo (Salary Base)`
+      : editEmploymentType === 'per_minute'
+        ? `$${(parseFloat(editMinuteRate) || 0.30).toFixed(2)}/min (Live Talk)`
+        : `$${parseInt(editHourlyRate) || 8}/hr (Scheduled Shift)`;
+
     const payload = {
       name: editName,
       email: editEmail,
@@ -195,7 +263,11 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       role: editRole,
       primaryLang: editLang,
       specialty: editSpecialty,
-      hourlyRate: parseInt(editHourlyRate) || 5,
+      employmentType: editEmploymentType,
+      hourlyRate: parseInt(editHourlyRate) || 8,
+      minuteRate: parseFloat(editMinuteRate) || 0.30,
+      monthlySalary: parseInt(editMonthlySalary) || 1200,
+      rateLabel: resolvedRateLabel,
       minutesRemaining: parseInt(editMinutes) || 0,
       totalPaid: parseFloat(editTotalPaid) || 0,
       billingType: editBillingType
@@ -257,7 +329,10 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   // Application Handlers
   const handleOpenApproveModal = (app) => {
     setSelectedAppForReview(app);
-    setReviewApprovedRate(app.hourlyRate || 5);
+    setReviewApprovedType(app.employmentType || 'hourly');
+    setReviewApprovedRate(app.hourlyRate || 8);
+    setReviewApprovedMinuteRate(app.minuteRate !== undefined ? app.minuteRate : 0.30);
+    setReviewApprovedMonthlySalary(app.monthlySalary || 1200);
     setReviewPassword(`interp${Math.floor(100 + Math.random() * 900)}!`);
     setReviewNotes('Approved by IK Enterprises Administration');
     setIsApproveModalOpen(true);
@@ -271,7 +346,10 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        approvedHourlyRate: parseInt(reviewApprovedRate) || 5,
+        approvedEmploymentType: reviewApprovedType,
+        approvedHourlyRate: parseInt(reviewApprovedRate) || 8,
+        approvedMinuteRate: parseFloat(reviewApprovedMinuteRate) || 0.30,
+        approvedMonthlySalary: parseInt(reviewApprovedMonthlySalary) || 1200,
         initialPassword: reviewPassword,
         adminNotes: reviewNotes
       })
@@ -291,6 +369,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
         setIsApproveModalOpen(false);
       });
   };
+
 
   const handleOpenRejectModal = (app) => {
     setSelectedAppForReview(app);
@@ -666,17 +745,36 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
                         </div>
                       </div>
 
-                      {/* Column 2: Specialties & Experience */}
+                      {/* Column 2: Employment Model & Qualifications */}
                       <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-1.5">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1">
-                          <Award className="w-3.5 h-3.5 text-purple-400" />
-                          <span>Qualifications & Rates</span>
-                        </span>
-                        <p className="font-semibold text-white">
-                          Experience: <span className="font-bold text-emerald-400">{app.experienceYears || 3} Years</span>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1">
+                            <Award className="w-3.5 h-3.5 text-purple-400" />
+                            <span>Employment & Rate</span>
+                          </span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                            app.employmentType === 'salary_base' 
+                              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                              : app.employmentType === 'per_minute'
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                : 'bg-brand-500/20 text-brand-300 border border-brand-500/30'
+                          }`}>
+                            {app.employmentType === 'salary_base' ? '🏢 Salary Base' : app.employmentType === 'per_minute' ? '⏱️ Per-Minute Talk' : '💼 Hourly Shift'}
+                          </span>
+                        </div>
+                        <p className="font-semibold text-white text-xs">
+                          Requested: <span className="font-mono font-bold text-emerald-400">
+                            {app.rateLabel || (
+                              app.employmentType === 'salary_base' 
+                                ? `$${app.monthlySalary || 1200}/mo` 
+                                : app.employmentType === 'per_minute'
+                                  ? `$${(app.minuteRate || 0.30).toFixed(2)}/min`
+                                  : `$${app.hourlyRate || 8}/hr`
+                            )}
+                          </span>
                         </p>
                         <p className="text-[11px] text-slate-300">
-                          Requested Rate: <span className="font-mono font-bold text-white">${app.hourlyRate || 5} / hr</span>
+                          Experience: <span className="font-bold text-white">{app.experienceYears || 3} Years</span>
                         </p>
                         <p className="text-[10px] text-slate-400 truncate">
                           Certifications: {Array.isArray(app.certifications) ? app.certifications.join(', ') : app.certifications}
@@ -901,8 +999,25 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
                         </td>
 
                         <td className="py-3.5 px-4">
-                          {u.role === 'interpreter' ? (
-                            <span className="font-mono text-emerald-400 font-bold">${activeRate} / hr</span>
+                          {u.role === 'interpreter' || u.role === 'admin' ? (
+                            <div>
+                              {u.employmentType === 'salary_base' ? (
+                                <span className="inline-flex items-center gap-1 font-mono text-purple-400 font-bold bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">
+                                  🏢 ${u.monthlySalary || 1200} / mo
+                                </span>
+                              ) : u.employmentType === 'per_minute' ? (
+                                <span className="inline-flex items-center gap-1 font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                                  ⏱️ ${(u.minuteRate !== undefined ? u.minuteRate : 0.30).toFixed(2)} / min
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 font-mono text-brand-300 font-bold bg-brand-500/10 px-2 py-0.5 rounded border border-brand-500/20">
+                                  💼 ${activeRate} / hr (Shift)
+                                </span>
+                              )}
+                              <span className="text-[9px] text-slate-400 block mt-0.5">
+                                {u.employmentType === 'salary_base' ? 'Fixed Full-Time Salary' : u.employmentType === 'per_minute' ? 'On-Demand Talk (2x)' : 'Scheduled Shift Queue'}
+                              </span>
+                            </div>
                           ) : isMasterOwner ? (
                             <span className="text-amber-300 font-bold">Unlimited Root</span>
                           ) : (
@@ -1053,27 +1168,73 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
                   </div>
 
                   {newAccountRole === 'interpreter' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <label className="font-semibold text-slate-300">Primary Language</label>
-                        <select
-                          value={formLang}
-                          onChange={(e) => setFormLang(e.target.value)}
-                          className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none bg-slate-900"
-                        >
-                          {LANGUAGES.map(l => <option key={l.code} value={l.name}>{l.name}</option>)}
-                        </select>
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="font-semibold text-slate-300">Primary Language</label>
+                          <select
+                            value={formLang}
+                            onChange={(e) => setFormLang(e.target.value)}
+                            className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none bg-slate-900"
+                          >
+                            {LANGUAGES.map(l => <option key={l.code} value={l.name}>{l.name}</option>)}
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="font-semibold text-slate-300">Employment Model</label>
+                          <select
+                            value={formEmploymentType}
+                            onChange={(e) => setFormEmploymentType(e.target.value)}
+                            className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none bg-slate-900"
+                          >
+                            <option value="hourly">💼 Hourly Rate (Scheduled Shifts)</option>
+                            <option value="per_minute">⏱️ Per-Minute Talk Rate (On-Demand 2x)</option>
+                            <option value="salary_base">🏢 Salary Base (Fixed Full-Time)</option>
+                          </select>
+                        </div>
                       </div>
-                      <div className="space-y-1">
-                        <label className="font-semibold text-slate-300">Hourly Rate ($ / hr)</label>
-                        <input
-                          type="number"
-                          value={formHourlyRate}
-                          onChange={(e) => setFormHourlyRate(e.target.value)}
-                          className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
-                          min="1"
-                        />
-                      </div>
+
+                      {formEmploymentType === 'hourly' && (
+                        <div className="space-y-1">
+                          <label className="font-semibold text-slate-300">Hourly Shift Rate ($ / hr)</label>
+                          <input
+                            type="number"
+                            value={formHourlyRate}
+                            onChange={(e) => setFormHourlyRate(e.target.value)}
+                            className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
+                            min="1"
+                          />
+                        </div>
+                      )}
+
+                      {formEmploymentType === 'per_minute' && (
+                        <div className="space-y-1">
+                          <label className="font-semibold text-slate-300">Per-Minute Live Talk Rate ($ / min)</label>
+                          <input
+                            type="number"
+                            step="0.05"
+                            min="0.10"
+                            max="5.00"
+                            value={formMinuteRate}
+                            onChange={(e) => setFormMinuteRate(parseFloat(e.target.value) || 0)}
+                            className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
+                          />
+                        </div>
+                      )}
+
+                      {formEmploymentType === 'salary_base' && (
+                        <div className="space-y-1">
+                          <label className="font-semibold text-slate-300">Monthly Fixed Salary ($ / mo)</label>
+                          <input
+                            type="number"
+                            min="300"
+                            step="50"
+                            value={formMonthlySalary}
+                            onChange={(e) => setFormMonthlySalary(e.target.value)}
+                            className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -1182,28 +1343,76 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
                   </div>
 
                   {editRole === 'interpreter' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <label className="font-semibold text-slate-300">Primary Language</label>
-                        <select
-                          value={editLang}
-                          onChange={(e) => setEditLang(e.target.value)}
-                          className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none bg-slate-900"
-                        >
-                          {LANGUAGES.map(l => <option key={l.code} value={l.name}>{l.name}</option>)}
-                        </select>
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="font-semibold text-slate-300">Primary Language</label>
+                          <select
+                            value={editLang}
+                            onChange={(e) => setEditLang(e.target.value)}
+                            className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none bg-slate-900"
+                          >
+                            {LANGUAGES.map(l => <option key={l.code} value={l.name}>{l.name}</option>)}
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="font-semibold text-slate-300">Employment Model</label>
+                          <select
+                            value={editEmploymentType}
+                            onChange={(e) => setEditEmploymentType(e.target.value)}
+                            className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none bg-slate-900"
+                          >
+                            <option value="hourly">💼 Hourly Rate (Scheduled Shifts)</option>
+                            <option value="per_minute">⏱️ Per-Minute Talk Rate (On-Demand 2x)</option>
+                            <option value="salary_base">🏢 Salary Base (Fixed Full-Time)</option>
+                          </select>
+                        </div>
                       </div>
-                      <div className="space-y-1">
-                        <label className="font-semibold text-slate-300">Hourly Rate ($ / hr)</label>
-                        <input
-                          type="number"
-                          value={editHourlyRate}
-                          onChange={(e) => setEditHourlyRate(e.target.value)}
-                          className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
-                          min="1"
-                          required
-                        />
-                      </div>
+
+                      {editEmploymentType === 'hourly' && (
+                        <div className="space-y-1">
+                          <label className="font-semibold text-slate-300">Hourly Shift Rate ($ / hr)</label>
+                          <input
+                            type="number"
+                            value={editHourlyRate}
+                            onChange={(e) => setEditHourlyRate(e.target.value)}
+                            className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
+                            min="1"
+                            required
+                          />
+                        </div>
+                      )}
+
+                      {editEmploymentType === 'per_minute' && (
+                        <div className="space-y-1">
+                          <label className="font-semibold text-slate-300">Per-Minute Live Talk Rate ($ / min)</label>
+                          <input
+                            type="number"
+                            step="0.05"
+                            min="0.10"
+                            max="5.00"
+                            value={editMinuteRate}
+                            onChange={(e) => setEditMinuteRate(parseFloat(e.target.value) || 0)}
+                            className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
+                            required
+                          />
+                        </div>
+                      )}
+
+                      {editEmploymentType === 'salary_base' && (
+                        <div className="space-y-1">
+                          <label className="font-semibold text-slate-300">Monthly Fixed Salary ($ / mo)</label>
+                          <input
+                            type="number"
+                            min="300"
+                            step="50"
+                            value={editMonthlySalary}
+                            onChange={(e) => setEditMonthlySalary(e.target.value)}
+                            className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
+                            required
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -1268,10 +1477,164 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       )}
 
       {/* ========================================================== */}
-      {/* TAB 2: LIVE OPERATIONS MONITOR */}
+      {/* TAB 2: LIVE OPERATIONS & VISITOR CONVERSION MONITOR */}
       {/* ========================================================== */}
       {activeTab === 'overview' && (
         <div className="space-y-6">
+          
+          {/* 🌟 1. REAL-TIME VISITOR TRAFFIC & CONVERSION FUNNEL HUD */}
+          <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-purple-500/30 space-y-6 shadow-xl">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
+                    <Activity className="w-4 h-4" />
+                    <span>Real-Time Visitor Traffic & Intake Funnel</span>
+                  </span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 animate-pulse">
+                    Live Tracking Active
+                  </span>
+                </div>
+                <h3 className="text-xl font-extrabold text-white mt-1">Today's Traffic, Submissions & Conversion Audit</h3>
+                <p className="text-xs text-slate-400">
+                  Track how many visitors arrived from introductory emails/links, how many applied or signed up, and how many browsed without submitting.
+                </p>
+              </div>
+
+              <button
+                onClick={fetchAnalytics}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold border border-slate-700 transition"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Refresh Live Stats</span>
+              </button>
+            </div>
+
+            {/* 4 Core Metric Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              
+              {/* Card 1: Total Visits Today */}
+              <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-1 relative overflow-hidden">
+                <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
+                  <span>Total Site Visits Today</span>
+                  <Globe className="w-4 h-4 text-brand-400" />
+                </div>
+                <p className="text-3xl font-black text-white">{analyticsData.today?.totalVisits || 0}</p>
+                <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                  <span>Unique Visitors:</span>
+                  <span className="font-bold text-brand-300">{analyticsData.today?.uniqueVisitors || 0}</span>
+                </div>
+              </div>
+
+              {/* Card 2: Interpreter Applications */}
+              <div className="p-5 rounded-2xl bg-amber-950/20 border border-amber-500/30 space-y-1">
+                <div className="flex items-center justify-between text-amber-400 text-xs font-semibold">
+                  <span>Interpreters Applied Today</span>
+                  <Award className="w-4 h-4" />
+                </div>
+                <p className="text-3xl font-black text-amber-400">{analyticsData.today?.interpreterApplications || 0}</p>
+                <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                  <span>Pending Review:</span>
+                  <span className="font-bold text-amber-300">{pendingApplicationsCount}</span>
+                </div>
+              </div>
+
+              {/* Card 3: Client Submissions / Signups */}
+              <div className="p-5 rounded-2xl bg-emerald-950/20 border border-emerald-500/30 space-y-1">
+                <div className="flex items-center justify-between text-emerald-400 text-xs font-semibold">
+                  <span>Client Accounts & Signups</span>
+                  <Users className="w-4 h-4" />
+                </div>
+                <p className="text-3xl font-black text-emerald-400">{analyticsData.today?.clientSignups || 0}</p>
+                <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                  <span>Total Clients:</span>
+                  <span className="font-bold text-emerald-300">{usersList.filter(u => u.role === 'host').length}</span>
+                </div>
+              </div>
+
+              {/* Card 4: Browsed Without Submitting (Drop-offs) */}
+              <div className="p-5 rounded-2xl bg-purple-950/20 border border-purple-500/30 space-y-1">
+                <div className="flex items-center justify-between text-purple-300 text-xs font-semibold">
+                  <span>Browsed (No Submission)</span>
+                  <TrendingUp className="w-4 h-4" />
+                </div>
+                <p className="text-3xl font-black text-purple-300">{analyticsData.today?.dropOffs || 0}</p>
+                <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                  <span>Today's Conversion Rate:</span>
+                  <span className="font-extrabold text-emerald-400">{analyticsData.today?.conversionRate || '0.0%'}</span>
+                </div>
+              </div>
+
+            </div>
+
+            {/* 7-Day History & Conversion Table */}
+            {Array.isArray(analyticsData.dailyHistory) && analyticsData.dailyHistory.length > 0 && (
+              <div className="space-y-3 pt-2">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                  <Clock className="w-3.5 h-3.5 text-purple-400" />
+                  <span>7-Day Visitor Traffic & Conversion Breakdown</span>
+                </h4>
+                
+                <div className="overflow-x-auto rounded-2xl border border-slate-800">
+                  <table className="w-full text-left text-xs text-slate-300">
+                    <thead className="bg-slate-900/90 text-[10px] uppercase font-bold text-slate-400 border-b border-slate-800">
+                      <tr>
+                        <th className="px-4 py-3">Date</th>
+                        <th className="px-4 py-3">Total Page Hits</th>
+                        <th className="px-4 py-3">Unique Visitors</th>
+                        <th className="px-4 py-3">Interpreters Applied</th>
+                        <th className="px-4 py-3">Clients Created</th>
+                        <th className="px-4 py-3">Browsed (No Submit)</th>
+                        <th className="px-4 py-3 text-right">Conversion %</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 bg-slate-950/40">
+                      {analyticsData.dailyHistory.map((day) => (
+                        <tr key={day.date} className="hover:bg-slate-900/50 transition">
+                          <td className="px-4 py-3 font-mono font-bold text-white">{day.date}</td>
+                          <td className="px-4 py-3 font-semibold text-slate-200">{day.visits}</td>
+                          <td className="px-4 py-3 font-semibold text-brand-300">{day.uniqueVisitors}</td>
+                          <td className="px-4 py-3 font-bold text-amber-400">{day.interpreterApplications}</td>
+                          <td className="px-4 py-3 font-bold text-emerald-400">{day.clientSignups}</td>
+                          <td className="px-4 py-3 font-medium text-slate-400">{day.dropOffs}</td>
+                          <td className="px-4 py-3 text-right font-extrabold text-emerald-400">{day.conversionRate}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Recent Live Visitor Hits Stream */}
+            {Array.isArray(analyticsData.recentVisits) && analyticsData.recentVisits.length > 0 && (
+              <div className="space-y-2 pt-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                    <Activity className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Recent Live Visitor Activity Stream</span>
+                  </h4>
+                  <span className="text-[10px] text-slate-400 font-mono">Last 15 Hits</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-48 overflow-y-auto p-2 bg-slate-950/60 rounded-2xl border border-slate-800">
+                  {analyticsData.recentVisits.map((v) => (
+                    <div key={v.id} className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800/80 text-[11px] space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-brand-300 truncate max-w-[150px]">{v.path || '/'}</span>
+                        <span className="text-[9px] text-slate-500">{new Date(v.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 truncate">
+                        Source: <span className="text-slate-300">{v.referrer || 'Direct'}</span>
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
             {/* Live Call Map & Dispatch Queue */}
@@ -1524,23 +1887,113 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
                 </div>
               </div>
 
-              {/* Set Approved Hourly Rate */}
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-300">Approved Hourly Rate ($/hr):</label>
-                <div className="relative">
-                  <span className="absolute left-3.5 top-2.5 font-bold text-emerald-400">$</span>
-                  <input
-                    type="number"
-                    min="5"
-                    max="300"
-                    required
-                    value={reviewApprovedRate}
-                    onChange={(e) => setReviewApprovedRate(e.target.value)}
-                    className="w-full pl-8 pr-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white font-bold focus:outline-none focus:border-emerald-500"
-                  />
+              {/* Approved Employment & Compensation Model */}
+              <div className="space-y-2">
+                <label className="font-semibold text-slate-300">Approved Employment & Compensation Model:</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setReviewApprovedType('hourly')}
+                    className={`p-2 rounded-xl border text-center transition ${
+                      reviewApprovedType === 'hourly'
+                        ? 'bg-brand-600/30 border-brand-500 text-white font-bold ring-1 ring-brand-500'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-[11px] font-bold">💼 Hourly Shift</p>
+                    <p className="text-[9px] text-slate-400 mt-0.5">Scheduled Queue</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setReviewApprovedType('per_minute')}
+                    className={`p-2 rounded-xl border text-center transition ${
+                      reviewApprovedType === 'per_minute'
+                        ? 'bg-emerald-600/30 border-emerald-500 text-white font-bold ring-1 ring-emerald-500'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-[11px] font-bold">⏱️ Per-Minute</p>
+                    <p className="text-[9px] text-slate-400 mt-0.5">Live Talk (2x)</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setReviewApprovedType('salary_base')}
+                    className={`p-2 rounded-xl border text-center transition ${
+                      reviewApprovedType === 'salary_base'
+                        ? 'bg-purple-600/30 border-purple-500 text-white font-bold ring-1 ring-purple-500'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-[11px] font-bold">🏢 Salary Base</p>
+                    <p className="text-[9px] text-slate-400 mt-0.5">Fixed Full-Time</p>
+                  </button>
                 </div>
-                <span className="text-[10px] text-slate-400">The rate paying clients will see when booking this linguist.</span>
               </div>
+
+              {/* Dynamic Rate Setting based on Approved Model */}
+              {reviewApprovedType === 'hourly' && (
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-300">Approved Hourly Shift Rate ($/hr):</label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-2.5 font-bold text-brand-400">$</span>
+                    <input
+                      type="number"
+                      min="5"
+                      max="300"
+                      required
+                      value={reviewApprovedRate}
+                      onChange={(e) => setReviewApprovedRate(e.target.value)}
+                      className="w-full pl-8 pr-12 py-2.5 rounded-xl bg-slate-950 border border-brand-500/50 text-xs text-white font-bold focus:outline-none focus:border-brand-500"
+                    />
+                    <span className="absolute right-3.5 top-2.5 text-xs text-slate-400">/ hr</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400">Paid for scheduled shift hours and confirmed appointment queues.</span>
+                </div>
+              )}
+
+              {reviewApprovedType === 'per_minute' && (
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-300">Approved Live Talk Rate ($/min):</label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-2.5 font-bold text-emerald-400">$</span>
+                    <input
+                      type="number"
+                      step="0.05"
+                      min="0.10"
+                      max="5.00"
+                      required
+                      value={reviewApprovedMinuteRate}
+                      onChange={(e) => setReviewApprovedMinuteRate(parseFloat(e.target.value) || 0)}
+                      className="w-full pl-8 pr-12 py-2.5 rounded-xl bg-slate-950 border border-emerald-500/50 text-xs text-white font-bold focus:outline-none focus:border-emerald-500"
+                    />
+                    <span className="absolute right-3.5 top-2.5 text-xs text-slate-400">/ min</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400">Paid strictly per connected live talk minute (on-demand flexible standby).</span>
+                </div>
+              )}
+
+              {reviewApprovedType === 'salary_base' && (
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-300">Approved Monthly Fixed Salary ($/mo):</label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-2.5 font-bold text-purple-400">$</span>
+                    <input
+                      type="number"
+                      min="300"
+                      max="15000"
+                      step="50"
+                      required
+                      value={reviewApprovedMonthlySalary}
+                      onChange={(e) => setReviewApprovedMonthlySalary(e.target.value)}
+                      className="w-full pl-8 pr-12 py-2.5 rounded-xl bg-slate-950 border border-purple-500/50 text-xs text-white font-bold focus:outline-none focus:border-purple-500"
+                    />
+                    <span className="absolute right-3.5 top-2.5 text-xs text-slate-400">/ mo</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400">Fixed monthly compensation for full-time in-house shifts & duties.</span>
+                </div>
+              )}
 
               {/* Set Initial Password */}
               <div className="space-y-1">
@@ -1569,6 +2022,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-emerald-500"
                 />
               </div>
+
 
               <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-800">
                 <button
@@ -1686,7 +2140,8 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
                   <p className="text-purple-300 font-bold font-sans uppercase text-[10px]">Your Official Portal Login Details:</p>
                   <p className="text-white">📧 Login Email: <span className="font-bold text-brand-300">{emailDispatchModal.loginEmail}</span></p>
                   <p className="text-white">🔑 Temporary Password: <span className="font-bold text-amber-400">{emailDispatchModal.temporaryPassword}</span></p>
-                  <p className="text-white">💵 Approved Hourly Rate: <span className="font-bold text-emerald-400">{emailDispatchModal.hourlyRate}</span></p>
+                  <p className="text-white">📋 Contract Model: <span className="font-bold text-purple-300">{emailDispatchModal.employmentType || 'Hourly Rate (Scheduled Shifts)'}</span></p>
+                  <p className="text-white">💵 Approved Terms: <span className="font-bold text-emerald-400">{emailDispatchModal.compensationTerms || emailDispatchModal.hourlyRate}</span></p>
                   <p className="text-white">🌐 Portal Access: <a href={emailDispatchModal.portalUrl} target="_blank" rel="noreferrer" className="text-brand-400 underline">{emailDispatchModal.portalUrl}</a></p>
                 </div>
 

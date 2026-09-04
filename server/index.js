@@ -182,7 +182,8 @@ let store = {
   ],
   appointments: [],
   callLogs: [],
-  wallets: { ...SEED_WALLETS }
+  wallets: { ...SEED_WALLETS },
+  visitorLogs: []
 };
 
 import { MongoClient } from 'mongodb';
@@ -199,6 +200,10 @@ function loadStore() {
 
       if (!Array.isArray(store.interpreterApplications)) {
         store.interpreterApplications = [];
+      }
+
+      if (!Array.isArray(store.visitorLogs)) {
+        store.visitorLogs = [];
       }
 
       // Ensure Owner Account always exists with latest credentials
@@ -572,7 +577,10 @@ app.post('/api/admin/users', (req, res) => {
     org, 
     primaryLang = 'Spanish', 
     specialty = 'General', 
-    hourlyRate = 55, 
+    employmentType = 'hourly',
+    hourlyRate = 8, 
+    minuteRate = 0.30,
+    monthlySalary = 1200,
     initialMinutes = 60,
     billingType = 'prepaid',
     certifications = 'Certified Linguist'
@@ -581,6 +589,12 @@ app.post('/api/admin/users', (req, res) => {
   if (!name || !email) {
     return res.status(400).json({ error: 'Name and email are required.' });
   }
+
+  const resolvedRateLabel = employmentType === 'salary_base'
+    ? `$${parseInt(monthlySalary) || 1200}/mo (Salary Base)`
+    : employmentType === 'per_minute'
+      ? `$${(parseFloat(minuteRate) || 0.30).toFixed(2)}/min (Live Talk)`
+      : `$${parseInt(hourlyRate) || 8}/hr (Scheduled Shift)`;
 
   const userId = `usr-${Date.now().toString(36)}`;
   const newUser = {
@@ -592,7 +606,11 @@ app.post('/api/admin/users', (req, res) => {
     org: org || (role === 'admin' ? 'IK Enterprises Operations' : role === 'interpreter' ? 'Linguist Pool' : 'Client Account'),
     primaryLang,
     specialty,
-    hourlyRate: parseInt(hourlyRate) || 55,
+    employmentType,
+    hourlyRate: parseInt(hourlyRate) || 8,
+    minuteRate: parseFloat(minuteRate) || 0.30,
+    monthlySalary: parseInt(monthlySalary) || 1200,
+    rateLabel: resolvedRateLabel,
     createdAt: new Date().toISOString()
   };
 
@@ -612,9 +630,13 @@ app.post('/api/admin/users', (req, res) => {
       status: 'online',
       rating: 5.0,
       totalCalls: 0,
-      hourlyRate: parseInt(hourlyRate) || 55,
+      employmentType,
+      hourlyRate: parseInt(hourlyRate) || 8,
+      minuteRate: parseFloat(minuteRate) || 0.30,
+      monthlySalary: parseInt(monthlySalary) || 1200,
+      rateLabel: resolvedRateLabel,
       certifications: [certifications],
-      bio: `Professional ${primaryLang} interpreter provisioned by administration.`
+      bio: `Professional ${primaryLang} interpreter provisioned under ${resolvedRateLabel}.`
     };
     store.interpreters.push(newInterpreter);
     io.emit('interpreter-registered', newInterpreter);
@@ -638,7 +660,22 @@ app.post('/api/admin/users', (req, res) => {
 // Update / Edit full user account details
 app.put('/api/admin/users/:id', (req, res) => {
   const { id } = req.params;
-  const { name, email, org, role, primaryLang, specialty, hourlyRate, minutesRemaining, totalPaid, password, billingType } = req.body;
+  const { 
+    name, 
+    email, 
+    org, 
+    role, 
+    primaryLang, 
+    specialty, 
+    employmentType, 
+    hourlyRate, 
+    minuteRate, 
+    monthlySalary, 
+    minutesRemaining, 
+    totalPaid, 
+    password, 
+    billingType 
+  } = req.body;
 
   const user = store.users.find(u => u.id === id);
   if (!user) {
@@ -652,7 +689,18 @@ app.put('/api/admin/users/:id', (req, res) => {
   if (primaryLang) user.primaryLang = primaryLang;
   if (specialty) user.specialty = specialty;
   if (password) user.password = password;
+  if (employmentType) user.employmentType = employmentType;
   if (hourlyRate !== undefined) user.hourlyRate = parseInt(hourlyRate);
+  if (minuteRate !== undefined) user.minuteRate = parseFloat(minuteRate);
+  if (monthlySalary !== undefined) user.monthlySalary = parseInt(monthlySalary);
+  
+  const resolvedType = user.employmentType || 'hourly';
+  user.rateLabel = resolvedType === 'salary_base'
+    ? `$${user.monthlySalary || 1200}/mo (Salary Base)`
+    : resolvedType === 'per_minute'
+      ? `$${(user.minuteRate || 0.30).toFixed(2)}/min (Live Talk)`
+      : `$${user.hourlyRate || 8}/hr (Scheduled Shift)`;
+
   if (billingType) user.billingType = billingType;
 
   // Update corresponding interpreter profile if applicable
@@ -664,7 +712,11 @@ app.put('/api/admin/users/:id', (req, res) => {
       interp.languages = [primaryLang, 'English'];
     }
     if (specialty) interp.specialties = [specialty, 'General / Customer Support'];
+    if (employmentType) interp.employmentType = employmentType;
     if (hourlyRate !== undefined) interp.hourlyRate = parseInt(hourlyRate);
+    if (minuteRate !== undefined) interp.minuteRate = parseFloat(minuteRate);
+    if (monthlySalary !== undefined) interp.monthlySalary = parseInt(monthlySalary);
+    interp.rateLabel = user.rateLabel;
   }
 
   // Update corresponding wallet if applicable
@@ -673,6 +725,7 @@ app.put('/api/admin/users/:id', (req, res) => {
     if (totalPaid !== undefined) store.wallets[id].totalPaid = parseFloat(totalPaid);
     if (billingType) store.wallets[id].billingType = billingType;
   }
+
 
   saveStore();
   res.json({ success: true, user, wallet: store.wallets[id], interpreterProfile: interp || null });
@@ -738,7 +791,11 @@ app.post('/api/interpreter-applications', (req, res) => {
     specialties = ['General / Customer Support'],
     certifications = ['Certified Professional Linguist'],
     experienceYears = 3,
-    hourlyRate = 5,
+    employmentType = 'hourly', // 'salary_base', 'hourly', 'per_minute'
+    hourlyRate = 8,
+    minuteRate = 0.30,
+    monthlySalary = 1200,
+    rateLabel = '',
     bio = '',
     cvFileName = '',
     cvFileData = '',
@@ -759,6 +816,14 @@ app.post('/api/interpreter-applications', (req, res) => {
   // Check if an application already exists for this email
   const existingAppIndex = store.interpreterApplications.findIndex(a => a.email.toLowerCase() === email.toLowerCase().trim());
 
+  const resolvedRateLabel = rateLabel || (
+    employmentType === 'salary_base' 
+      ? `$${parseInt(monthlySalary) || 1200}/mo (Salary Base)`
+      : employmentType === 'per_minute' 
+        ? `$${(parseFloat(minuteRate) || 0.30).toFixed(2)}/min (Live Talk)`
+        : `$${parseInt(hourlyRate) || 8}/hr (Scheduled Shift)`
+  );
+
   const newApp = {
     id: `app-${Date.now().toString(36)}`,
     name: name.trim(),
@@ -770,8 +835,12 @@ app.post('/api/interpreter-applications', (req, res) => {
     specialties: Array.isArray(specialties) && specialties.length > 0 ? specialties : ['General / Customer Support'],
     certifications: Array.isArray(certifications) && certifications.length > 0 ? certifications : ['Certified Professional Linguist'],
     experienceYears: parseInt(experienceYears) || 1,
-    hourlyRate: parseInt(hourlyRate) || 5,
-    bio: bio.trim() || `Certified ${primaryLang} professional linguist.`,
+    employmentType: employmentType,
+    hourlyRate: parseInt(hourlyRate) || 8,
+    minuteRate: parseFloat(minuteRate) || 0.30,
+    monthlySalary: parseInt(monthlySalary) || 1200,
+    rateLabel: resolvedRateLabel,
+    bio: bio.trim() || `Certified ${primaryLang} professional linguist under ${resolvedRateLabel}.`,
     cvFileName: cvFileName || 'Resume_CV.pdf',
     cvFileData: cvFileData || null,
     docFileName: docFileName || 'Credentials_Certificate.pdf',
@@ -805,18 +874,40 @@ app.get('/api/admin/interpreter-applications', (req, res) => {
 // 3. Admin: Approve Application & Provision Active Account
 app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
   const { id } = req.params;
-  const { approvedHourlyRate, initialPassword, adminNotes } = req.body;
+  const { 
+    approvedEmploymentType, 
+    approvedHourlyRate, 
+    approvedMinuteRate, 
+    approvedMonthlySalary, 
+    initialPassword, 
+    adminNotes 
+  } = req.body;
 
   const appItem = store.interpreterApplications.find(a => a.id === id);
   if (!appItem) {
     return res.status(404).json({ error: 'Application not found.' });
   }
 
-  const finalRate = approvedHourlyRate !== undefined ? parseInt(approvedHourlyRate) : appItem.hourlyRate || 5;
+  const finalType = approvedEmploymentType || appItem.employmentType || 'hourly';
+  const finalHourlyRate = approvedHourlyRate !== undefined ? parseInt(approvedHourlyRate) : (appItem.hourlyRate || 8);
+  const finalMinuteRate = approvedMinuteRate !== undefined ? parseFloat(approvedMinuteRate) : (appItem.minuteRate || 0.30);
+  const finalMonthlySalary = approvedMonthlySalary !== undefined ? parseInt(approvedMonthlySalary) : (appItem.monthlySalary || 1200);
+
+  const finalRateLabel = finalType === 'salary_base' 
+    ? `$${finalMonthlySalary}/mo (Salary Base)`
+    : finalType === 'per_minute' 
+      ? `$${finalMinuteRate.toFixed(2)}/min (Live Talk)`
+      : `$${finalHourlyRate}/hr (Scheduled Shift)`;
+
   const passwordToSet = initialPassword || 'interp2026!';
 
   // Mark application as approved
   appItem.status = 'approved';
+  appItem.employmentType = finalType;
+  appItem.hourlyRate = finalHourlyRate;
+  appItem.minuteRate = finalMinuteRate;
+  appItem.monthlySalary = finalMonthlySalary;
+  appItem.rateLabel = finalRateLabel;
   appItem.adminNotes = adminNotes || 'Approved by IK Enterprises Administration';
   appItem.approvedAt = new Date().toISOString();
 
@@ -830,11 +921,15 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
     email: appItem.email.toLowerCase(),
     password: passwordToSet,
     role: 'interpreter',
-    org: 'Certified Linguist Pool (Verified)',
+    org: finalType === 'salary_base' ? 'In-House Linguist Team (Salaried)' : 'Certified Linguist Pool (Verified)',
     primaryLang: appItem.primaryLang,
     languages: appItem.languages,
     specialty: appItem.specialties?.[0] || 'General / Customer Support',
-    hourlyRate: finalRate,
+    employmentType: finalType,
+    hourlyRate: finalHourlyRate,
+    minuteRate: finalMinuteRate,
+    monthlySalary: finalMonthlySalary,
+    rateLabel: finalRateLabel,
     certifications: appItem.certifications,
     bio: appItem.bio,
     phone: appItem.phone,
@@ -863,7 +958,11 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
     status: 'online',
     rating: 5.0,
     totalCalls: 0,
-    hourlyRate: finalRate,
+    employmentType: finalType,
+    hourlyRate: finalHourlyRate,
+    minuteRate: finalMinuteRate,
+    monthlySalary: finalMonthlySalary,
+    rateLabel: finalRateLabel,
     certifications: appItem.certifications,
     bio: appItem.bio,
     isVerified: true
@@ -884,9 +983,11 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
     recipientName: appItem.name,
     loginEmail: appItem.email,
     temporaryPassword: passwordToSet,
-    hourlyRate: `$${finalRate}/hr`,
+    employmentType: finalType === 'salary_base' ? 'Salary Base (Fixed Full-Time)' : finalType === 'per_minute' ? 'Per-Minute Talk Rate (On-Demand Flex)' : 'Hourly Rate (Scheduled Shifts)',
+    compensationTerms: finalRateLabel,
     portalUrl: 'https://linguabridge-portal.onrender.com'
   };
+
 
   appItem.emailDispatch = emailDispatch;
 
@@ -927,6 +1028,105 @@ app.delete('/api/admin/interpreter-applications/:id', (req, res) => {
   store.interpreterApplications = store.interpreterApplications.filter(a => a.id !== id);
   saveStore();
   res.json({ success: true, message: 'Application deleted.' });
+});
+
+// ==========================================
+// VISITOR TRAFFIC & CONVERSION ANALYTICS
+// ==========================================
+
+// Track public page visits
+app.post('/api/analytics/track-visit', (req, res) => {
+  const { path = '/', referrer = '', sessionId = '' } = req.body;
+  const now = new Date();
+  const dateKey = now.toISOString().split('T')[0];
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+
+  const logEntry = {
+    id: `vis-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 5)}`,
+    date: dateKey,
+    timestamp: now.toISOString(),
+    path,
+    referrer: referrer || 'Direct / Campaign Link',
+    ip: typeof ip === 'string' ? ip.split(',')[0].trim() : 'anonymous',
+    sessionId: sessionId || `sess-${Math.random().toString(36).substring(2, 8)}`
+  };
+
+  if (!Array.isArray(store.visitorLogs)) {
+    store.visitorLogs = [];
+  }
+
+  store.visitorLogs.unshift(logEntry);
+  if (store.visitorLogs.length > 10000) {
+    store.visitorLogs = store.visitorLogs.slice(0, 10000);
+  }
+
+  saveStore();
+  res.json({ success: true, logged: true });
+});
+
+// Admin: Get live visitor & conversion metrics
+app.get('/api/admin/analytics', (req, res) => {
+  const today = new Date().toISOString().split('T')[0];
+  const logs = Array.isArray(store.visitorLogs) ? store.visitorLogs : [];
+  const apps = Array.isArray(store.interpreterApplications) ? store.interpreterApplications : [];
+  const users = Array.isArray(store.users) ? store.users : [];
+
+  // Today's numbers
+  const visitsToday = logs.filter(l => l.date === today);
+  const totalVisitsToday = visitsToday.length;
+  const uniqueVisitorsToday = new Set(visitsToday.map(l => l.sessionId || l.ip)).size || totalVisitsToday;
+
+  const appsToday = apps.filter(a => (a.submittedAt || '').startsWith(today)).length;
+  const clientsToday = users.filter(u => u.role !== 'admin' && (u.createdAt || '').startsWith(today)).length;
+
+  const totalConversionsToday = appsToday + clientsToday;
+  const dropOffsToday = Math.max(0, uniqueVisitorsToday - totalConversionsToday);
+  const conversionRateToday = uniqueVisitorsToday > 0 
+    ? ((totalConversionsToday / uniqueVisitorsToday) * 100).toFixed(1)
+    : '0.0';
+
+  // Last 7 days breakdown table
+  const dailyHistory = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dayStr = d.toISOString().split('T')[0];
+    const dayLogs = logs.filter(l => l.date === dayStr);
+    const dayUnique = new Set(dayLogs.map(l => l.sessionId || l.ip)).size || dayLogs.length;
+    const dayApps = apps.filter(a => (a.submittedAt || '').startsWith(dayStr)).length;
+    const dayClients = users.filter(u => u.role !== 'admin' && (u.createdAt || '').startsWith(dayStr)).length;
+    const dayDropOffs = Math.max(0, dayUnique - (dayApps + dayClients));
+
+    dailyHistory.push({
+      date: dayStr,
+      visits: dayLogs.length,
+      uniqueVisitors: dayUnique,
+      interpreterApplications: dayApps,
+      clientSignups: dayClients,
+      dropOffs: dayDropOffs,
+      conversionRate: dayUnique > 0 ? (((dayApps + dayClients) / dayUnique) * 100).toFixed(1) + '%' : '0%'
+    });
+  }
+
+  res.json({
+    today: {
+      date: today,
+      totalVisits: totalVisitsToday,
+      uniqueVisitors: uniqueVisitorsToday,
+      interpreterApplications: appsToday,
+      clientSignups: clientsToday,
+      dropOffs: dropOffsToday,
+      conversionRate: `${conversionRateToday}%`
+    },
+    lifetime: {
+      totalVisits: logs.length,
+      totalApplications: apps.length,
+      totalClients: users.filter(u => u.role === 'host' || u.role === 'client').length,
+      totalInterpreters: store.interpreters.length
+    },
+    recentVisits: logs.slice(0, 15),
+    dailyHistory
+  });
 });
 
 // 5. Interpreters Roster

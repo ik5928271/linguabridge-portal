@@ -20,7 +20,7 @@ import {
   Building2,
   FileCheck
 } from 'lucide-react';
-import { LANGUAGES, SPECIALTIES } from '../data/mockData';
+import { LANGUAGES, SPECIALTIES, EMPLOYMENT_MODELS } from '../data/mockData';
 
 export default function InterpreterApplicationModal({ isOpen, onClose }) {
   const [fullName, setFullName] = useState('');
@@ -34,12 +34,18 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
   const [selectedSpecialties, setSelectedSpecialties] = useState(['Medical / Healthcare']);
   const [certificationsText, setCertificationsText] = useState('');
   const [experienceYears, setExperienceYears] = useState(3);
-  const [hourlyRate, setHourlyRate] = useState(5);
+  
+  // 3-Tier Compensation & Employment Preference
+  const [employmentType, setEmploymentType] = useState('hourly'); // 'hourly', 'per_minute', 'salary_base'
+  const [hourlyRate, setHourlyRate] = useState(8);
+  const [minuteRate, setMinuteRate] = useState(0.30);
+  const [monthlySalary, setMonthlySalary] = useState(1200);
   const [bio, setBio] = useState('');
   
   // File uploads
   const [cvFile, setCvFile] = useState(null);
   const [docFile, setDocFile] = useState(null);
+
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -130,6 +136,12 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
       finalLanguages.push('English');
     }
 
+    const resolvedRateLabel = employmentType === 'salary_base' 
+      ? `$${monthlySalary}/mo (Salary Base)`
+      : employmentType === 'per_minute' 
+        ? `$${minuteRate.toFixed(2)}/min (Live Talk)`
+        : `$${hourlyRate}/hr (Scheduled Shift)`;
+
     const payload = {
       name: fullName.trim(),
       email: email.trim().toLowerCase(),
@@ -142,13 +154,18 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
         ? certificationsText.split(',').map(c => c.trim()).filter(Boolean)
         : ['Certified Professional Linguist'],
       experienceYears: parseInt(experienceYears) || 1,
-      hourlyRate: parseInt(hourlyRate) || 5,
-      bio: bio.trim() || `Professional ${resolvedPrimary} interpreter with ${experienceYears} years experience.`,
+      employmentType: employmentType, // 'salary_base', 'hourly', 'per_minute'
+      hourlyRate: parseInt(hourlyRate) || 8,
+      minuteRate: parseFloat(minuteRate) || 0.30,
+      monthlySalary: parseInt(monthlySalary) || 1200,
+      rateLabel: resolvedRateLabel,
+      bio: bio.trim() || `Professional ${resolvedPrimary} interpreter with ${experienceYears} years experience under ${resolvedRateLabel}.`,
       cvFileName: cvFile ? cvFile.name : 'Resume_CV_Submitted.pdf',
       cvFileData: 'simulated_cv_attachment_data',
       docFileName: docFile ? docFile.name : 'Certification_Proof.pdf',
       docFileData: 'simulated_cert_attachment_data'
     };
+
 
     try {
       const response = await fetch('/api/interpreter-applications', {
@@ -225,6 +242,12 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
                 <span className="text-slate-400">Primary Language:</span>
                 <span className="font-bold text-brand-300">
                   {primaryLang === 'Other' ? (customPrimaryLang || 'Custom Language') : primaryLang}
+                </span>
+              </div>
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                <span className="text-slate-400">Compensation Model:</span>
+                <span className="font-bold text-emerald-400">
+                  {employmentType === 'salary_base' ? `🏢 $${monthlySalary}/mo (Salary Base)` : employmentType === 'per_minute' ? `⏱️ $${minuteRate.toFixed(2)}/min (Live Talk)` : `💼 $${hourlyRate}/hr (Scheduled Shifts)`}
                 </span>
               </div>
               <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
@@ -496,14 +519,116 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
               </div>
             </div>
 
-            {/* SECTION 3: QUALIFICATIONS & RATES */}
-            <div className="space-y-3 pt-2 border-t border-slate-800">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-brand-400 flex items-center gap-1.5">
-                <Award className="w-3.5 h-3.5" />
-                <span>3. Qualifications & Rate Preferences</span>
-              </h3>
+            {/* SECTION 3: EMPLOYMENT & COMPENSATION MODEL */}
+            <div className="space-y-4 pt-2 border-t border-slate-800">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-brand-400 flex items-center gap-1.5">
+                  <Award className="w-3.5 h-3.5" />
+                  <span>3. Preferred Employment & Compensation Model</span>
+                </h3>
+                <span className="text-[10px] text-slate-400">
+                  Select how you wish to be engaged & compensated
+                </span>
+              </div>
 
+              {/* 3 Model Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Model 2: Hourly Shift */}
+                <div 
+                  onClick={() => setEmploymentType('hourly')}
+                  className={`p-3.5 rounded-2xl border cursor-pointer transition relative flex flex-col justify-between ${
+                    employmentType === 'hourly'
+                      ? 'bg-brand-950/40 border-brand-500 ring-2 ring-brand-500/50'
+                      : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-bold text-white flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5 text-brand-400" />
+                        <span>Hourly Rate</span>
+                      </span>
+                      {employmentType === 'hourly' && (
+                        <span className="w-4 h-4 rounded-full bg-brand-500 flex items-center justify-center text-white text-[10px]">✓</span>
+                      )}
+                    </div>
+                    <span className="text-[10px] font-bold text-brand-300 bg-brand-500/10 px-2 py-0.5 rounded-md border border-brand-500/20 block w-fit mb-1.5">
+                      Scheduled Shifts
+                    </span>
+                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                      For Interpreters with dedicated long shifts & confirmed assignment worklists, QA specialists, and consultants.
+                    </p>
+                  </div>
+                  <div className="mt-3 pt-2 border-t border-slate-800/80 text-[11px] font-semibold text-brand-300">
+                    Typically $6 - $25 / hr
+                  </div>
+                </div>
+
+                {/* Model 3: Per-Minute Talk Rate */}
+                <div 
+                  onClick={() => setEmploymentType('per_minute')}
+                  className={`p-3.5 rounded-2xl border cursor-pointer transition relative flex flex-col justify-between ${
+                    employmentType === 'per_minute'
+                      ? 'bg-emerald-950/40 border-emerald-500 ring-2 ring-emerald-500/50'
+                      : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-bold text-white flex items-center gap-1">
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Per-Minute Talk</span>
+                      </span>
+                      {employmentType === 'per_minute' && (
+                        <span className="w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center text-white text-[10px]">✓</span>
+                      )}
+                    </div>
+                    <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 block w-fit mb-1.5">
+                      On-Demand Flex (2x Rate)
+                    </span>
+                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                      For On-Demand Interpreters with variable standby volume. Paid strictly per live call minute at a higher rate.
+                    </p>
+                  </div>
+                  <div className="mt-3 pt-2 border-t border-slate-800/80 text-[11px] font-semibold text-emerald-300">
+                    Typically $0.20 - $0.75 / min
+                  </div>
+                </div>
+
+                {/* Model 1: Salary Base */}
+                <div 
+                  onClick={() => setEmploymentType('salary_base')}
+                  className={`p-3.5 rounded-2xl border cursor-pointer transition relative flex flex-col justify-between ${
+                    employmentType === 'salary_base'
+                      ? 'bg-purple-950/40 border-purple-500 ring-2 ring-purple-500/50'
+                      : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-bold text-white flex items-center gap-1">
+                        <Building2 className="w-3.5 h-3.5 text-purple-400" />
+                        <span>Salary Base</span>
+                      </span>
+                      {employmentType === 'salary_base' && (
+                        <span className="w-4 h-4 rounded-full bg-purple-500 flex items-center justify-center text-white text-[10px]">✓</span>
+                      )}
+                    </div>
+                    <span className="text-[10px] font-bold text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded-md border border-purple-500/20 block w-fit mb-1.5">
+                      Fixed Full-Time / Dedicated
+                    </span>
+                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                      For Full-Time In-House Interpreters, Admin staff, Accounts, and dedicated shift operations with fixed monthly pay.
+                    </p>
+                  </div>
+                  <div className="mt-3 pt-2 border-t border-slate-800/80 text-[11px] font-semibold text-purple-300">
+                    Typically $1,200 - $3,500 / mo
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic Rate Input according to selected model */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="text-[11px] font-semibold text-slate-300 block mb-1">Years of Experience</label>
                   <input
@@ -512,24 +637,71 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
                     max="40"
                     value={experienceYears}
                     onChange={(e) => setExperienceYears(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-brand-500"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white focus:outline-none focus:border-brand-500"
                   />
                 </div>
 
-                <div>
-                  <label className="text-[11px] font-semibold text-slate-300 block mb-1">Desired Hourly Rate ($/hr)</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-xs text-emerald-400 font-bold">$</span>
-                    <input
-                      type="number"
-                      min="5"
-                      max="200"
-                      value={hourlyRate}
-                      onChange={(e) => setHourlyRate(e.target.value)}
-                      className="w-full pl-7 pr-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white font-bold focus:outline-none focus:border-brand-500"
-                    />
+                {employmentType === 'hourly' && (
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                      Desired Hourly Rate ($/hr) *
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 text-xs text-brand-400 font-bold">$</span>
+                      <input
+                        type="number"
+                        min="5"
+                        max="200"
+                        value={hourlyRate}
+                        onChange={(e) => setHourlyRate(e.target.value)}
+                        className="w-full pl-7 pr-12 py-2.5 rounded-xl bg-slate-900 border border-brand-500/50 text-xs text-white font-bold focus:outline-none focus:border-brand-500"
+                      />
+                      <span className="absolute right-3 top-2.5 text-xs text-slate-400">/ hr</span>
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {employmentType === 'per_minute' && (
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                      Desired Live Talk Rate ($/min) *
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 text-xs text-emerald-400 font-bold">$</span>
+                      <input
+                        type="number"
+                        step="0.05"
+                        min="0.10"
+                        max="5.00"
+                        value={minuteRate}
+                        onChange={(e) => setMinuteRate(parseFloat(e.target.value) || 0)}
+                        className="w-full pl-7 pr-12 py-2.5 rounded-xl bg-slate-900 border border-emerald-500/50 text-xs text-white font-bold focus:outline-none focus:border-emerald-500"
+                      />
+                      <span className="absolute right-3 top-2.5 text-xs text-slate-400">/ min</span>
+                    </div>
+                  </div>
+                )}
+
+                {employmentType === 'salary_base' && (
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                      Desired Monthly Salary ($/mo) *
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 text-xs text-purple-400 font-bold">$</span>
+                      <input
+                        type="number"
+                        min="300"
+                        max="15000"
+                        step="50"
+                        value={monthlySalary}
+                        onChange={(e) => setMonthlySalary(e.target.value)}
+                        className="w-full pl-7 pr-12 py-2.5 rounded-xl bg-slate-900 border border-purple-500/50 text-xs text-white font-bold focus:outline-none focus:border-purple-500"
+                      />
+                      <span className="absolute right-3 top-2.5 text-xs text-slate-400">/ mo</span>
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="text-[11px] font-semibold text-slate-300 block mb-1">Certifications (comma separated)</label>
@@ -538,7 +710,7 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
                     placeholder="CCHI, NBCMI, Court Certified..."
                     value={certificationsText}
                     onChange={(e) => setCertificationsText(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500"
                   />
                 </div>
               </div>
@@ -547,13 +719,14 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
                 <label className="text-[11px] font-semibold text-slate-300 block mb-1">Professional Bio / Summary</label>
                 <textarea
                   rows="2"
-                  placeholder="Briefly describe your translation background, medical/court setting experience, and language capabilities..."
+                  placeholder="Briefly describe your translation background, medical/court setting experience, and shift availability..."
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
                   className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500"
                 />
               </div>
             </div>
+
 
             {/* SECTION 4: DOCUMENT & CV ATTACHMENTS */}
             <div className="space-y-3 pt-2 border-t border-slate-800">

@@ -199,3 +199,38 @@ export const INITIAL_INTERPRETERS = [];
 export function getInterpretersForLanguage(languageName) {
   return [];
 }
+
+// 3-Tier Employment & Compensation Models
+export const EMPLOYMENT_MODELS = [
+  {
+    id: 'salary_base',
+    name: 'Salary Base (Fixed Full-Time / Dedicated)',
+    badge: 'Fixed Salary',
+    rateUnit: '/ month',
+    roles: ['Admin Operations', 'Accounts & Finance', 'Full-Time In-House Interpreters', 'Shift Supervisors'],
+    description: 'Fixed monthly salary, confirmed shift timings, predictable roster and guaranteed monthly compensation.',
+    defaultAmount: 1200,
+    exampleRate: '$1,200 - $3,500 / month'
+  },
+  {
+    id: 'hourly',
+    name: 'Per Hour Paying Rate (Scheduled Shifts & Confirmed Queue)',
+    badge: 'Hourly Shift',
+    rateUnit: '/ hr',
+    roles: ['Scheduled Interpreters (Long Shifts)', 'Consultants', 'QA Specialists', 'Shift Interpreters'],
+    description: 'Scheduled long shifts and confirmed assignment queues. Paid per confirmed shift hour worked.',
+    defaultAmount: 8,
+    exampleRate: '$6 - $25 / hr'
+  },
+  {
+    id: 'per_minute',
+    name: 'Per Minute Talking Rate (On-Demand / Flexible Talk Time)',
+    badge: 'Per-Minute Live Talk',
+    rateUnit: '/ min',
+    roles: ['On-Demand Flex Interpreters', 'Standby Medical/Legal Linguists'],
+    description: 'Flexible standby queue with variable call volumes. Paid strictly per live call talk-time minute at a higher/double effective rate.',
+    defaultAmount: 0.30,
+    exampleRate: '$0.20 - $0.75 / min (~$12 - $45/hr active talk)'
+  }
+];
+
