@@ -60,44 +60,48 @@ export default function Navbar({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-100 to-brand-300 bg-clip-text text-transparent">
+              <span className={`text-xl font-extrabold tracking-tight ${
+                theme === 'light'
+                  ? 'bg-gradient-to-r from-slate-950 via-slate-800 to-brand-600 bg-clip-text text-transparent'
+                  : 'bg-gradient-to-r from-white via-slate-100 to-brand-300 bg-clip-text text-transparent'
+              }`}>
                 LinguaBridge
               </span>
-              <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-400 border border-brand-500/20">
+              <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20">
                 3-Way Connect
               </span>
             </div>
-            <p className="text-xs text-slate-400 font-medium">Enterprise On-Demand Interpretation Portal</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Enterprise On-Demand Interpretation Portal</p>
           </div>
         </div>
 
         {/* Center Navigation - Intelligently adapts based on user role! */}
         {!currentUser ? (
           /* 1. PUBLIC VISITOR NAVIGATION (No internal dashboards exposed) */
-          <nav className="flex items-center gap-1 sm:gap-2 text-xs font-semibold text-slate-300">
+          <nav className="flex items-center gap-1 sm:gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
             <button
               onClick={() => setCurrentView('landing')}
               className={`px-3 py-1.5 rounded-lg transition ${
-                currentView === 'landing' ? 'text-brand-400 bg-brand-500/10 font-bold' : 'hover:text-white hover:bg-slate-800/50'
+                currentView === 'landing' ? 'text-brand-600 dark:text-brand-400 bg-brand-500/10 font-bold' : 'hover:text-brand-600 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/50'
               }`}
             >
               Home
             </button>
             <button
               onClick={() => scrollToSection('services')}
-              className="px-3 py-1.5 rounded-lg hover:text-white hover:bg-slate-800/50 transition"
+              className="px-3 py-1.5 rounded-lg hover:text-brand-600 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/50 transition"
             >
               Services
             </button>
             <button
               onClick={() => scrollToSection('how-it-works')}
-              className="px-3 py-1.5 rounded-lg hover:text-white hover:bg-slate-800/50 transition"
+              className="px-3 py-1.5 rounded-lg hover:text-brand-600 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/50 transition"
             >
               How It Works
             </button>
             <button
               onClick={() => scrollToSection('pricing')}
-              className="px-3 py-1.5 rounded-lg hover:text-white hover:bg-slate-800/50 transition"
+              className="px-3 py-1.5 rounded-lg hover:text-brand-600 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/50 transition"
             >
               Pricing & Minutes
             </button>
@@ -190,17 +194,17 @@ export default function Navbar({
             onClick={onToggleTheme}
             title={theme === 'light' ? 'Switch to Dark Theme' : 'Switch to Light Theme'}
             aria-label="Toggle Dark / Light Theme"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium border border-slate-700 transition"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/80 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-xs font-semibold border border-slate-300 dark:border-slate-700 transition shadow-sm"
           >
             {theme === 'light' ? (
               <>
-                <Moon className="w-3.5 h-3.5 text-indigo-400" />
-                <span className="hidden xl:inline">Dark</span>
+                <Moon className="w-3.5 h-3.5 text-indigo-600" />
+                <span className="hidden xl:inline text-[11px] font-bold text-slate-800">Dark</span>
               </>
             ) : (
               <>
                 <Sun className="w-3.5 h-3.5 text-amber-400" />
-                <span className="hidden xl:inline">Light</span>
+                <span className="hidden xl:inline text-[11px] font-semibold text-slate-300">Light</span>
               </>
             )}
           </button>
@@ -209,22 +213,22 @@ export default function Navbar({
           <button
             onClick={onOpenGlossary}
             title="Search Medical & Legal Glossaries"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/80 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-xs font-medium border border-slate-300 dark:border-slate-700 transition shadow-sm"
           >
-            <BookOpen className="w-3.5 h-3.5 text-brand-400" />
+            <BookOpen className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400" />
             <span className="hidden xl:inline">Glossary</span>
           </button>
 
           {/* 3-Way Split Screen Live Demo (For testing & interactive previews) */}
           <button
             onClick={() => setCurrentView('split-demo')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-md ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${
               currentView === 'split-demo'
                 ? 'bg-gradient-to-r from-brand-500 to-indigo-600 text-white ring-2 ring-brand-400'
-                : 'bg-gradient-to-r from-brand-600/20 to-indigo-600/20 hover:from-brand-600/30 hover:to-indigo-600/30 text-brand-300 border border-brand-500/30'
+                : 'bg-brand-50 hover:bg-brand-100 text-brand-700 border-brand-200 dark:bg-gradient-to-r dark:from-brand-600/20 dark:to-indigo-600/20 dark:hover:from-brand-600/30 dark:hover:to-indigo-600/30 dark:text-brand-300 border dark:border-brand-500/30'
             }`}
           >
-            <LayoutGrid className="w-3.5 h-3.5 text-brand-400 animate-pulse" />
+            <LayoutGrid className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400 animate-pulse" />
             <span>3-Way Demo</span>
           </button>
 
@@ -233,26 +237,26 @@ export default function Navbar({
             <div className="relative">
               <button
                 onClick={() => setShowUserMenu(!showUserMenu)}
-                className="flex items-center gap-2 p-1.5 pl-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 transition"
+                className="flex items-center gap-2 p-1.5 pl-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 transition shadow-sm"
               >
                 <div className="w-6 h-6 rounded-full bg-brand-500 text-white font-bold text-xs flex items-center justify-center">
                   {currentUser.name?.charAt(0) || 'U'}
                 </div>
                 <div className="text-left hidden sm:block">
-                  <p className="text-[11px] font-bold text-white leading-tight truncate max-w-[110px]">{currentUser.name || 'User'}</p>
-                  <p className="text-[9px] text-slate-400 capitalize">
+                  <p className="text-[11px] font-bold text-slate-900 dark:text-white leading-tight truncate max-w-[110px]">{currentUser.name || 'User'}</p>
+                  <p className="text-[9px] text-slate-500 dark:text-slate-400 capitalize">
                     {currentUser?.role === 'admin' ? 'Administrator' : currentUser?.role === 'interpreter' ? 'Interpreter' : 'Client / Payer'}
                   </p>
                 </div>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                <ChevronDown className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
               </button>
 
               {showUserMenu && (
-                <div className="absolute right-0 mt-2 w-52 glass-panel p-2 rounded-2xl border border-slate-700 shadow-2xl space-y-1 text-xs z-50">
-                  <div className="px-3 py-2 border-b border-slate-800">
-                    <p className="font-bold text-white truncate">{currentUser.name || 'User'}</p>
-                    <p className="text-[10px] text-slate-400 truncate">{currentUser.email || ''}</p>
-                    <span className="inline-block mt-1 text-[9px] font-bold px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-300">
+                <div className="absolute right-0 mt-2 w-52 glass-panel p-2 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl space-y-1 text-xs z-50">
+                  <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-800">
+                    <p className="font-bold text-slate-900 dark:text-white truncate">{currentUser.name || 'User'}</p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{currentUser.email || ''}</p>
+                    <span className="inline-block mt-1 text-[9px] font-bold px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-600 dark:text-brand-300">
                       {currentUser?.role === 'admin' ? '👑 Admin Account' : currentUser?.role === 'interpreter' ? '🎧 Certified Linguist' : '💳 Client / Payer Account'}
                     </span>
                   </div>
@@ -262,9 +266,9 @@ export default function Navbar({
                       setCurrentView(currentUser?.role === 'admin' ? 'admin' : currentUser?.role === 'interpreter' ? 'interpreter' : 'host');
                       setShowUserMenu(false);
                     }}
-                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-200 flex items-center gap-2 transition"
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center gap-2 transition"
                   >
-                    <Users className="w-3.5 h-3.5 text-brand-400" />
+                    <Users className="w-3.5 h-3.5 text-brand-500" />
                     <span>My Dashboard</span>
                   </button>
 
@@ -274,7 +278,7 @@ export default function Navbar({
                       setShowUserMenu(false);
                       setCurrentView('landing');
                     }}
-                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-500/20 text-red-400 flex items-center gap-2 transition"
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400 flex items-center gap-2 transition"
                   >
                     <LogOut className="w-3.5 h-3.5" />
                     <span>Sign Out</span>
@@ -287,9 +291,9 @@ export default function Navbar({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => onOpenAuth('signin')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold border border-slate-300 dark:border-slate-700 transition shadow-sm"
               >
-                <LogIn className="w-3.5 h-3.5 text-brand-400" />
+                <LogIn className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400" />
                 <span>Sign In</span>
               </button>
 

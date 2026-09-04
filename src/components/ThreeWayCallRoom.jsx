@@ -832,7 +832,7 @@ export default function ThreeWayCallRoom({
               <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
                 <span className="text-[10px] text-slate-400 font-semibold">Calculated Cost</span>
                 <p className="text-lg font-black text-emerald-400">
-                  \${((seconds / 60) * 0.95 + 2.50).toFixed(2)}
+                  ${((seconds / 60) * 0.95 + 2.50).toFixed(2)}
                 </p>
               </div>
             </div>

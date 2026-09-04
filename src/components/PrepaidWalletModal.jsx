@@ -147,10 +147,10 @@ export default function PrepaidWalletModal({
                   )}
                   <div className="flex items-baseline justify-between">
                     <p className="text-base font-black text-white">{pack.minutes} Mins</p>
-                    <p className="text-xs font-bold text-emerald-400">\${pack.price}</p>
+                    <p className="text-xs font-bold text-emerald-400">${pack.price}</p>
                   </div>
                   <div className="flex items-center justify-between mt-1 text-[10px] text-slate-400">
-                    <span>\${pack.ratePerMin}/min</span>
+                    <span>${pack.ratePerMin}/min</span>
                     <span className="text-emerald-400 font-semibold">{pack.tag}</span>
                   </div>
                 </button>
@@ -188,7 +188,7 @@ export default function PrepaidWalletModal({
             ) : (
               <>
                 <Zap className="w-4 h-4" />
-                <span>Pay \${activePrice} & Add {activeMinutes} Minutes</span>
+                <span>Pay ${activePrice} & Add {activeMinutes} Minutes</span>
               </>
             )}
           </button>

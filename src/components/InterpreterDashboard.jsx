@@ -130,7 +130,7 @@ export default function InterpreterDashboard({
               <span>•</span>
               <span>{interpreter.totalCalls} Lifetime Sessions</span>
               <span>•</span>
-              <span className="text-emerald-400 font-semibold">\${interpreter.hourlyRate}/hr billing</span>
+              <span className="text-emerald-400 font-semibold">${interpreter.hourlyRate}/hr billing</span>
             </div>
           </div>
         </div>
@@ -200,7 +200,7 @@ export default function InterpreterDashboard({
         <div className="glass-panel p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
           <div>
             <p className="text-xs text-slate-400 font-medium">Today's Estimated Earnings</p>
-            <p className="text-2xl font-black text-emerald-400 mt-1">\$130.16</p>
+            <p className="text-2xl font-black text-emerald-400 mt-1">$130.16</p>
             <p className="text-[11px] text-slate-400 mt-1">Direct deposit ready</p>
           </div>
           <div className="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
