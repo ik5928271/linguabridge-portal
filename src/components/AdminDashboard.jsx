@@ -24,12 +24,19 @@ import {
   CreditCard,
   Sparkles,
   RefreshCw,
+  Award,
+  Send,
+  FileCheck,
+  Mail,
+  Check,
+  AlertCircle,
+  Eye,
   X
 } from 'lucide-react';
 import { LANGUAGES, SPECIALTIES } from '../data/mockData';
 
 export default function AdminDashboard({ callLogs = [], appointments = [] }) {
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'roster', 'billing', 'users'
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'users', 'applications', 'roster', 'billing'
   const [searchTerm, setSearchTerm] = useState('');
   const [userRoleFilter, setUserRoleFilter] = useState('all');
 
@@ -49,6 +56,19 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       createdAt: '2026-08-30'
     }
   ]);
+
+  // Interpreter Applications & Verification Queue state
+  const [applications, setApplications] = useState([]);
+  const [appFilter, setAppFilter] = useState('all'); // 'all', 'pending', 'approved', 'rejected'
+  const [selectedAppForReview, setSelectedAppForReview] = useState(null);
+  const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
+  const [reviewApprovedRate, setReviewApprovedRate] = useState(5);
+  const [reviewPassword, setReviewPassword] = useState('interp2026!');
+  const [reviewNotes, setReviewNotes] = useState('');
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [emailDispatchModal, setEmailDispatchModal] = useState(null);
+  const [docPreviewModal, setDocPreviewModal] = useState(null);
 
   // Modal for creating new accounts
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -77,7 +97,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   const [editTotalPaid, setEditTotalPaid] = useState(0);
   const [editBillingType, setEditBillingType] = useState('prepaid');
 
-  // Fetch users from backend
+  // Fetch users & applications from backend
   const fetchUsers = () => {
     fetch('/api/admin/users')
       .then(res => res.json())
@@ -89,8 +109,24 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       .catch(() => {});
   };
 
+  const fetchApplications = () => {
+    fetch('/api/admin/interpreter-applications')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setApplications(data);
+        }
+      })
+      .catch(() => {});
+  };
+
   useEffect(() => {
     fetchUsers();
+    fetchApplications();
+    const timer = setInterval(() => {
+      fetchApplications();
+    }, 10000);
+    return () => clearInterval(timer);
   }, []);
 
   const handleCreateAccount = (e) => {
@@ -218,6 +254,81 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
     }
   };
 
+  // Application Handlers
+  const handleOpenApproveModal = (app) => {
+    setSelectedAppForReview(app);
+    setReviewApprovedRate(app.hourlyRate || 5);
+    setReviewPassword(`interp${Math.floor(100 + Math.random() * 900)}!`);
+    setReviewNotes('Approved by IK Enterprises Administration');
+    setIsApproveModalOpen(true);
+  };
+
+  const handleConfirmApproval = (e) => {
+    e.preventDefault();
+    if (!selectedAppForReview) return;
+
+    fetch(`/api/admin/interpreter-applications/${selectedAppForReview.id}/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        approvedHourlyRate: parseInt(reviewApprovedRate) || 5,
+        initialPassword: reviewPassword,
+        adminNotes: reviewNotes
+      })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setIsApproveModalOpen(false);
+          fetchApplications();
+          fetchUsers();
+          if (data.emailDispatch) {
+            setEmailDispatchModal(data.emailDispatch);
+          }
+        }
+      })
+      .catch(() => {
+        setIsApproveModalOpen(false);
+      });
+  };
+
+  const handleOpenRejectModal = (app) => {
+    setSelectedAppForReview(app);
+    setRejectReason('Application does not meet current credentialing requirements.');
+    setIsRejectModalOpen(true);
+  };
+
+  const handleConfirmReject = (e) => {
+    e.preventDefault();
+    if (!selectedAppForReview) return;
+
+    fetch(`/api/admin/interpreter-applications/${selectedAppForReview.id}/reject`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rejectReason })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setIsRejectModalOpen(false);
+          fetchApplications();
+        }
+      })
+      .catch(() => {
+        setIsRejectModalOpen(false);
+      });
+  };
+
+  const handleDeleteApplication = (id) => {
+    if (!confirm('Are you sure you want to remove this application record?')) return;
+    fetch(`/api/admin/interpreter-applications/${id}`, { method: 'DELETE' })
+      .then(res => res.json())
+      .then(() => fetchApplications())
+      .catch(() => {});
+  };
+
+  const pendingApplicationsCount = applications.filter(a => a.status === 'pending').length;
+
   const filteredUsers = usersList.filter(user => {
     const matchesSearch = 
       (user.name && user.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -229,6 +340,16 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
     if (userRoleFilter === 'interpreter') return matchesSearch && user.role === 'interpreter';
     if (userRoleFilter === 'host') return matchesSearch && user.role === 'host';
     return matchesSearch;
+  });
+
+  const filteredApplications = applications.filter(app => {
+    const matchesSearch = 
+      (app.name && app.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (app.email && app.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (app.primaryLang && app.primaryLang.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    if (appFilter === 'all') return matchesSearch;
+    return matchesSearch && app.status === appFilter;
   });
 
   return (
@@ -254,18 +375,32 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
         </div>
 
         {/* Tab switcher */}
-        <div className="flex flex-wrap items-center bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 shadow-inner">
+        <div className="flex flex-wrap items-center bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 shadow-inner gap-1">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition ${
               activeTab === 'overview' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
             Live Monitor
           </button>
           <button
+            onClick={() => setActiveTab('applications')}
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+              activeTab === 'applications' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Award className="w-3.5 h-3.5 text-amber-400" />
+            <span>Linguist Applications</span>
+            {pendingApplicationsCount > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 text-[10px] font-extrabold animate-pulse">
+                {pendingApplicationsCount}
+              </span>
+            )}
+          </button>
+          <button
             onClick={() => setActiveTab('users')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
               activeTab === 'users' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
@@ -274,15 +409,15 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
           </button>
           <button
             onClick={() => setActiveTab('roster')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition ${
               activeTab === 'roster' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
-            Interpreters
+            Active Interpreters
           </button>
           <button
             onClick={() => setActiveTab('billing')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition ${
               activeTab === 'billing' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
@@ -337,6 +472,277 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
           </span>
         </div>
       </div>
+
+      {/* ========================================================== */}
+      {/* TAB: 📄 INTERPRETER APPLICATIONS & VERIFICATION QUEUE */}
+      {/* ========================================================== */}
+      {activeTab === 'applications' && (
+        <div className="space-y-6">
+          
+          {/* Action Toolbar */}
+          <div className="glass-panel p-6 rounded-3xl border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Award className="w-5 h-5 text-amber-400" />
+                <span>Interpreter Applications & Credential Review Queue</span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Review submitted linguist CVs, credentials, and languages before provisioning login accounts
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={fetchApplications}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold border border-slate-700 transition"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Refresh Queue</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Filter Bar & Search */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="flex items-center bg-slate-900/80 p-1 rounded-xl border border-slate-800 text-xs font-bold">
+              <button
+                onClick={() => setAppFilter('all')}
+                className={`px-3 py-1.5 rounded-lg transition ${appFilter === 'all' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                All Applications ({applications.length})
+              </button>
+              <button
+                onClick={() => setAppFilter('pending')}
+                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${appFilter === 'pending' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                <span>Pending Review</span>
+                {pendingApplicationsCount > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black">
+                    {pendingApplicationsCount}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setAppFilter('approved')}
+                className={`px-3 py-1.5 rounded-lg transition ${appFilter === 'approved' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                Approved & Active ({applications.filter(a => a.status === 'approved').length})
+              </button>
+              <button
+                onClick={() => setAppFilter('rejected')}
+                className={`px-3 py-1.5 rounded-lg transition ${appFilter === 'rejected' ? 'bg-red-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                Declined ({applications.filter(a => a.status === 'rejected').length})
+              </button>
+            </div>
+
+            <div className="relative flex-1 max-w-xs">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search applicant name, email, language..."
+                className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+              />
+            </div>
+          </div>
+
+          {/* Applications List */}
+          {filteredApplications.length === 0 ? (
+            <div className="p-12 rounded-3xl bg-slate-900/40 border border-slate-800 text-center space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center mx-auto">
+                <FileText className="w-6 h-6" />
+              </div>
+              <p className="text-base font-bold text-white">No Applications Found</p>
+              <p className="text-xs text-slate-400 max-w-md mx-auto">
+                When linguists apply through the portal signup form, their full resume, documents, and languages will appear in this review queue.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredApplications.map((app) => {
+                const isPending = app.status === 'pending';
+                const isApproved = app.status === 'approved';
+                const isRejected = app.status === 'rejected';
+
+                return (
+                  <div 
+                    key={app.id} 
+                    className={`p-6 rounded-3xl border transition space-y-4 relative ${
+                      isPending 
+                        ? 'bg-slate-900/90 border-amber-500/40 ring-1 ring-amber-500/20' 
+                        : isApproved 
+                          ? 'bg-slate-900/60 border-emerald-500/30' 
+                          : 'bg-slate-900/40 border-slate-800 opacity-75'
+                    }`}
+                  >
+                    {/* Header Row */}
+                    <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                      <div className="flex items-start gap-3.5">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white font-black flex items-center justify-center text-lg shadow-lg shrink-0">
+                          {app.name?.charAt(0) || 'L'}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2.5">
+                            <h4 className="text-base font-extrabold text-white">{app.name}</h4>
+                            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider border ${
+                              isPending 
+                                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse' 
+                                : isApproved 
+                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' 
+                                  : 'bg-red-500/20 text-red-300 border-red-500/40'
+                            }`}>
+                              {app.status === 'pending' ? '● Pending Review' : app.status === 'approved' ? '✓ Verified & Provisioned' : '✕ Declined'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-300 mt-0.5 flex flex-wrap items-center gap-2">
+                            <span className="font-mono text-purple-300">{app.email}</span>
+                            {app.phone && <span>• {app.phone}</span>}
+                            <span>• {app.country || 'United States'}</span>
+                            <span className="text-slate-500">• Submitted {new Date(app.submittedAt || Date.now()).toLocaleDateString()}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {isPending && (
+                          <>
+                            <button
+                              onClick={() => handleOpenApproveModal(app)}
+                              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-600/30 transition"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Review & Approve Account</span>
+                            </button>
+                            <button
+                              onClick={() => handleOpenRejectModal(app)}
+                              className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-red-950/40 text-slate-300 hover:text-red-300 font-bold text-xs border border-slate-700 hover:border-red-500/40 transition"
+                            >
+                              <span>Decline</span>
+                            </button>
+                          </>
+                        )}
+
+                        {isApproved && app.emailDispatch && (
+                          <button
+                            onClick={() => setEmailDispatchModal(app.emailDispatch)}
+                            className="px-3.5 py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 font-bold text-xs flex items-center gap-1.5 transition"
+                          >
+                            <Mail className="w-3.5 h-3.5" />
+                            <span>View Email Dispatch</span>
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => handleDeleteApplication(app.id)}
+                          className="p-2 rounded-xl bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 border border-slate-700 transition"
+                          title="Delete Application Record"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Qualifications & CV Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                      
+                      {/* Column 1: Language Fluency */}
+                      <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-1.5">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1">
+                          <Globe className="w-3.5 h-3.5 text-brand-400" />
+                          <span>Language Expertise</span>
+                        </span>
+                        <p className="font-bold text-white text-sm">
+                          Primary: <span className="text-brand-300">{app.primaryLang}</span>
+                        </p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {(app.languages || [app.primaryLang, 'English']).map((l, idx) => (
+                            <span key={idx} className="px-2 py-0.5 rounded-md bg-slate-900 text-slate-300 text-[10px] font-semibold border border-slate-800">
+                              {l}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Column 2: Specialties & Experience */}
+                      <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-1.5">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1">
+                          <Award className="w-3.5 h-3.5 text-purple-400" />
+                          <span>Qualifications & Rates</span>
+                        </span>
+                        <p className="font-semibold text-white">
+                          Experience: <span className="font-bold text-emerald-400">{app.experienceYears || 3} Years</span>
+                        </p>
+                        <p className="text-[11px] text-slate-300">
+                          Requested Rate: <span className="font-mono font-bold text-white">${app.hourlyRate || 5} / hr</span>
+                        </p>
+                        <p className="text-[10px] text-slate-400 truncate">
+                          Certifications: {Array.isArray(app.certifications) ? app.certifications.join(', ') : app.certifications}
+                        </p>
+                      </div>
+
+                      {/* Column 3: Submitted CV & Documents */}
+                      <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-2">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1">
+                          <FileCheck className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Submitted Files</span>
+                        </span>
+                        
+                        <div className="space-y-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setDocPreviewModal({ title: 'CV / Resume Preview', fileName: app.cvFileName || 'Applicant_Resume_CV.pdf', applicantName: app.name, type: 'cv' })}
+                            className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left flex items-center justify-between text-[11px] text-slate-200 transition"
+                          >
+                            <span className="flex items-center gap-1.5 truncate">
+                              <FileText className="w-3.5 h-3.5 text-brand-400 shrink-0" />
+                              <span className="truncate">{app.cvFileName || 'CV_Resume.pdf'}</span>
+                            </span>
+                            <Eye className="w-3 h-3 text-slate-400 shrink-0 ml-1" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setDocPreviewModal({ title: 'Credential Certificate Preview', fileName: app.docFileName || 'Certification_Diploma.pdf', applicantName: app.name, type: 'cert' })}
+                            className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left flex items-center justify-between text-[11px] text-slate-200 transition"
+                          >
+                            <span className="flex items-center gap-1.5 truncate">
+                              <Award className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                              <span className="truncate">{app.docFileName || 'Certificate.pdf'}</span>
+                            </span>
+                            <Eye className="w-3 h-3 text-slate-400 shrink-0 ml-1" />
+                          </button>
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* Bio Snippet */}
+                    {app.bio && (
+                      <p className="text-xs text-slate-300 bg-slate-950/40 p-3 rounded-2xl border border-slate-800/60 leading-relaxed">
+                        <strong className="text-slate-400 block text-[10px] uppercase font-bold mb-0.5">Professional Bio:</strong>
+                        {app.bio}
+                      </p>
+                    )}
+
+                    {/* Admin Notes if processed */}
+                    {app.adminNotes && (
+                      <p className="text-[11px] text-slate-400 bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-800 flex items-center gap-1.5">
+                        <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+                        <span>Admin Decision Notes: <strong className="text-slate-200">{app.adminNotes}</strong></span>
+                      </p>
+                    )}
+
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+        </div>
+      )}
 
       {/* ========================================================== */}
       {/* TAB 1: 👑 USER & ACCOUNT MANAGEMENT SUITE (MASTER ACCESS) */}
@@ -1068,6 +1474,297 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
                 </table>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================== */}
+      {/* MODAL 1: APPROVE APPLICATION & PROVISION ACCOUNT */}
+      {/* ========================================================== */}
+      {isApproveModalOpen && selectedAppForReview && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="max-w-lg w-full bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 relative text-white">
+            
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                  <Award className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white">Approve & Provision Account</h3>
+                  <p className="text-xs text-slate-400">Issue credentials to {selectedAppForReview.name}</p>
+                </div>
+              </div>
+              <button onClick={() => setIsApproveModalOpen(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmApproval} className="space-y-4 text-xs">
+              {/* Applicant Overview Card */}
+              <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Applicant:</span>
+                  <span className="font-bold text-white">{selectedAppForReview.name}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Email:</span>
+                  <span className="font-mono text-purple-300">{selectedAppForReview.email}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Languages:</span>
+                  <span className="font-semibold text-brand-300">{(selectedAppForReview.languages || [selectedAppForReview.primaryLang]).join(', ')}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Submitted CV:</span>
+                  <span className="text-emerald-400 flex items-center gap-1 font-mono">
+                    <FileText className="w-3 h-3" />
+                    {selectedAppForReview.cvFileName || 'Resume.pdf'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Set Approved Hourly Rate */}
+              <div className="space-y-1">
+                <label className="font-semibold text-slate-300">Approved Hourly Rate ($/hr):</label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-2.5 font-bold text-emerald-400">$</span>
+                  <input
+                    type="number"
+                    min="5"
+                    max="300"
+                    required
+                    value={reviewApprovedRate}
+                    onChange={(e) => setReviewApprovedRate(e.target.value)}
+                    className="w-full pl-8 pr-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white font-bold focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <span className="text-[10px] text-slate-400">The rate paying clients will see when booking this linguist.</span>
+              </div>
+
+              {/* Set Initial Password */}
+              <div className="space-y-1">
+                <label className="font-semibold text-slate-300">Initial Login Password:</label>
+                <div className="relative">
+                  <Key className="w-4 h-4 text-purple-400 absolute left-3.5 top-2.5" />
+                  <input
+                    type="text"
+                    required
+                    value={reviewPassword}
+                    onChange={(e) => setReviewPassword(e.target.value)}
+                    className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white font-mono font-bold focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <span className="text-[10px] text-slate-400">This temporary password will be dispatched to the linguist via email.</span>
+              </div>
+
+              {/* Approval Notes */}
+              <div className="space-y-1">
+                <label className="font-semibold text-slate-300">Internal Verification Notes:</label>
+                <input
+                  type="text"
+                  value={reviewNotes}
+                  onChange={(e) => setReviewNotes(e.target.value)}
+                  placeholder="e.g. Credentials verified with state licensing board"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsApproveModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-emerald-600/30"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Confirm & Dispatch Login Credentials</span>
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================== */}
+      {/* MODAL 2: DECLINE APPLICATION */}
+      {/* ========================================================== */}
+      {isRejectModalOpen && selectedAppForReview && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-slate-900 border border-red-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 relative text-white">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-red-500/20 text-red-400 flex items-center justify-center">
+                  <AlertCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white">Decline Application</h3>
+                  <p className="text-xs text-slate-400">{selectedAppForReview.name}</p>
+                </div>
+              </div>
+              <button onClick={() => setIsRejectModalOpen(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmReject} className="space-y-4 text-xs">
+              <div className="space-y-1">
+                <label className="font-semibold text-slate-300">Reason for Declining:</label>
+                <textarea
+                  rows="3"
+                  required
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-red-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsRejectModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs"
+                >
+                  Confirm Decline
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================== */}
+      {/* MODAL 3: OFFICIAL CREDENTIAL DISPATCH EMAIL PREVIEW */}
+      {/* ========================================================== */}
+      {emailDispatchModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="max-w-xl w-full bg-slate-900 border border-purple-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 relative text-white">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
+                  <Mail className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                    ✓ Email Dispatched Successfully
+                  </span>
+                  <h3 className="text-base font-extrabold text-white mt-1">Official Credential Notification</h3>
+                </div>
+              </div>
+              <button onClick={() => setEmailDispatchModal(null)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Simulated Email Message Card */}
+            <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3.5 text-xs">
+              <div className="border-b border-slate-800/80 pb-2.5 space-y-1">
+                <p><span className="text-slate-400">To:</span> <strong className="text-white">{emailDispatchModal.to}</strong></p>
+                <p><span className="text-slate-400">From:</span> <strong className="text-purple-300">operations@linguabridge.com (IK Enterprises)</strong></p>
+                <p><span className="text-slate-400">Subject:</span> <strong className="text-emerald-300">{emailDispatchModal.subject}</strong></p>
+              </div>
+
+              <div className="space-y-2 text-slate-300 leading-relaxed">
+                <p>Dear <strong>{emailDispatchModal.recipientName}</strong>,</p>
+                <p>
+                  Congratulations! Your application and professional credentials have been reviewed and approved by the <strong>IK Enterprises Verification Board</strong>. Your certified interpreter profile is now active on the LinguaBridge global network.
+                </p>
+
+                <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2 font-mono text-xs">
+                  <p className="text-purple-300 font-bold font-sans uppercase text-[10px]">Your Official Portal Login Details:</p>
+                  <p className="text-white">📧 Login Email: <span className="font-bold text-brand-300">{emailDispatchModal.loginEmail}</span></p>
+                  <p className="text-white">🔑 Temporary Password: <span className="font-bold text-amber-400">{emailDispatchModal.temporaryPassword}</span></p>
+                  <p className="text-white">💵 Approved Hourly Rate: <span className="font-bold text-emerald-400">{emailDispatchModal.hourlyRate}</span></p>
+                  <p className="text-white">🌐 Portal Access: <a href={emailDispatchModal.portalUrl} target="_blank" rel="noreferrer" className="text-brand-400 underline">{emailDispatchModal.portalUrl}</a></p>
+                </div>
+
+                <p className="text-[11px] text-slate-400">
+                  Please sign in to your dashboard to set your availability status, review live 3-way conference dispatches, and access medical/legal glossaries.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(`Login Email: ${emailDispatchModal.loginEmail}\nPassword: ${emailDispatchModal.temporaryPassword}\nPortal: ${emailDispatchModal.portalUrl}`);
+                  alert('Login details copied to clipboard!');
+                }}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition"
+              >
+                Copy Details
+              </button>
+              <button
+                type="button"
+                onClick={() => setEmailDispatchModal(null)}
+                className="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30"
+              >
+                Done
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================== */}
+      {/* MODAL 4: DOCUMENT & CV INSPECTION PREVIEW */}
+      {/* ========================================================== */}
+      {docPreviewModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 relative text-white">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-brand-500/20 text-brand-400 flex items-center justify-center">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white">{docPreviewModal.title}</h3>
+                  <p className="text-xs text-slate-400">Applicant: {docPreviewModal.applicantName}</p>
+                </div>
+              </div>
+              <button onClick={() => setDocPreviewModal(null)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800 text-center space-y-3">
+              <div className="w-14 h-14 rounded-2xl bg-slate-900 text-emerald-400 flex items-center justify-center mx-auto border border-slate-800">
+                <FileCheck className="w-7 h-7" />
+              </div>
+              <p className="text-sm font-bold text-white">{docPreviewModal.fileName}</p>
+              <p className="text-xs text-slate-400">
+                {docPreviewModal.type === 'cv' 
+                  ? 'Official Curriculum Vitae / Resume with certified interpretation history and hospital clearances.'
+                  : 'Certified Professional Linguist Accreditation & State License.'}
+              </p>
+              <span className="inline-block text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+                ✓ Verified File Format & Integrity (PDF)
+              </span>
+            </div>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setDocPreviewModal(null)}
+                className="w-full py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs"
+              >
+                Close Preview
+              </button>
+            </div>
           </div>
         </div>
       )}

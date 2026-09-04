@@ -11,6 +11,7 @@ import DemoSplitView from './components/DemoSplitView';
 import ScheduleModal from './components/ScheduleModal';
 import GlossaryModal from './components/GlossaryModal';
 import AuthModal from './components/AuthModal';
+import InterpreterApplicationModal from './components/InterpreterApplicationModal';
 
 export default function App() {
   // Navigation & Role states
@@ -22,6 +23,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState('signin'); // 'signin' or 'signup'
+  const [isInterpreterAppOpen, setIsInterpreterAppOpen] = useState(false);
 
   // Global Prepaid Minute Wallet State (Clean starting slate for live testing)
   const [clientWallet, setClientWallet] = useState({
@@ -168,6 +170,7 @@ export default function App() {
           setCurrentView={setCurrentView}
           currentUser={currentUser}
           onOpenAuth={handleOpenAuth}
+          onOpenInterpreterApplication={() => setIsInterpreterAppOpen(true)}
           onLogout={handleLogout}
           onlineStatus={onlineStatus}
           setOnlineStatus={setOnlineStatus}
@@ -191,6 +194,7 @@ export default function App() {
             onOpenSchedule={() => setIsScheduleOpen(true)}
             onOpenGlossary={() => setIsGlossaryOpen(true)}
             onOpenAuth={handleOpenAuth}
+            onOpenInterpreterApplication={() => setIsInterpreterAppOpen(true)}
           />
         )}
 
@@ -252,6 +256,15 @@ export default function App() {
         onClose={() => setIsAuthOpen(false)}
         initialMode={authMode}
         onSuccessLogin={handleSuccessLogin}
+        onOpenInterpreterApplication={() => {
+          setIsAuthOpen(false);
+          setIsInterpreterAppOpen(true);
+        }}
+      />
+
+      <InterpreterApplicationModal
+        isOpen={isInterpreterAppOpen}
+        onClose={() => setIsInterpreterAppOpen(false)}
       />
 
       <ScheduleModal

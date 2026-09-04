@@ -157,6 +157,29 @@ const SEED_WALLETS = {
 let store = {
   users: [...SEED_USERS],
   interpreters: SEED_USERS.filter(u => u.role === 'interpreter'),
+  interpreterApplications: [
+    {
+      id: 'app-seed-1',
+      name: 'Ahmed Farooq',
+      email: 'ahmed.farooq@linguabridge-applicant.com',
+      phone: '+1 (555) 234-8901',
+      country: 'United States',
+      primaryLang: 'Urdu',
+      languages: ['Urdu', 'Punjabi', 'English', 'Hindi'],
+      specialties: ['Medical / Healthcare', 'Legal / Court Certified', 'Immigration & Refugee'],
+      certifications: ['Certified Healthcare Interpreter (CCHI)', 'State Court Interpreter'],
+      experienceYears: 7,
+      hourlyRate: 5,
+      bio: 'Certified Urdu and Punjabi medical interpreter with 7+ years translating in emergency departments, trauma surgeries, and immigration court hearings.',
+      cvFileName: 'Ahmed_Farooq_Certified_Linguist_CV.pdf',
+      cvFileData: 'data:application/pdf;base64,JVBERi0xLjQKJ...',
+      docFileName: 'CCHI_Healthcare_Certification_Farooq.pdf',
+      docFileData: 'data:application/pdf;base64,JVBERi0xLjQKJ...',
+      status: 'pending', // 'pending', 'approved', 'rejected'
+      adminNotes: '',
+      submittedAt: new Date(Date.now() - 3600000 * 2).toISOString()
+    }
+  ],
   appointments: [],
   callLogs: [],
   wallets: { ...SEED_WALLETS }
@@ -173,6 +196,10 @@ function loadStore() {
     if (fs.existsSync(STORE_FILE)) {
       const data = fs.readFileSync(STORE_FILE, 'utf8');
       store = JSON.parse(data);
+
+      if (!Array.isArray(store.interpreterApplications)) {
+        store.interpreterApplications = [];
+      }
 
       // Ensure Owner Account always exists with latest credentials
       const ownerIndex = store.users.findIndex(u => u.email.toLowerCase() === DEFAULT_OWNER.email.toLowerCase() || u.isOwner);
@@ -202,7 +229,7 @@ function loadStore() {
       // Ensure Interpreters collection is synchronized
       store.interpreters = store.users.filter(u => u.role === 'interpreter');
 
-      console.log(`[Database Loaded] Users: ${store.users.length}, Interpreters: ${store.interpreters.length}, Appointments: ${store.appointments.length}`);
+      console.log(`[Database Loaded] Users: ${store.users.length}, Interpreters: ${store.interpreters.length}, Applications: ${store.interpreterApplications.length}, Appointments: ${store.appointments.length}`);
     } else {
       saveStore();
     }
@@ -244,6 +271,12 @@ async function initMongo() {
       }
     }
 
+    // Sync Applications from MongoDB
+    const mongoApps = await db.collection('interpreter_applications').find({}).toArray();
+    if (mongoApps.length > 0) {
+      store.interpreterApplications = mongoApps.map(({ _id, ...a }) => a);
+    }
+
     // Sync Appointments & Call Logs
     const mongoAppointments = await db.collection('appointments').find({}).toArray();
     if (mongoAppointments.length > 0) {
@@ -256,7 +289,7 @@ async function initMongo() {
     }
 
     store.interpreters = store.users.filter(u => u.role === 'interpreter');
-    console.log(`[MongoDB Sync Complete] Real Users: ${store.users.length}, Wallets: ${Object.keys(store.wallets).length}, Appointments: ${store.appointments.length}`);
+    console.log(`[MongoDB Sync Complete] Real Users: ${store.users.length}, Applications: ${store.interpreterApplications.length}, Wallets: ${Object.keys(store.wallets).length}`);
   } catch (err) {
     console.error('❌ [MongoDB Connection Warning]:', err.message);
   }
@@ -268,6 +301,9 @@ async function saveStore() {
     if (db) {
       for (const u of store.users) {
         await db.collection('users').updateOne({ id: u.id }, { $set: u }, { upsert: true }).catch(() => {});
+      }
+      for (const app of store.interpreterApplications) {
+        await db.collection('interpreter_applications').updateOne({ id: app.id }, { $set: app }, { upsert: true }).catch(() => {});
       }
       for (const uId of Object.keys(store.wallets)) {
         await db.collection('wallets').updateOne({ userId: uId }, { $set: store.wallets[uId] }, { upsert: true }).catch(() => {});
@@ -684,6 +720,213 @@ app.delete('/api/admin/users/:id', (req, res) => {
 
   saveStore();
   res.json({ success: true, message: 'Account removed successfully.' });
+});
+
+// ==========================================
+// INTERPRETER APPLICATIONS & VERIFICATION QUEUE
+// ==========================================
+
+// 1. Submit new Interpreter Application (Public Intake)
+app.post('/api/interpreter-applications', (req, res) => {
+  const {
+    name,
+    email,
+    phone = '',
+    country = 'United States',
+    primaryLang = 'Spanish',
+    languages = ['Spanish', 'English'],
+    specialties = ['General / Customer Support'],
+    certifications = ['Certified Professional Linguist'],
+    experienceYears = 3,
+    hourlyRate = 5,
+    bio = '',
+    cvFileName = '',
+    cvFileData = '',
+    docFileName = '',
+    docFileData = ''
+  } = req.body;
+
+  if (!name || !email) {
+    return res.status(400).json({ error: 'Full name and email are required.' });
+  }
+
+  // Check if email already registered as an active user
+  const existingUser = store.users.find(u => u.email.toLowerCase() === email.toLowerCase().trim());
+  if (existingUser) {
+    return res.status(400).json({ error: 'An active account with this email already exists in our system.' });
+  }
+
+  // Check if an application already exists for this email
+  const existingAppIndex = store.interpreterApplications.findIndex(a => a.email.toLowerCase() === email.toLowerCase().trim());
+
+  const newApp = {
+    id: `app-${Date.now().toString(36)}`,
+    name: name.trim(),
+    email: email.toLowerCase().trim(),
+    phone: phone.trim(),
+    country: country.trim(),
+    primaryLang,
+    languages: Array.isArray(languages) && languages.length > 0 ? languages : [primaryLang, 'English'],
+    specialties: Array.isArray(specialties) && specialties.length > 0 ? specialties : ['General / Customer Support'],
+    certifications: Array.isArray(certifications) && certifications.length > 0 ? certifications : ['Certified Professional Linguist'],
+    experienceYears: parseInt(experienceYears) || 1,
+    hourlyRate: parseInt(hourlyRate) || 5,
+    bio: bio.trim() || `Certified ${primaryLang} professional linguist.`,
+    cvFileName: cvFileName || 'Resume_CV.pdf',
+    cvFileData: cvFileData || null,
+    docFileName: docFileName || 'Credentials_Certificate.pdf',
+    docFileData: docFileData || null,
+    status: 'pending', // 'pending', 'approved', 'rejected'
+    adminNotes: '',
+    submittedAt: new Date().toISOString()
+  };
+
+  if (existingAppIndex >= 0) {
+    store.interpreterApplications[existingAppIndex] = { ...store.interpreterApplications[existingAppIndex], ...newApp };
+  } else {
+    store.interpreterApplications.unshift(newApp);
+  }
+
+  saveStore();
+  io.emit('new-interpreter-application', newApp);
+
+  res.json({
+    success: true,
+    message: 'Interpreter application submitted successfully. Our verification team will review your CV and credentials.',
+    application: newApp
+  });
+});
+
+// 2. Admin: Get all applications
+app.get('/api/admin/interpreter-applications', (req, res) => {
+  res.json(store.interpreterApplications || []);
+});
+
+// 3. Admin: Approve Application & Provision Active Account
+app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
+  const { id } = req.params;
+  const { approvedHourlyRate, initialPassword, adminNotes } = req.body;
+
+  const appItem = store.interpreterApplications.find(a => a.id === id);
+  if (!appItem) {
+    return res.status(404).json({ error: 'Application not found.' });
+  }
+
+  const finalRate = approvedHourlyRate !== undefined ? parseInt(approvedHourlyRate) : appItem.hourlyRate || 5;
+  const passwordToSet = initialPassword || 'interp2026!';
+
+  // Mark application as approved
+  appItem.status = 'approved';
+  appItem.adminNotes = adminNotes || 'Approved by IK Enterprises Administration';
+  appItem.approvedAt = new Date().toISOString();
+
+  // Create or Update Active User Account
+  let existingUser = store.users.find(u => u.email.toLowerCase() === appItem.email.toLowerCase());
+  const userId = existingUser ? existingUser.id : `usr-${Date.now().toString(36)}`;
+
+  const userAccount = {
+    id: userId,
+    name: appItem.name,
+    email: appItem.email.toLowerCase(),
+    password: passwordToSet,
+    role: 'interpreter',
+    org: 'Certified Linguist Pool (Verified)',
+    primaryLang: appItem.primaryLang,
+    languages: appItem.languages,
+    specialty: appItem.specialties?.[0] || 'General / Customer Support',
+    hourlyRate: finalRate,
+    certifications: appItem.certifications,
+    bio: appItem.bio,
+    phone: appItem.phone,
+    isVerified: true,
+    createdAt: new Date().toISOString()
+  };
+
+  if (existingUser) {
+    const idx = store.users.findIndex(u => u.id === existingUser.id);
+    store.users[idx] = { ...store.users[idx], ...userAccount };
+  } else {
+    store.users.push(userAccount);
+  }
+
+  // Create or Update Interpreter Roster Item
+  let existingInterp = store.interpreters.find(i => i.email.toLowerCase() === appItem.email.toLowerCase() || i.userId === userId);
+  const interpProfile = {
+    id: existingInterp ? existingInterp.id : `int-${Date.now().toString(36)}`,
+    userId: userId,
+    name: appItem.name,
+    email: appItem.email.toLowerCase(),
+    avatar: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 900000000)}?w=150&auto=format&fit=crop&q=80`,
+    languages: appItem.languages,
+    primaryLang: appItem.primaryLang,
+    specialties: appItem.specialties,
+    status: 'online',
+    rating: 5.0,
+    totalCalls: 0,
+    hourlyRate: finalRate,
+    certifications: appItem.certifications,
+    bio: appItem.bio,
+    isVerified: true
+  };
+
+  if (existingInterp) {
+    const idx = store.interpreters.findIndex(i => i.id === existingInterp.id);
+    store.interpreters[idx] = { ...store.interpreters[idx], ...interpProfile };
+  } else {
+    store.interpreters.push(interpProfile);
+  }
+
+  // Simulated Official Credential Dispatch Email Record
+  const emailDispatch = {
+    to: appItem.email,
+    subject: 'Welcome to LinguaBridge - Your Certified Interpreter Account is Approved & Active',
+    sentAt: new Date().toISOString(),
+    recipientName: appItem.name,
+    loginEmail: appItem.email,
+    temporaryPassword: passwordToSet,
+    hourlyRate: `$${finalRate}/hr`,
+    portalUrl: 'https://linguabridge-portal.onrender.com'
+  };
+
+  appItem.emailDispatch = emailDispatch;
+
+  saveStore();
+  io.emit('interpreter-registered', interpProfile);
+
+  res.json({
+    success: true,
+    message: `Account approved and provisioned for ${appItem.name}. Login credentials generated.`,
+    user: userAccount,
+    interpreter: interpProfile,
+    application: appItem,
+    emailDispatch
+  });
+});
+
+// 4. Admin: Reject Application
+app.post('/api/admin/interpreter-applications/:id/reject', (req, res) => {
+  const { id } = req.params;
+  const { rejectReason } = req.body;
+
+  const appItem = store.interpreterApplications.find(a => a.id === id);
+  if (!appItem) {
+    return res.status(404).json({ error: 'Application not found.' });
+  }
+
+  appItem.status = 'rejected';
+  appItem.adminNotes = rejectReason || 'Application does not meet current credentialing requirements.';
+  appItem.rejectedAt = new Date().toISOString();
+
+  saveStore();
+  res.json({ success: true, message: 'Application status updated to rejected.', application: appItem });
+});
+
+// 5. Admin: Delete Application
+app.delete('/api/admin/interpreter-applications/:id', (req, res) => {
+  const { id } = req.params;
+  store.interpreterApplications = store.interpreterApplications.filter(a => a.id !== id);
+  saveStore();
+  res.json({ success: true, message: 'Application deleted.' });
 });
 
 // 5. Interpreters Roster

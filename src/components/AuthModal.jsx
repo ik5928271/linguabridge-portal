@@ -19,7 +19,8 @@ export default function AuthModal({
   isOpen, 
   onClose, 
   initialMode = 'signin', // 'signin' or 'signup'
-  onSuccessLogin 
+  onSuccessLogin,
+  onOpenInterpreterApplication
 }) {
   if (!isOpen) return null;
 
@@ -325,117 +326,127 @@ export default function AuthModal({
               </div>
             </div>
 
-            {/* Common fields */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-300">Full Name</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Dr. Jennifer Adams"
-                  className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
-                  required
-                />
-              </div>
+            {/* Role specific forms */}
+            {role === 'interpreter' ? (
+              <div className="space-y-4">
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-950 border border-emerald-500/30 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                      <Award className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-white text-xs">Interpreter Verification & Credential Intake</h4>
+                      <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                        All prospective interpreters must submit their languages, qualifications, and <strong className="text-white">CV/Resume</strong> for verification by the <strong className="text-emerald-400">IK Enterprises Administration Board</strong> before portal login credentials are provisioned.
+                      </p>
+                    </div>
+                  </div>
 
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-300">Work Email</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@company.com"
-                  className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
-                  required
-                />
-              </div>
-            </div>
+                  <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-[10px] text-slate-400 space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-emerald-400 font-semibold">
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                      <span>Step 1: Fill Application & Attach CV + Credentials</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-brand-400 font-semibold">
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                      <span>Step 2: IK Enterprises Review & Verification</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-purple-400 font-semibold">
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                      <span>Step 3: Receive Official Login Credentials via Email</span>
+                    </div>
+                  </div>
 
-            {/* Role specific fields */}
-            {role === 'host' ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-300">Organization / Company (Optional for Individuals)</label>
-                  <input
-                    type="text"
-                    value={orgName}
-                    onChange={(e) => setOrgName(e.target.value)}
-                    placeholder="e.g. St. Jude Hospital, Law Firm, or Individual"
-                    className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-300">Primary Domain</label>
-                  <select
-                    value={specialty}
-                    onChange={(e) => setSpecialty(e.target.value)}
-                    className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none bg-slate-900"
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onOpenInterpreterApplication) onOpenInterpreterApplication();
+                    }}
+                    className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition transform hover:scale-[1.01]"
                   >
-                    {SPECIALTIES.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-                  </select>
+                    <span>Open Interpreter Application & Document Intake</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
                 </div>
-              </div>
-            ) : role === 'admin' ? (
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-300">Operations Title / Department</label>
-                <input
-                  type="text"
-                  value={orgName}
-                  onChange={(e) => setOrgName(e.target.value)}
-                  placeholder="e.g. Platform Owner / Operations Management"
-                  className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
-                />
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-300">Primary Language Pair</label>
-                  <select
-                    value={primaryLang}
-                    onChange={(e) => setPrimaryLang(e.target.value)}
-                    className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none bg-slate-900"
-                  >
-                    {LANGUAGES.map(l => <option key={l.code} value={l.name}>{l.flag} {l.name}</option>)}
-                  </select>
+              <>
+                {/* Client / Host Registration Form */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-300">Full Name</label>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="e.g. Dr. Jennifer Adams"
+                      className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-300">Work Email</label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="name@company.com"
+                      className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
+                      required
+                    />
+                  </div>
                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-300">Organization / Company (Optional)</label>
+                    <input
+                      type="text"
+                      value={orgName}
+                      onChange={(e) => setOrgName(e.target.value)}
+                      placeholder="e.g. St. Jude Hospital, Law Firm, or Individual"
+                      className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-300">Primary Domain</label>
+                    <select
+                      value={specialty}
+                      onChange={(e) => setSpecialty(e.target.value)}
+                      className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none bg-slate-900"
+                    >
+                      {SPECIALTIES.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-300">Primary Certification</label>
+                  <label className="font-semibold text-slate-300">Create Password</label>
                   <input
-                    type="text"
-                    value={certifications}
-                    onChange={(e) => setCertifications(e.target.value)}
-                    placeholder="CCHI, NBCMI, Court Certified"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="At least 8 characters"
                     className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
+                    required
                   />
                 </div>
-              </div>
+
+                <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 text-[10px] text-slate-400 flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>By signing up, you agree to HIPAA Business Associate Agreement & Terms.</span>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-brand-500 via-brand-600 to-indigo-600 hover:from-brand-600 hover:to-indigo-700 text-white font-extrabold text-xs shadow-lg shadow-brand-500/25 flex items-center justify-center gap-2 transition"
+                >
+                  <span>Create Account & Start</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </>
             )}
-
-            <div className="space-y-1">
-              <label className="font-semibold text-slate-300">Create Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="At least 8 characters"
-                className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
-                required
-              />
-            </div>
-
-            <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 text-[10px] text-slate-400 flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>By signing up, you agree to HIPAA Business Associate Agreement & Terms.</span>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-extrabold text-xs shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 transition"
-            >
-              <span>Create Account & Start</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
           </form>
         )}
 
