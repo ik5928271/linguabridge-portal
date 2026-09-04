@@ -36,7 +36,8 @@ export default function LandingPage({
   onSelectRole, 
   onOpenSchedule, 
   onOpenGlossary,
-  onOpenAuth 
+  onOpenAuth,
+  onOpenInterpreterApplication 
 }) {
   const [langSearch, setLangSearch] = useState('');
   const [openFaq, setOpenFaq] = useState(null);
@@ -566,6 +567,36 @@ export default function LandingPage({
               )}
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* 7.5 CERTIFIED LINGUIST ONBOARDING CTA BANNER */}
+      <section className="py-8 px-4 max-w-7xl mx-auto">
+        <div className="glass-panel p-8 sm:p-10 rounded-3xl border border-emerald-500/30 bg-gradient-to-r from-slate-900 via-emerald-950/40 to-slate-900 flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl relative overflow-hidden">
+          <div className="space-y-2 max-w-xl">
+            <span className="text-xs uppercase font-bold text-emerald-400 tracking-wider bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/30 inline-block">
+              Career & Credentialing
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
+              Are you a Certified Interpreter? Join Our Global Roster
+            </h2>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Submit your CV, languages, and credentials to the <strong className="text-white">IK Enterprises Verification Board</strong>. Earn competitive hourly rates with flexible remote schedules.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (onOpenInterpreterApplication) onOpenInterpreterApplication();
+              else onOpenAuth('signup');
+            }}
+            className="px-8 py-4 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-sm shadow-xl shadow-emerald-600/30 transition transform hover:-translate-y-0.5 shrink-0 flex items-center gap-2"
+          >
+            <Award className="w-5 h-5" />
+            <span>Apply as Certified Linguist</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
         </div>
       </section>
 

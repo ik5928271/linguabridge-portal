@@ -11,7 +11,8 @@ import {
   ArrowRight, 
   ShieldCheck,
   Sparkles,
-  Zap
+  Zap,
+  Award
 } from 'lucide-react';
 import { LANGUAGES, SPECIALTIES } from '../data/mockData';
 
