@@ -235,16 +235,18 @@ export default function PrepaidWalletModal({
                     Pay via Card (Remitly / WorldRemit / SendWave)
                   </span>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold">
-                    Fast & 0% Fee
+                    Fast & Instant Deposit
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-300 leading-relaxed">
-                  UK & International clients can pay using their standard <strong>Debit or Credit Card</strong> (Visa, Mastercard) via Remitly or WorldRemit directly to our verified settlement account.
+                  UK & International clients can pay using any standard <strong>Debit or Credit Card</strong> (Visa, Mastercard) via Remitly, WorldRemit, or SendWave directly to our verified bank account:
                 </p>
-                <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1 text-[11px] font-mono text-slate-300">
-                  <p><span className="text-slate-500">Recipient Name:</span> IK Enterprises / Authorized Account</p>
-                  <p><span className="text-slate-500">Delivery:</span> Bank Account / Instant Deposit</p>
-                  <p><span className="text-slate-500">Payment Reference:</span> TOPUP-{activeMinutes}MINS</p>
+                <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5 text-[11px] font-mono text-slate-200">
+                  <p><span className="text-slate-400">Bank Name:</span> <strong>Faysal Bank</strong></p>
+                  <p><span className="text-slate-400">Account Title:</span> <strong>IK Enterprises</strong></p>
+                  <p><span className="text-slate-400">IBAN:</span> <strong className="text-emerald-400">PK55FAYS3376301000001057</strong></p>
+                  <p><span className="text-slate-400">City / Country:</span> Lahore, Pakistan</p>
+                  <p><span className="text-slate-400">Payment Reference:</span> TOPUP-{activeMinutes}MINS</p>
                 </div>
                 <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
@@ -258,23 +260,24 @@ export default function PrepaidWalletModal({
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-white flex items-center gap-1.5">
                     <Landmark className="w-3.5 h-3.5 text-sky-400" />
-                    Local UK Bank Transfer (Faster Payments / BACS)
+                    Direct International Bank Transfer / UK Wire
                   </span>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 font-bold">
-                    Payoneer / Wise
+                    Direct Wire
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-300">
-                  Transfer directly from any UK banking app (Barclays, HSBC, Lloyds, NatWest, Monzo, Revolut) using our UK receiving account:
+                  Transfer directly from any UK or International banking app using our verified corporate bank account:
                 </p>
-                <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5 font-mono text-[11px] text-slate-300">
-                  <p><span className="text-slate-500">Beneficiary:</span> IK Enterprises (LinguaBridge)</p>
-                  <p><span className="text-slate-500">UK Sort Code:</span> 04-00-04 (or your Payoneer Sort Code)</p>
-                  <p><span className="text-slate-500">Account Number:</span> 12345678 (Payoneer UK Account)</p>
-                  <p><span className="text-slate-500">Reference:</span> TOPUP-{activeMinutes}M</p>
+                <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5 font-mono text-[11px] text-slate-200">
+                  <p><span className="text-slate-400">Beneficiary:</span> <strong>IK Enterprises</strong></p>
+                  <p><span className="text-slate-400">Bank:</span> <strong>Faysal Bank</strong></p>
+                  <p><span className="text-slate-400">IBAN:</span> <strong className="text-emerald-400">PK55FAYS3376301000001057</strong></p>
+                  <p><span className="text-slate-400">SWIFT / BIC:</span> <strong className="text-sky-300">FAYSPKKA</strong></p>
+                  <p><span className="text-slate-400">City:</span> Lahore, Pakistan</p>
                 </div>
                 <p className="text-[10px] text-slate-400">
-                  Funds clear in 1-2 minutes. Your account wallet is updated immediately.
+                  Transfers are confirmed promptly. Your account wallet is updated immediately upon confirmation.
                 </p>
               </div>
             )}
@@ -287,20 +290,21 @@ export default function PrepaidWalletModal({
                     International SWIFT / Direct IBAN Wire
                   </span>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold">
-                    Corporate / Invoiced
+                    Corporate / Firm Wire
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-300">
-                  For hospitals, legal practices, and corporate accounts paying via international wire or company invoice:
+                  For law firms, hospitals, clinics, and corporate practices paying via direct international wire transfer:
                 </p>
-                <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5 font-mono text-[11px] text-slate-300">
-                  <p><span className="text-slate-500">Account Name:</span> IK Enterprises</p>
-                  <p><span className="text-slate-500">IBAN:</span> PK36MEZN0000000000000000 (Your Pakistani IBAN)</p>
-                  <p><span className="text-slate-500">SWIFT/BIC:</span> MEZNPKKA (Your Bank SWIFT)</p>
-                  <p><span className="text-slate-500">Bank:</span> Meezan Bank / HBL / Standard Chartered</p>
+                <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5 font-mono text-[11px] text-slate-200">
+                  <p><span className="text-slate-400">Account Title:</span> <strong>IK Enterprises</strong></p>
+                  <p><span className="text-slate-400">Bank Name:</span> <strong>Faysal Bank Limited</strong></p>
+                  <p><span className="text-slate-400">IBAN:</span> <strong className="text-emerald-400">PK55FAYS3376301000001057</strong></p>
+                  <p><span className="text-slate-400">SWIFT / BIC:</span> <strong className="text-amber-300">FAYSPKKA</strong></p>
+                  <p><span className="text-slate-400">City / Country:</span> Lahore, Pakistan</p>
                 </div>
                 <p className="text-[10px] text-slate-400">
-                  Official corporate invoice and VAT receipt sent automatically to your registered email.
+                  Official invoice and payment receipt sent automatically to your registered client email.
                 </p>
               </div>
             )}

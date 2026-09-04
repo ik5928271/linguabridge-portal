@@ -64,7 +64,7 @@ export default function MainClientBookingFlow({
   // Form selections
   const [selectedLanguage, setSelectedLanguage] = useState('Russian');
   const [selectedSpecialty, setSelectedSpecialty] = useState('General / Customer Support');
-  const [matchMode, setMatchMode] = useState('specific');
+  const [matchMode, setMatchMode] = useState('auto');
   const [realInterpreters, setRealInterpreters] = useState([]);
   const [selectedInterpreter, setSelectedInterpreter] = useState(null);
 
@@ -516,15 +516,6 @@ END:VCALENDAR`;
             <div className="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs">
               <button
                 type="button"
-                onClick={() => setMatchMode('specific')}
-                className={`px-3 py-1 rounded-lg font-bold transition ${
-                  matchMode === 'specific' ? 'bg-brand-600 text-white' : 'text-slate-400'
-                }`}
-              >
-                Browse & Pick ({availableInterpreters.length})
-              </button>
-              <button
-                type="button"
                 onClick={() => {
                   setMatchMode('auto');
                   if (availableInterpreters.length > 0) {
@@ -532,10 +523,20 @@ END:VCALENDAR`;
                   }
                 }}
                 className={`px-3 py-1 rounded-lg font-bold transition ${
-                  matchMode === 'auto' ? 'bg-brand-600 text-white' : 'text-slate-400'
+                  matchMode === 'auto' ? 'bg-brand-600 text-white shadow' : 'text-slate-400 hover:text-white'
                 }`}
               >
                 Instant Best Match
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMatchMode('specific')}
+                className={`px-3 py-1 rounded-lg font-bold transition ${
+                  matchMode === 'specific' ? 'bg-brand-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Browse & Pick ({availableInterpreters.length})
               </button>
             </div>
           </div>

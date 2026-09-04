@@ -216,21 +216,23 @@ export default function Navbar({
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/80 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-xs font-medium border border-slate-300 dark:border-slate-700 transition shadow-sm"
           >
             <BookOpen className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400" />
-            <span className="hidden xl:inline">Glossary</span>
+            <span className="hidden sm:inline">Glossary</span>
           </button>
 
-          {/* 3-Way Split Screen Live Demo (For testing & interactive previews) */}
-          <button
-            onClick={() => setCurrentView('split-demo')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${
-              currentView === 'split-demo'
-                ? 'bg-gradient-to-r from-brand-500 to-indigo-600 text-white ring-2 ring-brand-400'
-                : 'bg-brand-50 hover:bg-brand-100 text-brand-700 border-brand-200 dark:bg-gradient-to-r dark:from-brand-600/20 dark:to-indigo-600/20 dark:hover:from-brand-600/30 dark:hover:to-indigo-600/30 dark:text-brand-300 border dark:border-brand-500/30'
-            }`}
-          >
-            <LayoutGrid className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400 animate-pulse" />
-            <span>3-Way Demo</span>
-          </button>
+          {/* Admin-only Demo Preview */}
+          {currentUser?.role === 'admin' && (
+            <button
+              onClick={() => setCurrentView('split-demo')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${
+                currentView === 'split-demo'
+                  ? 'bg-gradient-to-r from-brand-500 to-indigo-600 text-white ring-2 ring-brand-400'
+                  : 'bg-brand-50 hover:bg-brand-100 text-brand-700 border-brand-200 dark:bg-gradient-to-r dark:from-brand-600/20 dark:to-indigo-600/20 dark:text-brand-300 border dark:border-brand-500/30'
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400" />
+              <span>3-Way Demo</span>
+            </button>
+          )}
 
           {/* AUTH SUITE: Sign In & Sign Up for visitors OR User Profile for authenticated users */}
           {currentUser ? (

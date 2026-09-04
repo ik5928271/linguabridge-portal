@@ -97,11 +97,11 @@ export default function LandingPage({
         {/* Primary Action Buttons */}
         <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
           <button
-            onClick={() => onOpenAuth('signup')}
+            onClick={() => onSelectRole('host')}
             className="flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-brand-500 via-brand-600 to-indigo-600 hover:from-brand-600 hover:to-indigo-700 text-white font-extrabold text-base shadow-xl shadow-brand-500/30 transition transform hover:-translate-y-0.5"
           >
-            <UserPlus className="w-5 h-5" />
-            <span>Create Free Account</span>
+            <PhoneCall className="w-5 h-5" />
+            <span>Book Certified Interpreter Now</span>
             <ArrowRight className="w-4 h-4" />
           </button>
 
@@ -110,15 +110,17 @@ export default function LandingPage({
             className="flex items-center gap-2 px-7 py-4 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 font-bold text-base border border-slate-700 transition"
           >
             <LogIn className="w-5 h-5 text-brand-400" />
-            <span>Sign In</span>
+            <span>Client Sign In</span>
           </button>
 
           <button
-            onClick={() => onSelectRole('split-demo')}
-            className="flex items-center gap-2 px-7 py-4 rounded-xl bg-gradient-to-r from-emerald-600/20 to-teal-600/20 hover:from-emerald-600/30 hover:to-teal-600/30 text-emerald-300 font-bold text-base border border-emerald-500/40 transition"
+            onClick={() => {
+              const el = document.getElementById('how-it-works');
+              if (el) el.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="flex items-center gap-2 px-6 py-4 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 font-semibold text-base border border-slate-700 transition"
           >
-            <LayoutGrid className="w-5 h-5 text-emerald-400" />
-            <span>Live 3-Way Demo</span>
+            <span>How It Works</span>
           </button>
         </div>
 
