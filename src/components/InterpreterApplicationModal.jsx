@@ -335,14 +335,25 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
 
             {/* SECTION 2: LANGUAGES & SPECIALTIES */}
             <div className="space-y-3 pt-2 border-t border-slate-800">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-brand-400 flex items-center gap-1.5">
-                <Globe className="w-3.5 h-3.5" />
-                <span>2. Language Fluency & Working Specialties</span>
-              </h3>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-brand-400 flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>2. Language Fluency & Working Specialties</span>
+                </h3>
+                <span className="text-[10px] text-emerald-400 font-semibold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 w-fit">
+                  Base Language: English (Default 3-Way Bridge)
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-300 leading-relaxed">
+                ℹ️ <strong>How It Works:</strong> Our platform connects English-speaking clients (doctors, lawyers, customer service) with non-English speakers. All interpreters interpret <strong>bidirectionally between English and their chosen language(s)</strong>.
+              </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-300 block mb-1.5">Primary Target Language *</label>
+                  <label className="text-[11px] font-semibold text-slate-300 block mb-1.5">
+                    Primary Target Language (Paired with English) *
+                  </label>
                   <select
                     value={primaryLang}
                     onChange={(e) => {
@@ -354,9 +365,11 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
                     }}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-brand-500"
                   >
-                    <option value="English">🇺🇸 English (English)</option>
+                    <option value="English">🇺🇸 English Only (Direct / Monolingual Support)</option>
                     {LANGUAGES.map(l => (
-                      <option key={l.code} value={l.name}>{l.flag} {l.name} ({l.nativeName})</option>
+                      <option key={l.code} value={l.name}>
+                        {l.flag} English ⟷ {l.name} ({l.nativeName})
+                      </option>
                     ))}
                     <option value="Other">🌐 Other / Custom Language...</option>
                   </select>
@@ -366,7 +379,7 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
                       <input
                         type="text"
                         required
-                        placeholder="Type custom primary language (e.g. Pashto, Somali, Bengali...)"
+                        placeholder="Type custom language (e.g. English ⟷ Pashto, Somali, Kurdish...)"
                         value={customPrimaryLang}
                         onChange={(e) => setCustomPrimaryLang(e.target.value)}
                         className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-brand-500 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
@@ -378,7 +391,7 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="text-[11px] font-semibold text-slate-300">
-                      All Working Languages ({selectedLanguages.length} selected)
+                      All Working Languages ({selectedLanguages.length} active)
                     </label>
                     <span className="text-[10px] text-slate-400">Click to toggle</span>
                   </div>
