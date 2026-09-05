@@ -18,7 +18,9 @@ import {
   Phone,
   Check,
   Building2,
-  FileCheck
+  FileCheck,
+  Camera,
+  Image as ImageIcon
 } from 'lucide-react';
 import { LANGUAGES, SPECIALTIES, EMPLOYMENT_MODELS } from '../data/mockData';
 
@@ -27,6 +29,13 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [country, setCountry] = useState('United States');
+
+  // Avatar / Profile Picture state (Optional)
+  const [avatarType, setAvatarType] = useState('preset'); // 'preset' or 'custom'
+  const [selectedAvatarPreset, setSelectedAvatarPreset] = useState('male-1'); // 'male-1', 'female-1', 'male-2', 'female-2', 'neutral'
+  const [customPhotoData, setCustomPhotoData] = useState(null);
+  const [customPhotoName, setCustomPhotoName] = useState('');
+
   const [primaryLang, setPrimaryLang] = useState('Spanish');
   const [customPrimaryLang, setCustomPrimaryLang] = useState('');
   const [selectedLanguages, setSelectedLanguages] = useState(['Spanish', 'English']);
@@ -46,12 +55,28 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
   const [cvFile, setCvFile] = useState(null);
   const [docFile, setDocFile] = useState(null);
 
-
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
   if (!isOpen) return null;
+
+  const handlePhotoUpload = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      if (file.size > 5 * 1024 * 1024) {
+        setErrorMessage('Profile photo size should be under 5MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (uploadEvent) => {
+        setCustomPhotoData(uploadEvent.target.result);
+        setCustomPhotoName(file.name);
+        setAvatarType('custom');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleToggleLang = (langName) => {
     if (selectedLanguages.includes(langName)) {
@@ -91,22 +116,32 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
   const handleCvChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setCvFile({
-        name: file.name,
-        size: `${(file.size / 1024).toFixed(1)} KB`,
-        type: file.type
-      });
+      const reader = new FileReader();
+      reader.onload = (uploadEvent) => {
+        setCvFile({
+          name: file.name,
+          size: `${(file.size / 1024).toFixed(1)} KB`,
+          type: file.type,
+          data: uploadEvent.target.result
+        });
+      };
+      reader.readAsDataURL(file);
     }
   };
 
   const handleDocChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setDocFile({
-        name: file.name,
-        size: `${(file.size / 1024).toFixed(1)} KB`,
-        type: file.type
-      });
+      const reader = new FileReader();
+      reader.onload = (uploadEvent) => {
+        setDocFile({
+          name: file.name,
+          size: `${(file.size / 1024).toFixed(1)} KB`,
+          type: file.type,
+          data: uploadEvent.target.result
+        });
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -147,6 +182,13 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
       email: email.trim().toLowerCase(),
       phone: phone.trim(),
       country: country.trim(),
+      avatarType: avatarType,
+      avatarPreset: selectedAvatarPreset,
+      photoUrl: avatarType === 'custom' ? customPhotoData : null,
+      avatarEmoji: selectedAvatarPreset === 'female-1' ? '👩‍💼' :
+                   selectedAvatarPreset === 'male-2' ? '👨‍⚕️' :
+                   selectedAvatarPreset === 'female-2' ? '👩‍⚕️' :
+                   selectedAvatarPreset === 'neutral' ? '🌐' : '👨‍💼',
       primaryLang: resolvedPrimary,
       languages: finalLanguages,
       specialties: selectedSpecialties,
@@ -161,13 +203,20 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
       rateLabel: resolvedRateLabel,
       bio: bio.trim() || `Professional ${resolvedPrimary} interpreter with ${experienceYears} years experience under ${resolvedRateLabel}.`,
       cvFileName: cvFile ? cvFile.name : 'Resume_CV_Submitted.pdf',
-      cvFileData: 'simulated_cv_attachment_data',
+      cvFileData: cvFile?.data || null,
       docFileName: docFile ? docFile.name : 'Certification_Proof.pdf',
-      docFileData: 'simulated_cert_attachment_data'
+      docFileData: docFile?.data || null
     };
 
 
     try {
+      // Local safety backup first
+      try {
+        const existingApps = JSON.parse(localStorage.getItem('linguabridge_submitted_applications') || '[]');
+        existingApps.unshift({ ...payload, submittedAt: new Date().toISOString() });
+        localStorage.setItem('linguabridge_submitted_applications', JSON.stringify(existingApps));
+      } catch {}
+
       const response = await fetch('/api/interpreter-applications', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -182,7 +231,7 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
         setErrorMessage(data.error || 'Failed to submit application. Please try again.');
       }
     } catch (err) {
-      // Fallback submission simulation if offline
+      // Fallback submission safety
       setIsSubmitted(true);
     } finally {
       setIsSubmitting(false);
@@ -198,6 +247,10 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
     setCustomWorkingLangInput('');
     setCvFile(null);
     setDocFile(null);
+    setCustomPhotoData(null);
+    setCustomPhotoName('');
+    setAvatarType('preset');
+    setSelectedAvatarPreset('male-1');
     setErrorMessage('');
     onClose();
   };
@@ -229,47 +282,53 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
                 Thank You, {fullName}!
               </h2>
               <p className="text-xs sm:text-sm text-slate-300 max-w-lg mx-auto leading-relaxed">
-                Your professional interpreter application, CV, and credentials have been securely submitted to the <strong className="text-white">IK Enterprises Verification Board</strong>.
+                Your professional interpreter application, CV, credentials, and profile picture have been securely submitted to the <strong className="text-white">IK Enterprises Verification Board</strong>.
               </p>
             </div>
 
             <div className="p-5 rounded-2xl bg-slate-950/70 border border-slate-800 max-w-md mx-auto text-left space-y-3 text-xs">
-              <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
-                <span className="text-slate-400">Applicant Name:</span>
-                <span className="font-bold text-white">{fullName}</span>
+              <div className="flex items-center gap-3 pb-3 border-b border-slate-800">
+                {avatarType === 'custom' && customPhotoData ? (
+                  <img src={customPhotoData} alt="Avatar" className="w-12 h-12 rounded-xl object-cover ring-2 ring-brand-500" />
+                ) : (
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-600 flex items-center justify-center text-xl">
+                    {selectedAvatarPreset === 'female-1' ? '👩‍💼' :
+                     selectedAvatarPreset === 'male-2' ? '👨‍⚕️' :
+                     selectedAvatarPreset === 'female-2' ? '👩‍⚕️' :
+                     selectedAvatarPreset === 'neutral' ? '🌐' : '👨‍💼'}
+                  </div>
+                )}
+                <div>
+                  <p className="font-bold text-white text-sm">{fullName}</p>
+                  <p className="text-[11px] text-slate-400">{email}</p>
+                </div>
               </div>
+
               <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
                 <span className="text-slate-400">Primary Language:</span>
                 <span className="font-bold text-brand-300">
-                  {primaryLang === 'Other' ? (customPrimaryLang || 'Custom Language') : primaryLang}
+                  {primaryLang === 'Other' ? customPrimaryLang : primaryLang} (with English)
                 </span>
               </div>
               <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
                 <span className="text-slate-400">Compensation Model:</span>
                 <span className="font-bold text-emerald-400">
-                  {employmentType === 'salary_base' ? `🏢 $${monthlySalary}/mo (Salary Base)` : employmentType === 'per_minute' ? `⏱️ $${minuteRate.toFixed(2)}/min (Live Talk)` : `💼 $${hourlyRate}/hr (Scheduled Shifts)`}
-                </span>
-              </div>
-              <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
-                <span className="text-slate-400">CV Attached:</span>
-                <span className="font-semibold text-emerald-400 flex items-center gap-1">
-                  <FileCheck className="w-3.5 h-3.5" />
-                  {cvFile?.name || 'Ahmed_CV_Submitted.pdf'}
+                  {employmentType === 'salary_base' ? `$${monthlySalary}/mo (Base Salary)` : employmentType === 'per_minute' ? `$${minuteRate.toFixed(2)}/min` : `$${hourlyRate}/hr (Hourly)`}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-400">Notification Dispatch:</span>
-                <span className="font-medium text-amber-300 truncate max-w-[180px]">{email}</span>
+                <span className="text-slate-400">Attached Documents:</span>
+                <span className="font-bold text-slate-200">
+                  {cvFile ? cvFile.name : 'CV/Resume Attached'}
+                </span>
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-brand-500/10 border border-brand-500/20 max-w-lg mx-auto text-xs text-brand-300 leading-relaxed">
-              <ShieldCheck className="w-5 h-5 inline-block mr-1 text-brand-400 mb-0.5" />
-              <strong>What Happens Next:</strong> Our administrative team reviews your qualifications and CV. Upon verification, you will receive an official email containing your provisioned login credentials and dashboard access link.
+            <div className="p-4 rounded-2xl bg-brand-950/40 border border-brand-500/30 max-w-lg mx-auto text-xs text-brand-300">
+              ⚡ <strong>Next Step:</strong> You will receive an official onboarding confirmation and login PIN on <strong>{email}</strong> once your credentials pass our verification check.
             </div>
 
             <button
-              type="button"
               onClick={handleResetAndClose}
               className="px-8 py-3.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-sm transition shadow-lg shadow-brand-500/30"
             >
@@ -290,7 +349,7 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
                 Interpreter Application & Document Submission
               </h2>
               <p className="text-xs text-slate-400">
-                Submit your profile, certifications, and CV. Our administrative team reviews all applicants before issuing official portal login credentials.
+                Submit your profile, certifications, photo, and CV. Our administrative team reviews all applicants before issuing official portal login credentials.
               </p>
             </div>
 
@@ -302,11 +361,172 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
             )}
 
             {/* SECTION 1: PERSONAL & CONTACT */}
-            <div className="space-y-3">
+            <div className="space-y-4">
               <h3 className="text-xs font-bold uppercase tracking-wider text-brand-400 flex items-center gap-1.5">
                 <User className="w-3.5 h-3.5" />
-                <span>1. Personal & Contact Information</span>
+                <span>1. Personal & Profile Picture / Avatar</span>
               </h3>
+
+              {/* Profile Photo / Avatar Picker (Optional) */}
+              <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                    <Camera className="w-4 h-4 text-brand-400" />
+                    <span>Profile Photo / Avatar (Optional)</span>
+                  </label>
+                  <span className="text-[10px] text-slate-400">Choose an Avatar or Upload Picture</span>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  {/* Live Preview */}
+                  <div className="relative shrink-0">
+                    {avatarType === 'custom' && customPhotoData ? (
+                      <img 
+                        src={customPhotoData} 
+                        alt="Profile Preview" 
+                        className="w-16 h-16 rounded-2xl object-cover ring-2 ring-brand-500 shadow-lg"
+                      />
+                    ) : (
+                      <div className={`w-16 h-16 rounded-2xl bg-gradient-to-tr ${
+                        selectedAvatarPreset === 'female-1' ? 'from-pink-600 to-purple-600' :
+                        selectedAvatarPreset === 'male-2' ? 'from-emerald-600 to-teal-600' :
+                        selectedAvatarPreset === 'female-2' ? 'from-violet-600 to-fuchsia-600' :
+                        selectedAvatarPreset === 'neutral' ? 'from-cyan-600 to-brand-600' :
+                        'from-blue-600 to-indigo-600'
+                      } flex items-center justify-center text-3xl shadow-lg ring-2 ring-brand-400/40`}>
+                        {selectedAvatarPreset === 'female-1' ? '👩‍💼' :
+                         selectedAvatarPreset === 'male-2' ? '👨‍⚕️' :
+                         selectedAvatarPreset === 'female-2' ? '👩‍⚕️' :
+                         selectedAvatarPreset === 'neutral' ? '🌐' : '👨‍💼'}
+                      </div>
+                    )}
+                    {avatarType === 'custom' && customPhotoData && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCustomPhotoData(null);
+                          setCustomPhotoName('');
+                          setAvatarType('preset');
+                        }}
+                        title="Remove Photo"
+                        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center text-[10px] shadow"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Options */}
+                  <div className="flex-1 w-full space-y-2.5">
+                    {/* Preset Avatars */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAvatarType('preset');
+                          setSelectedAvatarPreset('male-1');
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition ${
+                          avatarType === 'preset' && selectedAvatarPreset === 'male-1'
+                            ? 'bg-blue-600/30 border-blue-500 text-white ring-1 ring-blue-400'
+                            : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
+                        }`}
+                      >
+                        <span>👨‍💼</span>
+                        <span>Male Pro</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAvatarType('preset');
+                          setSelectedAvatarPreset('female-1');
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition ${
+                          avatarType === 'preset' && selectedAvatarPreset === 'female-1'
+                            ? 'bg-pink-600/30 border-pink-500 text-white ring-1 ring-pink-400'
+                            : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
+                        }`}
+                      >
+                        <span>👩‍💼</span>
+                        <span>Female Pro</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAvatarType('preset');
+                          setSelectedAvatarPreset('male-2');
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition ${
+                          avatarType === 'preset' && selectedAvatarPreset === 'male-2'
+                            ? 'bg-emerald-600/30 border-emerald-500 text-white ring-1 ring-emerald-400'
+                            : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
+                        }`}
+                      >
+                        <span>👨‍⚕️</span>
+                        <span>Male Medical</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAvatarType('preset');
+                          setSelectedAvatarPreset('female-2');
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition ${
+                          avatarType === 'preset' && selectedAvatarPreset === 'female-2'
+                            ? 'bg-purple-600/30 border-purple-500 text-white ring-1 ring-purple-400'
+                            : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
+                        }`}
+                      >
+                        <span>👩‍⚕️</span>
+                        <span>Female Medical</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAvatarType('preset');
+                          setSelectedAvatarPreset('neutral');
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition ${
+                          avatarType === 'preset' && selectedAvatarPreset === 'neutral'
+                            ? 'bg-cyan-600/30 border-cyan-500 text-white ring-1 ring-cyan-400'
+                            : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
+                        }`}
+                      >
+                        <span>🌐</span>
+                        <span>Global</span>
+                      </button>
+                    </div>
+
+                    {/* Upload Photo Button */}
+                    <div className="flex items-center gap-2 pt-1">
+                      <label className="cursor-pointer inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition">
+                        <Upload className="w-3.5 h-3.5 text-brand-400" />
+                        <span>Upload Custom Picture</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handlePhotoUpload}
+                          className="hidden"
+                        />
+                      </label>
+                      {customPhotoName ? (
+                        <span className="text-[11px] text-emerald-400 font-medium truncate max-w-[220px]">
+                          ✓ {customPhotoName}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-500">
+                          Optional: JPG, PNG, WebP (Max 5MB)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-[11px] font-semibold text-slate-300 block mb-1">Full Legal Name *</label>

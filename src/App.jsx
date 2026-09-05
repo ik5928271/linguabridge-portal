@@ -41,27 +41,66 @@ export default function App() {
   };
 
   // Navigation & Role states
-  const [currentRole, setCurrentRole] = useState('host'); // 'host', 'interpreter', 'guest', 'admin'
-  const [currentView, setCurrentView] = useState('landing'); // 'landing', 'host', 'interpreter', 'guest', 'admin', 'room', 'split-demo'
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('linguabridge_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [currentRole, setCurrentRole] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem('linguabridge_user');
+      if (savedUser) {
+        const u = JSON.parse(savedUser);
+        return (u.role === 'client' || u.role === 'host') ? 'host' : u.role || 'host';
+      }
+    } catch {}
+    return 'host';
+  });
+
+  const [currentView, setCurrentView] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem('linguabridge_user');
+      if (savedUser) {
+        const u = JSON.parse(savedUser);
+        return u.role === 'admin' ? 'admin' : u.role === 'interpreter' ? 'interpreter' : 'host';
+      }
+    } catch {}
+    return 'landing';
+  });
+
   const [onlineStatus, setOnlineStatus] = useState(true);
 
-  // Authenticated user state
-  const [currentUser, setCurrentUser] = useState(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState('signin'); // 'signin' or 'signup'
   const [isInterpreterAppOpen, setIsInterpreterAppOpen] = useState(false);
 
-  // Global Prepaid Minute Wallet State (Clean starting slate for live testing)
-  const [clientWallet, setClientWallet] = useState({
-    totalPaid: 0.00,
-    totalMinutesPurchased: 0,
-    minutesUsed: 0,
-    minutesRemaining: 0,
-    billingType: 'prepaid' // 'prepaid' or 'postpaid_hospital'
+  // Global Prepaid Minute Wallet State (Persisted in localStorage & synced with backend)
+  const [clientWallet, setClientWallet] = useState(() => {
+    try {
+      const savedWallet = localStorage.getItem('linguabridge_wallet');
+      if (savedWallet) return JSON.parse(savedWallet);
+    } catch {}
+    return {
+      totalPaid: 0.00,
+      totalMinutesPurchased: 0,
+      minutesUsed: 0,
+      minutesRemaining: 0,
+      billingType: 'prepaid'
+    };
   });
 
   const handleUpdateWallet = (updates) => {
-    setClientWallet(prev => ({ ...prev, ...updates }));
+    setClientWallet(prev => {
+      const updated = { ...prev, ...updates };
+      try {
+        localStorage.setItem('linguabridge_wallet', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
   };
 
   // Active Session state for live conference room
@@ -183,14 +222,29 @@ export default function App() {
 
   const handleSuccessLogin = (user, walletData) => {
     setCurrentUser(user);
+    try {
+      localStorage.setItem('linguabridge_user', JSON.stringify(user));
+    } catch {}
+
     const normalizedRole = (user.role === 'client' || user.role === 'host') ? 'host' : user.role;
     setCurrentRole(normalizedRole);
+    
     if (walletData) {
       setClientWallet(walletData);
+      try {
+        localStorage.setItem('linguabridge_wallet', JSON.stringify(walletData));
+      } catch {}
     } else if (user.id) {
       fetch(`/api/wallet/${user.id}`)
         .then(res => res.json())
-        .then(w => { if (w) setClientWallet(w); })
+        .then(w => { 
+          if (w) {
+            setClientWallet(w); 
+            try {
+              localStorage.setItem('linguabridge_wallet', JSON.stringify(w));
+            } catch {}
+          }
+        })
         .catch(() => {});
     }
     setCurrentView(normalizedRole === 'admin' ? 'admin' : normalizedRole === 'interpreter' ? 'interpreter' : 'host');
@@ -198,6 +252,10 @@ export default function App() {
 
   const handleLogout = () => {
     setCurrentUser(null);
+    try {
+      localStorage.removeItem('linguabridge_user');
+      localStorage.removeItem('linguabridge_wallet');
+    } catch {}
     setCurrentView('landing');
   };
 

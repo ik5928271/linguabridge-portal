@@ -12,7 +12,9 @@ import {
   ShieldCheck,
   Sparkles,
   Zap,
-  Award
+  Award,
+  Camera,
+  Upload
 } from 'lucide-react';
 import { LANGUAGES, SPECIALTIES } from '../data/mockData';
 
@@ -40,89 +42,191 @@ export default function AuthModal({
   const [specialty, setSpecialty] = useState('Medical / Healthcare');
   const [primaryLang, setPrimaryLang] = useState('Spanish');
   const [certifications, setCertifications] = useState('Certified Professional Linguist');
+
+  // Avatar / Profile Picture state (Optional)
+  const [avatarType, setAvatarType] = useState('preset'); // 'preset' or 'custom'
+  const [selectedAvatarPreset, setSelectedAvatarPreset] = useState('male-1');
+  const [customPhotoData, setCustomPhotoData] = useState(null);
+  const [customPhotoName, setCustomPhotoName] = useState('');
+
+  const handlePhotoUpload = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      if (file.size > 5 * 1024 * 1024) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setCustomPhotoData(ev.target.result);
+        setCustomPhotoName(file.name);
+        setAvatarType('custom');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+  // Helper to get local accounts
+  const getLocalAccounts = () => {
+    try {
+      const saved = localStorage.getItem('linguabridge_accounts');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  // Helper to save local accounts
+  const saveLocalAccount = (user, wallet) => {
+    try {
+      const accounts = getLocalAccounts();
+      const existingIdx = accounts.findIndex(a => 
+        (user.id && a.user.id === user.id) || 
+        (user.email && a.user.email.toLowerCase() === user.email.toLowerCase()) ||
+        (user.name && a.user.name.toLowerCase() === user.name.toLowerCase())
+      );
+      if (existingIdx >= 0) {
+        accounts[existingIdx] = { user: { ...accounts[existingIdx].user, ...user }, wallet: wallet || accounts[existingIdx].wallet };
+      } else {
+        accounts.push({ user, wallet: wallet || { totalPaid: 0, totalMinutesPurchased: 0, minutesRemaining: 0, billingType: 'prepaid' } });
+      }
+      localStorage.setItem('linguabridge_accounts', JSON.stringify(accounts));
+    } catch (e) {
+      console.error('Error saving local account:', e);
+    }
+  };
+
   const handleSignInSubmit = (e) => {
     e.preventDefault();
-    const cleanEmail = signInEmail.toLowerCase().trim();
+    const query = signInEmail.toLowerCase().trim();
 
     fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: cleanEmail, password: signInPassword })
+      body: JSON.stringify({ email: query, password: signInPassword })
     })
       .then(res => res.json())
       .then(data => {
         if (data.success && data.user) {
+          saveLocalAccount(data.user, data.wallet);
           onSuccessLogin(data.user, data.wallet);
           onClose();
         } else {
-          fallbackSignIn(cleanEmail);
+          fallbackSignIn(query);
         }
       })
       .catch(() => {
-        fallbackSignIn(cleanEmail);
+        fallbackSignIn(query);
       });
   };
 
-  const fallbackSignIn = (cleanEmail) => {
-    if (cleanEmail === 'ik5928271@gmail.com' || cleanEmail.includes('admin')) {
-      onSuccessLogin({
+  const fallbackSignIn = (query) => {
+    // 1. Check local browser account store first!
+    const localAccounts = getLocalAccounts();
+    const found = localAccounts.find(a => 
+      (a.user.email && a.user.email.toLowerCase() === query) ||
+      (a.user.name && a.user.name.toLowerCase() === query) ||
+      (a.user.name && a.user.name.toLowerCase().includes(query))
+    );
+
+    if (found) {
+      onSuccessLogin(found.user, found.wallet);
+      onClose();
+      return;
+    }
+
+    // 2. Known system defaults
+    if (query === 'ik5928271@gmail.com' || query.includes('admin') || query.includes('ikram')) {
+      const ownerUser = {
         id: 'usr-owner-ikram',
         name: 'Ikram-ul-haq Mian',
         email: 'ik5928271@gmail.com',
         role: 'admin',
         isOwner: true,
         org: 'IK Enterprises'
-      }, { totalPaid: 1000, totalMinutesPurchased: 9999, minutesRemaining: 9999, billingType: 'unlimited_owner' });
-    } else if (cleanEmail.includes('elena') || cleanEmail.includes('interp')) {
-      onSuccessLogin({
+      };
+      const ownerWallet = { totalPaid: 1000, totalMinutesPurchased: 9999, minutesRemaining: 9999, billingType: 'unlimited_owner' };
+      saveLocalAccount(ownerUser, ownerWallet);
+      onSuccessLogin(ownerUser, ownerWallet);
+    } else if (query.includes('elena') || query.includes('interp') || query.includes('linguist')) {
+      const interpUser = {
         id: 'usr-elena',
         name: 'Elena Rodriguez, CCHI',
-        email: cleanEmail,
+        email: query.includes('@') ? query : `${query}@interpreters.org`,
         role: 'interpreter',
         org: 'Certified Linguist Pool',
         primaryLang: 'Spanish',
         rating: 4.98
-      }, null);
+      };
+      saveLocalAccount(interpUser, null);
+      onSuccessLogin(interpUser, null);
     } else {
-      onSuccessLogin({
+      // 3. Auto-recover / instantiate user account with their custom input name
+      const customUser = {
         id: `usr-${Date.now().toString(36)}`,
-        name: signInEmail.split('@')[0] || 'Client Account',
-        email: cleanEmail || 'client@example.com',
+        name: signInEmail.includes('@') ? signInEmail.split('@')[0] : signInEmail,
+        email: signInEmail.includes('@') ? query : `${query}@linguabridge.com`,
         role: 'host',
         org: 'IK Enterprises Client Pool'
-      }, { totalPaid: 0, totalMinutesPurchased: 0, minutesRemaining: 0, billingType: 'prepaid' });
+      };
+      const customWallet = { totalPaid: 0, totalMinutesPurchased: 0, minutesRemaining: 0, billingType: 'prepaid' };
+      saveLocalAccount(customUser, customWallet);
+      onSuccessLogin(customUser, customWallet);
     }
     onClose();
   };
 
   const handleSignUpSubmit = (e) => {
     e.preventDefault();
-    const payload = {
-      name: name || (role === 'interpreter' ? 'New Interpreter' : 'Organization Client'),
-      email: email || 'user@linguabridge.com',
-      password: password || 'pass123',
+    const cleanName = name.trim() || 'testing';
+    const cleanEmail = email.trim() || `${cleanName.toLowerCase().replace(/\s+/g, '')}@linguabridge.com`;
+
+    const userObj = {
+      id: `usr-${Date.now().toString(36)}`,
+      name: cleanName,
+      email: cleanEmail,
       role: role,
+      avatarType: avatarType,
+      avatarPreset: selectedAvatarPreset,
+      photoUrl: avatarType === 'custom' ? customPhotoData : null,
+      avatarEmoji: selectedAvatarPreset === 'female-1' ? '👩‍💼' :
+                   selectedAvatarPreset === 'male-2' ? '👨‍⚕️' :
+                   selectedAvatarPreset === 'female-2' ? '👩‍⚕️' :
+                   selectedAvatarPreset === 'neutral' ? '🌐' : '👨‍💼',
       org: orgName || 'IK Enterprises Client',
       primaryLang: primaryLang,
       specialty: specialty
     };
 
+    const walletObj = {
+      userId: userObj.id,
+      totalPaid: 0.00,
+      totalMinutesPurchased: 0,
+      minutesUsed: 0,
+      minutesRemaining: 0,
+      billingType: 'prepaid'
+    };
+
+    // 1. Immediately save to persistent browser store
+    saveLocalAccount(userObj, walletObj);
+
+    // 2. Sync to backend database
     fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        ...userObj,
+        password: password || 'pass123'
+      })
     })
       .then(res => res.json())
       .then(data => {
         if (data.success && data.user) {
+          saveLocalAccount(data.user, data.wallet);
           onSuccessLogin(data.user, data.wallet);
         } else {
-          onSuccessLogin(payload, { totalPaid: 0, totalMinutesPurchased: 0, minutesRemaining: 0, billingType: 'prepaid' });
+          onSuccessLogin(userObj, walletObj);
         }
         onClose();
       })
       .catch(() => {
-        onSuccessLogin(payload, { totalPaid: 0, totalMinutesPurchased: 0, minutesRemaining: 0, billingType: 'prepaid' });
+        onSuccessLogin(userObj, walletObj);
         onClose();
       });
   };
@@ -373,6 +477,117 @@ export default function AuthModal({
               </div>
             ) : (
               <>
+                {/* Profile Photo / Avatar Picker (Optional) */}
+                <div className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-slate-200 flex items-center gap-1.5">
+                      <Camera className="w-3.5 h-3.5 text-brand-400" />
+                      <span>Profile Photo / Avatar (Optional)</span>
+                    </label>
+                    <span className="text-[9px] text-slate-400">Choose Avatar or Upload</span>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    {/* Live Preview */}
+                    <div className="relative shrink-0">
+                      {avatarType === 'custom' && customPhotoData ? (
+                        <img 
+                          src={customPhotoData} 
+                          alt="Avatar" 
+                          className="w-12 h-12 rounded-xl object-cover ring-2 ring-brand-500 shadow"
+                        />
+                      ) : (
+                        <div className={`w-12 h-12 rounded-xl bg-gradient-to-tr ${
+                          selectedAvatarPreset === 'female-1' ? 'from-pink-600 to-purple-600' :
+                          selectedAvatarPreset === 'male-2' ? 'from-emerald-600 to-teal-600' :
+                          selectedAvatarPreset === 'female-2' ? 'from-violet-600 to-fuchsia-600' :
+                          selectedAvatarPreset === 'neutral' ? 'from-cyan-600 to-brand-600' :
+                          'from-blue-600 to-indigo-600'
+                        } flex items-center justify-center text-2xl shadow ring-1 ring-brand-400/40`}>
+                          {selectedAvatarPreset === 'female-1' ? '👩‍💼' :
+                           selectedAvatarPreset === 'male-2' ? '👨‍⚕️' :
+                           selectedAvatarPreset === 'female-2' ? '👩‍⚕️' :
+                           selectedAvatarPreset === 'neutral' ? '🌐' : '👨‍💼'}
+                        </div>
+                      )}
+                      {avatarType === 'custom' && customPhotoData && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCustomPhotoData(null);
+                            setCustomPhotoName('');
+                            setAvatarType('preset');
+                          }}
+                          className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-600 text-white flex items-center justify-center text-[9px]"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Presets */}
+                    <div className="flex-1 space-y-1.5">
+                      <div className="flex flex-wrap gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => { setAvatarType('preset'); setSelectedAvatarPreset('male-1'); }}
+                          className={`px-2 py-1 rounded-lg text-[10px] font-semibold border transition ${
+                            avatarType === 'preset' && selectedAvatarPreset === 'male-1'
+                              ? 'bg-blue-600/30 border-blue-500 text-white'
+                              : 'bg-slate-950 border-slate-800 text-slate-400'
+                          }`}
+                        >
+                          👨‍💼 Male
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setAvatarType('preset'); setSelectedAvatarPreset('female-1'); }}
+                          className={`px-2 py-1 rounded-lg text-[10px] font-semibold border transition ${
+                            avatarType === 'preset' && selectedAvatarPreset === 'female-1'
+                              ? 'bg-pink-600/30 border-pink-500 text-white'
+                              : 'bg-slate-950 border-slate-800 text-slate-400'
+                          }`}
+                        >
+                          👩‍💼 Female
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setAvatarType('preset'); setSelectedAvatarPreset('male-2'); }}
+                          className={`px-2 py-1 rounded-lg text-[10px] font-semibold border transition ${
+                            avatarType === 'preset' && selectedAvatarPreset === 'male-2'
+                              ? 'bg-emerald-600/30 border-emerald-500 text-white'
+                              : 'bg-slate-950 border-slate-800 text-slate-400'
+                          }`}
+                        >
+                          👨‍⚕️ Medical
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setAvatarType('preset'); setSelectedAvatarPreset('neutral'); }}
+                          className={`px-2 py-1 rounded-lg text-[10px] font-semibold border transition ${
+                            avatarType === 'preset' && selectedAvatarPreset === 'neutral'
+                              ? 'bg-cyan-600/30 border-cyan-500 text-white'
+                              : 'bg-slate-950 border-slate-800 text-slate-400'
+                          }`}
+                        >
+                          🌐 Global
+                        </button>
+                      </div>
+
+                      <label className="cursor-pointer inline-flex items-center gap-1 text-[10px] text-brand-400 hover:text-brand-300 font-semibold">
+                        <Upload className="w-3 h-3" />
+                        <span>{customPhotoName ? `✓ ${customPhotoName}` : 'Or upload photo file (JPG/PNG)'}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handlePhotoUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Client / Host Registration Form */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div className="space-y-1">

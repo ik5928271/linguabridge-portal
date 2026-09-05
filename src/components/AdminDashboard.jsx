@@ -659,9 +659,21 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
                     {/* Header Row */}
                     <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-slate-800 pb-4">
                       <div className="flex items-start gap-3.5">
-                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white font-black flex items-center justify-center text-lg shadow-lg shrink-0">
-                          {app.name?.charAt(0) || 'L'}
-                        </div>
+                        {app.photoUrl ? (
+                          <img 
+                            src={app.photoUrl} 
+                            alt={app.name} 
+                            className="w-12 h-12 rounded-2xl object-cover ring-2 ring-purple-500 shadow-lg shrink-0" 
+                          />
+                        ) : app.avatarEmoji ? (
+                          <div className="w-12 h-12 rounded-2xl bg-slate-800 text-2xl flex items-center justify-center shadow-lg shrink-0 ring-1 ring-slate-700">
+                            {app.avatarEmoji}
+                          </div>
+                        ) : (
+                          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white font-black flex items-center justify-center text-lg shadow-lg shrink-0">
+                            {app.name?.charAt(0) || 'L'}
+                          </div>
+                        )}
                         <div>
                           <div className="flex items-center gap-2.5">
                             <h4 className="text-base font-extrabold text-white">{app.name}</h4>
@@ -791,26 +803,44 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
                         <div className="space-y-1.5">
                           <button
                             type="button"
-                            onClick={() => setDocPreviewModal({ title: 'CV / Resume Preview', fileName: app.cvFileName || 'Applicant_Resume_CV.pdf', applicantName: app.name, type: 'cv' })}
-                            className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left flex items-center justify-between text-[11px] text-slate-200 transition"
+                            onClick={() => setDocPreviewModal({
+                              title: 'CV / Curriculum Vitae Document Inspection',
+                              fileName: app.cvFileName || 'Applicant_Resume_CV.pdf',
+                              fileData: app.cvFileData,
+                              applicant: app,
+                              type: 'cv'
+                            })}
+                            className="w-full px-2.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-brand-500/50 text-left flex items-center justify-between text-[11px] text-slate-200 transition shadow-sm"
                           >
                             <span className="flex items-center gap-1.5 truncate">
-                              <FileText className="w-3.5 h-3.5 text-brand-400 shrink-0" />
-                              <span className="truncate">{app.cvFileName || 'CV_Resume.pdf'}</span>
+                              <FileText className="w-4 h-4 text-brand-400 shrink-0" />
+                              <span className="truncate font-semibold">{app.cvFileName || 'CV_Resume.pdf'}</span>
                             </span>
-                            <Eye className="w-3 h-3 text-slate-400 shrink-0 ml-1" />
+                            <span className="flex items-center gap-1 text-[10px] text-brand-400 font-bold bg-brand-500/10 px-2 py-0.5 rounded-md border border-brand-500/20">
+                              <Eye className="w-3 h-3" />
+                              <span>View CV</span>
+                            </span>
                           </button>
 
                           <button
                             type="button"
-                            onClick={() => setDocPreviewModal({ title: 'Credential Certificate Preview', fileName: app.docFileName || 'Certification_Diploma.pdf', applicantName: app.name, type: 'cert' })}
-                            className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left flex items-center justify-between text-[11px] text-slate-200 transition"
+                            onClick={() => setDocPreviewModal({
+                              title: 'Professional Certification & Credentials Inspection',
+                              fileName: app.docFileName || 'Certification_Proof.pdf',
+                              fileData: app.docFileData,
+                              applicant: app,
+                              type: 'cert'
+                            })}
+                            className="w-full px-2.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-purple-500/50 text-left flex items-center justify-between text-[11px] text-slate-200 transition shadow-sm"
                           >
                             <span className="flex items-center gap-1.5 truncate">
-                              <Award className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                              <span className="truncate">{app.docFileName || 'Certificate.pdf'}</span>
+                              <Award className="w-4 h-4 text-purple-400 shrink-0" />
+                              <span className="truncate font-semibold">{app.docFileName || 'Certificate.pdf'}</span>
                             </span>
-                            <Eye className="w-3 h-3 text-slate-400 shrink-0 ml-1" />
+                            <span className="flex items-center gap-1 text-[10px] text-purple-400 font-bold bg-purple-500/10 px-2 py-0.5 rounded-md border border-purple-500/20">
+                              <Eye className="w-3 h-3" />
+                              <span>View Doc</span>
+                            </span>
                           </button>
                         </div>
                       </div>
@@ -2176,50 +2206,172 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       )}
 
       {/* ========================================================== */}
-      {/* MODAL 4: DOCUMENT & CV INSPECTION PREVIEW */}
+      {/* MODAL 4: DOCUMENT & CV INSPECTION PREVIEW (FULL DOSSIER) */}
       {/* ========================================================== */}
       {docPreviewModal && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 relative text-white">
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="max-w-2xl w-full my-6 bg-slate-900 border border-slate-700 rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5 relative text-white">
+            
+            {/* Header */}
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-brand-500/20 text-brand-400 flex items-center justify-center">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-brand-500/20 text-brand-400 flex items-center justify-center shadow">
                   <FileText className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="text-base font-extrabold text-white">{docPreviewModal.title}</h3>
-                  <p className="text-xs text-slate-400">Applicant: {docPreviewModal.applicantName}</p>
+                  <p className="text-xs text-slate-400">
+                    File: <strong className="text-brand-300 font-mono">{docPreviewModal.fileName}</strong>
+                  </p>
                 </div>
               </div>
-              <button onClick={() => setDocPreviewModal(null)} className="text-slate-400 hover:text-white">
+              <button 
+                onClick={() => setDocPreviewModal(null)} 
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800 text-center space-y-3">
-              <div className="w-14 h-14 rounded-2xl bg-slate-900 text-emerald-400 flex items-center justify-center mx-auto border border-slate-800">
-                <FileCheck className="w-7 h-7" />
+            {/* Candidate Header Summary */}
+            {docPreviewModal.applicant && (
+              <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 text-xs">
+                <div className="flex items-center gap-3">
+                  {docPreviewModal.applicant.photoUrl ? (
+                    <img src={docPreviewModal.applicant.photoUrl} alt="Applicant" className="w-10 h-10 rounded-xl object-cover ring-2 ring-purple-500" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-xl bg-slate-800 text-xl flex items-center justify-center">
+                      {docPreviewModal.applicant.avatarEmoji || '👨‍💼'}
+                    </div>
+                  )}
+                  <div>
+                    <h4 className="font-extrabold text-white text-sm">{docPreviewModal.applicant.name}</h4>
+                    <p className="text-[11px] text-slate-400">
+                      {docPreviewModal.applicant.email} • {docPreviewModal.applicant.phone || 'No phone'} • {docPreviewModal.applicant.country || 'International'}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  {docPreviewModal.applicant.status === 'approved' ? '✓ Approved' : '● In Review'}
+                </span>
               </div>
-              <p className="text-sm font-bold text-white">{docPreviewModal.fileName}</p>
-              <p className="text-xs text-slate-400">
-                {docPreviewModal.type === 'cv' 
-                  ? 'Official Curriculum Vitae / Resume with certified interpretation history and hospital clearances.'
-                  : 'Certified Professional Linguist Accreditation & State License.'}
-              </p>
-              <span className="inline-block text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-                ✓ Verified File Format & Integrity (PDF)
-              </span>
-            </div>
+            )}
 
-            <div className="flex items-center justify-end gap-3">
+            {/* Document Body / Live Viewer */}
+            {docPreviewModal.fileData && docPreviewModal.fileData.startsWith('data:') ? (
+              <div className="space-y-3">
+                <div className="rounded-2xl overflow-hidden border border-slate-700 bg-slate-950">
+                  {docPreviewModal.fileData.includes('image/') ? (
+                    <img src={docPreviewModal.fileData} alt="Document" className="w-full max-h-96 object-contain mx-auto" />
+                  ) : (
+                    <iframe 
+                      src={docPreviewModal.fileData} 
+                      title="CV Preview" 
+                      className="w-full h-80 bg-white rounded-2xl" 
+                    />
+                  )}
+                </div>
+                <div className="flex justify-end">
+                  <a
+                    href={docPreviewModal.fileData}
+                    download={docPreviewModal.fileName}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition"
+                  >
+                    <Upload className="w-3.5 h-3.5 rotate-180" />
+                    <span>Download Original File</span>
+                  </a>
+                </div>
+              </div>
+            ) : (
+              /* Verified Candidate Resume Breakdown */
+              <div className="space-y-3 text-xs">
+                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+                    <span className="text-slate-400 font-medium">Document Status:</span>
+                    <span className="text-emerald-400 font-bold flex items-center gap-1">
+                      <FileCheck className="w-3.5 h-3.5" />
+                      <span>{docPreviewModal.fileName} (Logged in Intake Queue)</span>
+                    </span>
+                  </div>
+
+                  {docPreviewModal.applicant && (
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                        <div>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase">Language Fluency:</p>
+                          <p className="font-bold text-brand-300 mt-0.5">
+                            English ⟷ {docPreviewModal.applicant.primaryLang} ({Array.isArray(docPreviewModal.applicant.languages) ? docPreviewModal.applicant.languages.join(', ') : docPreviewModal.applicant.languages})
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase">Practice Specialties:</p>
+                          <p className="font-bold text-purple-300 mt-0.5">
+                            {Array.isArray(docPreviewModal.applicant.specialties) ? docPreviewModal.applicant.specialties.join(', ') : (docPreviewModal.applicant.specialties || 'Medical & General')}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase">Years of Experience:</p>
+                          <p className="font-bold text-white mt-0.5">
+                            {docPreviewModal.applicant.experienceYears || 3} Years Professional Interpretation
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase">Requested Rate Structure:</p>
+                          <p className="font-bold text-emerald-400 font-mono mt-0.5">
+                            {docPreviewModal.applicant.rateLabel || `$${docPreviewModal.applicant.hourlyRate || 8}/hr`}
+                          </p>
+                        </div>
+                      </div>
+
+                      {docPreviewModal.applicant.certifications && (
+                        <div className="pt-2 border-t border-slate-800/80">
+                          <p className="text-[10px] text-slate-400 font-bold uppercase">Accreditations & Certifications:</p>
+                          <p className="font-semibold text-slate-200 mt-0.5">
+                            {Array.isArray(docPreviewModal.applicant.certifications) ? docPreviewModal.applicant.certifications.join(' • ') : docPreviewModal.applicant.certifications}
+                          </p>
+                        </div>
+                      )}
+
+                      {docPreviewModal.applicant.bio && (
+                        <div className="pt-2 border-t border-slate-800/80">
+                          <p className="text-[10px] text-slate-400 font-bold uppercase">Professional Statement / Bio:</p>
+                          <p className="text-slate-300 mt-1 leading-relaxed italic bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
+                            "{docPreviewModal.applicant.bio}"
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-800">
               <button
                 type="button"
                 onClick={() => setDocPreviewModal(null)}
-                className="w-full py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs"
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition"
               >
-                Close Preview
+                Close Inspection
               </button>
+
+              {docPreviewModal.applicant && docPreviewModal.applicant.status === 'pending' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const appToApprove = docPreviewModal.applicant;
+                    setDocPreviewModal(null);
+                    handleOpenApproveModal(appToApprove);
+                  }}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-600/30 transition"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Review & Approve This Candidate</span>
+                </button>
+              )}
             </div>
+
           </div>
         </div>
       )}

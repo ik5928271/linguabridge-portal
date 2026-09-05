@@ -50,7 +50,7 @@ export default function Navbar({
   };
 
   return (
-    <header className="sticky top-0 z-50 glass-panel border-b border-slate-800/80 px-4 lg:px-8 py-3 transition-all">
+    <header className="sticky top-0 z-50 glass-panel border-b border-slate-200/80 dark:border-slate-800/80 px-4 lg:px-8 py-3 transition-all">
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
         
         {/* Brand Logo & Tagline */}
@@ -108,7 +108,7 @@ export default function Navbar({
           </nav>
         ) : currentUser?.role === 'admin' ? (
           /* 2. ADMIN USER NAVIGATION (Master access to all dashboards) */
-          <div className="flex items-center bg-slate-900/90 p-1 rounded-xl border border-purple-500/40 shadow-inner">
+          <div className="flex items-center bg-slate-100 dark:bg-slate-900/90 p-1 rounded-xl border border-purple-300 dark:border-purple-500/40 shadow-inner">
             <button
               onClick={() => {
                 setCurrentRole('admin');
@@ -117,10 +117,10 @@ export default function Navbar({
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 currentView === 'admin'
                   ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30 font-bold'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800/50'
               }`}
             >
-              <ShieldAlert className="w-3.5 h-3.5 text-purple-300" />
+              <ShieldAlert className="w-3.5 h-3.5 text-purple-600 dark:text-purple-300" />
               <span>Admin Operations</span>
             </button>
 
@@ -132,7 +132,7 @@ export default function Navbar({
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 currentView === 'host'
                   ? 'bg-brand-600 text-white shadow-md shadow-brand-600/30'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800/50'
               }`}
             >
               <Users className="w-3.5 h-3.5" />
@@ -147,7 +147,7 @@ export default function Navbar({
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 currentView === 'interpreter'
                   ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800/50'
               }`}
             >
               <Headphones className="w-3.5 h-3.5" />
@@ -156,7 +156,7 @@ export default function Navbar({
           </div>
         ) : currentUser?.role === 'interpreter' ? (
           /* 3. LOGGED-IN INTERPRETER NAVIGATION */
-          <div className="flex items-center bg-slate-900/90 p-1 rounded-xl border border-emerald-500/30">
+          <div className="flex items-center bg-slate-100 dark:bg-slate-900/90 p-1 rounded-xl border border-emerald-300 dark:border-emerald-500/30">
             <button
               onClick={() => {
                 setCurrentRole('interpreter');
@@ -164,14 +164,14 @@ export default function Navbar({
               }}
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 text-white shadow-md shadow-emerald-600/30"
             >
-              <Headphones className="w-3.5 h-3.5" />
+              <Headphones className="w-3.5 h-3.5 text-white" />
               <span>Interpreter Workbench</span>
               <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" />
             </button>
           </div>
         ) : (
           /* 4. LOGGED-IN CLIENT / PAYER NAVIGATION */
-          <div className="flex items-center bg-slate-900/90 p-1 rounded-xl border border-brand-500/30">
+          <div className="flex items-center bg-slate-100 dark:bg-slate-900/90 p-1 rounded-xl border border-brand-300 dark:border-brand-500/30">
             <button
               onClick={() => {
                 setCurrentRole('host');
@@ -179,54 +179,54 @@ export default function Navbar({
               }}
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-brand-600 text-white shadow-md shadow-brand-600/30"
             >
-              <Users className="w-3.5 h-3.5" />
+              <Users className="w-3.5 h-3.5 text-white" />
               <span>My Client / Payer Dashboard</span>
             </button>
           </div>
         )}
 
-        {/* Right Tools & Auth Suite */}
+        {/* Right Tools & Auth Suite (4 Top-Right Buttons) */}
         <div className="flex items-center gap-2 shrink-0">
           
-          {/* Dark / Light Theme Toggle Button */}
+          {/* 1. Dark / Light Theme Toggle Button */}
           <button
             type="button"
             onClick={onToggleTheme}
             title={theme === 'light' ? 'Switch to Dark Theme' : 'Switch to Light Theme'}
             aria-label="Toggle Dark / Light Theme"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/80 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-xs font-semibold border border-slate-300 dark:border-slate-700 transition shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800/90 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white text-xs font-semibold border border-slate-300/90 dark:border-slate-700 transition shadow-sm"
           >
             {theme === 'light' ? (
               <>
                 <Moon className="w-3.5 h-3.5 text-indigo-600" />
-                <span className="hidden xl:inline text-[11px] font-bold text-slate-800">Dark</span>
+                <span className="inline text-xs font-bold text-slate-800">Dark</span>
               </>
             ) : (
               <>
                 <Sun className="w-3.5 h-3.5 text-amber-400" />
-                <span className="hidden xl:inline text-[11px] font-semibold text-slate-300">Light</span>
+                <span className="inline text-xs font-semibold text-slate-200">Light</span>
               </>
             )}
           </button>
 
-          {/* Terminology Glossary button */}
+          {/* 2. Terminology Glossary button */}
           <button
             onClick={onOpenGlossary}
             title="Search Medical & Legal Glossaries"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/80 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-xs font-medium border border-slate-300 dark:border-slate-700 transition shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-800/90 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white text-xs font-semibold border border-slate-300/90 dark:border-slate-700 transition shadow-sm"
           >
             <BookOpen className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400" />
-            <span className="hidden sm:inline">Glossary</span>
+            <span>Glossary</span>
           </button>
 
           {/* Admin-only Demo Preview */}
           {currentUser?.role === 'admin' && (
             <button
               onClick={() => setCurrentView('split-demo')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm ${
                 currentView === 'split-demo'
                   ? 'bg-gradient-to-r from-brand-500 to-indigo-600 text-white ring-2 ring-brand-400'
-                  : 'bg-brand-50 hover:bg-brand-100 text-brand-700 border-brand-200 dark:bg-gradient-to-r dark:from-brand-600/20 dark:to-indigo-600/20 dark:text-brand-300 border dark:border-brand-500/30'
+                  : 'bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 dark:bg-gradient-to-r dark:from-brand-600/20 dark:to-indigo-600/20 dark:text-brand-300 dark:border-brand-500/30'
               }`}
             >
               <LayoutGrid className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400" />
@@ -239,11 +239,19 @@ export default function Navbar({
             <div className="relative">
               <button
                 onClick={() => setShowUserMenu(!showUserMenu)}
-                className="flex items-center gap-2 p-1.5 pl-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 transition shadow-sm"
+                className="flex items-center gap-2 p-1.5 pl-2.5 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 transition shadow-sm"
               >
-                <div className="w-6 h-6 rounded-full bg-brand-500 text-white font-bold text-xs flex items-center justify-center">
-                  {currentUser.name?.charAt(0) || 'U'}
-                </div>
+                {currentUser.photoUrl ? (
+                  <img src={currentUser.photoUrl} alt="Avatar" className="w-6 h-6 rounded-full object-cover ring-1 ring-brand-400" />
+                ) : currentUser.avatarEmoji ? (
+                  <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs">
+                    {currentUser.avatarEmoji}
+                  </div>
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-brand-500 text-white font-bold text-xs flex items-center justify-center">
+                    {currentUser.name?.charAt(0) || 'U'}
+                  </div>
+                )}
                 <div className="text-left hidden sm:block">
                   <p className="text-[11px] font-bold text-slate-900 dark:text-white leading-tight truncate max-w-[110px]">{currentUser.name || 'User'}</p>
                   <p className="text-[9px] text-slate-500 dark:text-slate-400 capitalize">
@@ -289,22 +297,24 @@ export default function Navbar({
               )}
             </div>
           ) : (
-            /* Visitor Authentication Actions */
+            /* Visitor Authentication Actions: 3. Sign In & 4. Sign Up */
             <div className="flex items-center gap-2">
+              {/* 3. Sign In Button */}
               <button
                 onClick={() => onOpenAuth('signin')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold border border-slate-300 dark:border-slate-700 transition shadow-sm"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-brand-600 dark:hover:text-white text-xs font-bold border border-slate-300/90 dark:border-slate-700 transition shadow-sm"
               >
                 <LogIn className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400" />
                 <span>Sign In</span>
               </button>
 
+              {/* 4. Sign Up Button */}
               <button
                 onClick={() => onOpenAuth('signup')}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-brand-500 to-indigo-600 hover:from-brand-600 hover:to-indigo-700 text-white text-xs font-extrabold shadow-lg shadow-brand-500/25 transition transform hover:scale-105"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-brand-600 via-brand-500 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white text-xs font-extrabold shadow-md shadow-brand-500/25 border border-transparent transition transform hover:scale-105"
               >
-                <UserPlus className="w-3.5 h-3.5" />
-                <span>Sign Up</span>
+                <UserPlus className="w-3.5 h-3.5 text-white" />
+                <span className="text-white">Sign Up</span>
               </button>
             </div>
           )}
