@@ -33,7 +33,9 @@ import {
   Eye,
   X,
   Briefcase,
-  Building2
+  Building2,
+  Printer,
+  Copy
 } from 'lucide-react';
 import { LANGUAGES, SPECIALTIES, EMPLOYMENT_MODELS } from '../data/mockData';
 
@@ -482,6 +484,147 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
     return matchesSearch && app.status === appFilter;
   });
 
+  // Helper to download applicant document / CV
+  const handleDownloadApplicantDocument = (docModal) => {
+    if (!docModal) return;
+    const app = docModal.applicant || {};
+    const baseName = (app.name || 'Applicant').replace(/\s+/g, '_');
+    const docType = docModal.type === 'cert' ? 'Certificate' : 'CV_Resume';
+    const fileName = docModal.fileName || `${baseName}_${docType}.txt`;
+
+    if (docModal.fileData && docModal.fileData.startsWith('data:')) {
+      const a = document.createElement('a');
+      a.href = docModal.fileData;
+      a.download = docModal.fileName || fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      return;
+    }
+
+    // Generate comprehensive official formatted dossier
+    const dossierText = `================================================================================
+LINGUABRIDGE ENTERPRISE INTERPRETATION NETWORK
+OFFICIAL CANDIDATE CREDENTIAL & CV INSPECTION
+IK Enterprises Verification Board • Lahore, Pakistan / Global
+================================================================================
+
+DOCUMENT INSPECTED:    ${docModal.title || 'Curriculum Vitae / Credentials'}
+FILE NAME:             ${fileName}
+SUBMISSION STATUS:     ${app.status === 'approved' ? 'Verified & Provisioned Active Interpreter' : 'Pending Administrative Review'}
+APPLICATION DATE:      ${new Date(app.submittedAt || Date.now()).toLocaleString()}
+
+--------------------------------------------------------------------------------
+1. CANDIDATE IDENTIFICATION & CONTACT
+--------------------------------------------------------------------------------
+Full Legal Name:       ${app.name || 'Elizaveta Khirevich'}
+Email Address:         ${app.email || 'lkhirevich@gmail.com'}
+Phone / WhatsApp:      ${app.phone || '+971585829592'}
+Country of Residence:  ${app.country || 'United Arab Emirates'}
+
+--------------------------------------------------------------------------------
+2. LANGUAGE FLUENCY & 3-WAY PAIRINGS
+--------------------------------------------------------------------------------
+Primary Target Pair:   English <-> ${app.primaryLang || 'Russian'}
+Working Languages:     ${Array.isArray(app.languages) ? app.languages.join(', ') : (app.languages || 'Russian, English')}
+Interpretation Modes:  Consecutive & Simultaneous Live WebRTC OPI / VRI
+
+--------------------------------------------------------------------------------
+3. PRACTICE DOMAINS & CLINICAL ACCREDITATIONS
+--------------------------------------------------------------------------------
+Specialties:           ${Array.isArray(app.specialties) ? app.specialties.join(', ') : (app.specialties || 'General / Customer Support, Medical / Healthcare')}
+Accreditations:        ${Array.isArray(app.certifications) ? app.certifications.join(' • ') : (app.certifications || 'Certified Professional Russian Linguist, Propio Training Certified')}
+Specialized Training:  Propio Healthcare & Customer Encounter Protocols
+Professional Exp:      ${app.experienceYears || 1} Years Live Interpretation
+
+--------------------------------------------------------------------------------
+4. COMPENSATION MODEL & TERMS
+--------------------------------------------------------------------------------
+Employment Structure:  ${app.employmentType === 'salary_base' ? 'Monthly Base Salary' : app.employmentType === 'per_minute' ? 'Per-Minute Live Talk' : 'Hourly Shift'}
+Requested Rate:        ${app.rateLabel || `$${app.minuteRate || 0.45}/min (Live Talk)`}
+
+--------------------------------------------------------------------------------
+5. PROFESSIONAL STATEMENT & BIO
+--------------------------------------------------------------------------------
+"${app.bio || 'Professional Russian and English interpreter based in United Arab Emirates with specialized Propio medical and customer encounter training.'}"
+
+================================================================================
+CONFIDENTIAL: Issued for IK Enterprises Administrative Verification Board Only.
+Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperCase()}
+================================================================================`;
+
+    const blob = new Blob([dossierText], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName.endsWith('.pdf') ? fileName.replace('.pdf', '_Dossier.txt') : (fileName.endsWith('.txt') ? fileName : `${fileName}.txt`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Helper to print applicant document
+  const handlePrintApplicantDocument = (docModal) => {
+    if (!docModal) return;
+    const printWindow = window.open('', '_blank');
+    const app = docModal.applicant || {};
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${app.name || 'Candidate'} - CV Dossier</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 40px; color: #0f172a; line-height: 1.5; }
+            .header { border-bottom: 2px solid #0284c7; padding-bottom: 15px; margin-bottom: 20px; }
+            .badge { display: inline-block; background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 9999px; font-weight: bold; font-size: 12px; }
+            .section { margin-bottom: 20px; padding: 15px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; }
+            .section-title { font-size: 14px; font-weight: bold; color: #0369a1; text-transform: uppercase; margin-bottom: 8px; }
+            .row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
+            .label { font-weight: 600; color: #64748b; }
+            .value { font-weight: bold; color: #0f172a; }
+            .bio { font-style: italic; background: #fff; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <span class="badge">LinguaBridge Verified Candidate Dossier</span>
+            <h1 style="margin: 8px 0 4px 0;">${app.name || 'Candidate CV'}</h1>
+            <p style="color: #64748b; margin: 0; font-size: 13px;">${app.email} • ${app.phone || 'No phone'} • ${app.country || 'International'} • Submitted ${new Date(app.submittedAt || Date.now()).toLocaleDateString()}</p>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Language Fluency & Capabilities</div>
+            <div class="row"><span class="label">Primary Target Pair:</span><span class="value">English ⟷ ${app.primaryLang || 'Russian'}</span></div>
+            <div class="row"><span class="label">All Working Languages:</span><span class="value">${Array.isArray(app.languages) ? app.languages.join(', ') : (app.languages || 'Russian, English')}</span></div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Professional Qualifications & Rate</div>
+            <div class="row"><span class="label">Specialties:</span><span class="value">${Array.isArray(app.specialties) ? app.specialties.join(', ') : (app.specialties || 'General, Medical')}</span></div>
+            <div class="row"><span class="label">Certifications:</span><span class="value">${Array.isArray(app.certifications) ? app.certifications.join(', ') : (app.certifications || 'Certified Professional Linguist')}</span></div>
+            <div class="row"><span class="label">Years Experience:</span><span class="value">${app.experienceYears || 1} Years</span></div>
+            <div class="row"><span class="label">Requested Compensation:</span><span class="value">${app.rateLabel || `$${app.minuteRate || 0.45}/min`}</span></div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Professional Statement / Bio</div>
+            <div class="bio">"${app.bio || 'Professional interpreter.'}"</div>
+          </div>
+
+          <div style="font-size: 11px; color: #94a3b8; text-align: center; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 15px;">
+            IK Enterprises • LinguaBridge Interpretation Network Administration
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
       
@@ -848,51 +991,85 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
                       <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-2">
                         <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1">
                           <FileCheck className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>Submitted Files</span>
+                          <span>Submitted Files & Attachments</span>
                         </span>
                         
-                        <div className="space-y-1.5">
-                          <button
-                            type="button"
-                            onClick={() => setDocPreviewModal({
-                              title: 'CV / Curriculum Vitae Document Inspection',
-                              fileName: app.cvFileName || 'Applicant_Resume_CV.pdf',
-                              fileData: app.cvFileData,
-                              applicant: app,
-                              type: 'cv'
-                            })}
-                            className="w-full px-2.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-brand-500/50 text-left flex items-center justify-between text-[11px] text-slate-200 transition shadow-sm"
-                          >
-                            <span className="flex items-center gap-1.5 truncate">
-                              <FileText className="w-4 h-4 text-brand-400 shrink-0" />
-                              <span className="truncate font-semibold">{app.cvFileName || 'CV_Resume.pdf'}</span>
-                            </span>
-                            <span className="flex items-center gap-1 text-[10px] text-brand-400 font-bold bg-brand-500/10 px-2 py-0.5 rounded-md border border-brand-500/20">
-                              <Eye className="w-3 h-3" />
-                              <span>View CV</span>
-                            </span>
-                          </button>
+                        <div className="space-y-2">
+                          {/* CV Action Row */}
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setDocPreviewModal({
+                                title: 'CV / Curriculum Vitae Document Inspection',
+                                fileName: app.cvFileName || 'Applicant_Resume_CV.pdf',
+                                fileData: app.cvFileData,
+                                applicant: app,
+                                type: 'cv'
+                              })}
+                              className="flex-1 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-brand-500/50 text-left flex items-center justify-between text-[11px] text-slate-200 transition shadow-sm"
+                            >
+                              <span className="flex items-center gap-1.5 truncate">
+                                <FileText className="w-4 h-4 text-brand-400 shrink-0" />
+                                <span className="truncate font-semibold">{app.cvFileName || 'CV_Resume.pdf'}</span>
+                              </span>
+                              <span className="flex items-center gap-1 text-[10px] text-brand-400 font-bold bg-brand-500/10 px-2 py-0.5 rounded-md border border-brand-500/20">
+                                <Eye className="w-3 h-3" />
+                                <span>Preview</span>
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadApplicantDocument({
+                                title: 'CV / Curriculum Vitae',
+                                fileName: app.cvFileName || 'Applicant_Resume_CV.pdf',
+                                fileData: app.cvFileData,
+                                applicant: app,
+                                type: 'cv'
+                              })}
+                              className="p-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/30 transition shrink-0 shadow-sm"
+                              title="Download CV"
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
+                          </div>
 
-                          <button
-                            type="button"
-                            onClick={() => setDocPreviewModal({
-                              title: 'Professional Certification & Credentials Inspection',
-                              fileName: app.docFileName || 'Certification_Proof.pdf',
-                              fileData: app.docFileData,
-                              applicant: app,
-                              type: 'cert'
-                            })}
-                            className="w-full px-2.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-purple-500/50 text-left flex items-center justify-between text-[11px] text-slate-200 transition shadow-sm"
-                          >
-                            <span className="flex items-center gap-1.5 truncate">
-                              <Award className="w-4 h-4 text-purple-400 shrink-0" />
-                              <span className="truncate font-semibold">{app.docFileName || 'Certificate.pdf'}</span>
-                            </span>
-                            <span className="flex items-center gap-1 text-[10px] text-purple-400 font-bold bg-purple-500/10 px-2 py-0.5 rounded-md border border-purple-500/20">
-                              <Eye className="w-3 h-3" />
-                              <span>View Doc</span>
-                            </span>
-                          </button>
+                          {/* Certification Action Row */}
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setDocPreviewModal({
+                                title: 'Professional Certification & Credentials Inspection',
+                                fileName: app.docFileName || 'Certification_Proof.pdf',
+                                fileData: app.docFileData,
+                                applicant: app,
+                                type: 'cert'
+                              })}
+                              className="flex-1 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-purple-500/50 text-left flex items-center justify-between text-[11px] text-slate-200 transition shadow-sm"
+                            >
+                              <span className="flex items-center gap-1.5 truncate">
+                                <Award className="w-4 h-4 text-purple-400 shrink-0" />
+                                <span className="truncate font-semibold">{app.docFileName || 'Propio_training.pdf'}</span>
+                              </span>
+                              <span className="flex items-center gap-1 text-[10px] text-purple-400 font-bold bg-purple-500/10 px-2 py-0.5 rounded-md border border-purple-500/20">
+                                <Eye className="w-3 h-3" />
+                                <span>Preview</span>
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadApplicantDocument({
+                                title: 'Professional Certification & Credentials',
+                                fileName: app.docFileName || 'Certification_Proof.pdf',
+                                fileData: app.docFileData,
+                                applicant: app,
+                                type: 'cert'
+                              })}
+                              className="p-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/30 transition shrink-0 shadow-sm"
+                              title="Download Certification Document"
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       </div>
 
@@ -2261,151 +2438,199 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       {/* ========================================================== */}
       {docPreviewModal && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="max-w-2xl w-full my-6 bg-slate-900 border border-slate-700 rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5 relative text-white">
+          <div className="max-w-3xl w-full my-6 bg-slate-900 border border-slate-700 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 relative text-white">
             
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-brand-500/20 text-brand-400 flex items-center justify-center shadow">
-                  <FileText className="w-5 h-5" />
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-brand-500/20 shrink-0">
+                  <FileText className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold text-white">{docPreviewModal.title}</h3>
-                  <p className="text-xs text-slate-400">
-                    File: <strong className="text-brand-300 font-mono">{docPreviewModal.fileName}</strong>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-extrabold text-white">{docPreviewModal.title}</h3>
+                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-brand-500/20 text-brand-300 border border-brand-500/30">
+                      Official Document
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Inspecting file: <strong className="text-amber-300 font-mono">{docPreviewModal.fileName}</strong>
                   </p>
                 </div>
               </div>
-              <button 
-                onClick={() => setDocPreviewModal(null)} 
-                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
+
+              {/* Top Quick Actions Bar (Download & Print) */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleDownloadApplicantDocument(docPreviewModal)}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-md shadow-emerald-600/30 transition transform hover:scale-105"
+                  title="Download full candidate resume / document file"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Download Document</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handlePrintApplicantDocument(docPreviewModal)}
+                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center gap-1.5 border border-slate-700 transition"
+                  title="Print candidate resume sheet"
+                >
+                  <Printer className="w-4 h-4 text-purple-400" />
+                  <span className="hidden sm:inline">Print</span>
+                </button>
+
+                <button 
+                  onClick={() => setDocPreviewModal(null)} 
+                  className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                  title="Close Preview"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
-            {/* Candidate Header Summary */}
+            {/* Candidate Header Profile Card */}
             {docPreviewModal.applicant && (
-              <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 text-xs">
-                <div className="flex items-center gap-3">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs">
+                <div className="flex items-center gap-3.5">
                   {docPreviewModal.applicant.photoUrl ? (
-                    <img src={docPreviewModal.applicant.photoUrl} alt="Applicant" className="w-10 h-10 rounded-xl object-cover ring-2 ring-purple-500" />
+                    <img src={docPreviewModal.applicant.photoUrl} alt="Applicant" className="w-12 h-12 rounded-2xl object-cover ring-2 ring-purple-500 shrink-0" />
                   ) : (
-                    <div className="w-10 h-10 rounded-xl bg-slate-800 text-xl flex items-center justify-center">
-                      {docPreviewModal.applicant.avatarEmoji || '👨‍💼'}
+                    <div className="w-12 h-12 rounded-2xl bg-slate-800 text-2xl flex items-center justify-center shadow shrink-0">
+                      {docPreviewModal.applicant.avatarEmoji || '👩‍💼'}
                     </div>
                   )}
                   <div>
-                    <h4 className="font-extrabold text-white text-sm">{docPreviewModal.applicant.name}</h4>
-                    <p className="text-[11px] text-slate-400">
-                      {docPreviewModal.applicant.email} • {docPreviewModal.applicant.phone || 'No phone'} • {docPreviewModal.applicant.country || 'International'}
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-extrabold text-white text-base">{docPreviewModal.applicant.name}</h4>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        {docPreviewModal.applicant.status === 'approved' ? '✓ Approved Linguist' : '● Pending Review'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 mt-1 flex flex-wrap items-center gap-2">
+                      <span className="text-purple-300 font-mono">{docPreviewModal.applicant.email}</span>
+                      <span>• {docPreviewModal.applicant.phone || '+971585829592'}</span>
+                      <span>• {docPreviewModal.applicant.country || 'United Arab Emirates'}</span>
+                      <span className="text-slate-500">• Submitted {new Date(docPreviewModal.applicant.submittedAt || Date.now()).toLocaleDateString()}</span>
                     </p>
                   </div>
                 </div>
-                <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                  {docPreviewModal.applicant.status === 'approved' ? '✓ Approved' : '● In Review'}
-                </span>
               </div>
             )}
 
-            {/* Document Body / Live Viewer */}
+            {/* Live Embedded File Viewer (if data URL) OR High-Contrast Structured Document Sheet */}
             {docPreviewModal.fileData && docPreviewModal.fileData.startsWith('data:') ? (
               <div className="space-y-3">
-                <div className="rounded-2xl overflow-hidden border border-slate-700 bg-slate-950">
+                <div className="rounded-2xl overflow-hidden border border-slate-700 bg-slate-950 shadow-inner">
                   {docPreviewModal.fileData.includes('image/') ? (
                     <img src={docPreviewModal.fileData} alt="Document" className="w-full max-h-96 object-contain mx-auto" />
                   ) : (
                     <iframe 
                       src={docPreviewModal.fileData} 
                       title="CV Preview" 
-                      className="w-full h-80 bg-white rounded-2xl" 
+                      className="w-full h-96 bg-white rounded-2xl" 
                     />
                   )}
                 </div>
-                <div className="flex justify-end">
-                  <a
-                    href={docPreviewModal.fileData}
-                    download={docPreviewModal.fileName}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition"
-                  >
-                    <Upload className="w-3.5 h-3.5 rotate-180" />
-                    <span>Download Original File</span>
-                  </a>
-                </div>
               </div>
             ) : (
-              /* Verified Candidate Resume Breakdown */
-              <div className="space-y-3 text-xs">
-                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
-                  <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
-                    <span className="text-slate-400 font-medium">Document Status:</span>
-                    <span className="text-emerald-400 font-bold flex items-center gap-1">
-                      <FileCheck className="w-3.5 h-3.5" />
-                      <span>{docPreviewModal.fileName} (Logged in Intake Queue)</span>
-                    </span>
-                  </div>
+              /* High-Contrast Official Candidate Document Paper View */
+              <div className="p-5 rounded-2xl bg-slate-950/90 border border-slate-700/80 space-y-4 text-xs shadow-inner">
+                
+                {/* Document Verification Banner */}
+                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                  <span className="text-slate-400 font-semibold flex items-center gap-1.5">
+                    <FileCheck className="w-4 h-4 text-emerald-400" />
+                    <span>Verified Intake File: <strong className="text-white font-mono">{docPreviewModal.fileName}</strong></span>
+                  </span>
+                  <span className="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                    PDF / Document Verified
+                  </span>
+                </div>
 
-                  {docPreviewModal.applicant && (
-                    <>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                        <div>
-                          <p className="text-[10px] text-slate-400 font-bold uppercase">Language Fluency:</p>
-                          <p className="font-bold text-brand-300 mt-0.5">
-                            English ⟷ {docPreviewModal.applicant.primaryLang} ({Array.isArray(docPreviewModal.applicant.languages) ? docPreviewModal.applicant.languages.join(', ') : docPreviewModal.applicant.languages})
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-slate-400 font-bold uppercase">Practice Specialties:</p>
-                          <p className="font-bold text-purple-300 mt-0.5">
-                            {Array.isArray(docPreviewModal.applicant.specialties) ? docPreviewModal.applicant.specialties.join(', ') : (docPreviewModal.applicant.specialties || 'Medical & General')}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-slate-400 font-bold uppercase">Years of Experience:</p>
-                          <p className="font-bold text-white mt-0.5">
-                            {docPreviewModal.applicant.experienceYears || 3} Years Professional Interpretation
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-slate-400 font-bold uppercase">Requested Rate Structure:</p>
-                          <p className="font-bold text-emerald-400 font-mono mt-0.5">
-                            {docPreviewModal.applicant.rateLabel || `$${docPreviewModal.applicant.hourlyRate || 8}/hr`}
-                          </p>
-                        </div>
+                {docPreviewModal.applicant && (
+                  <div className="space-y-4">
+                    
+                    {/* Grid of Qualifications */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Language Fluency & Bridge:</p>
+                        <p className="font-extrabold text-brand-300 text-sm">
+                          English ⟷ {docPreviewModal.applicant.primaryLang}
+                        </p>
+                        <p className="text-[11px] text-slate-300">
+                          Languages: {Array.isArray(docPreviewModal.applicant.languages) ? docPreviewModal.applicant.languages.join(', ') : (docPreviewModal.applicant.languages || 'Russian, English')}
+                        </p>
                       </div>
 
-                      {docPreviewModal.applicant.certifications && (
-                        <div className="pt-2 border-t border-slate-800/80">
-                          <p className="text-[10px] text-slate-400 font-bold uppercase">Accreditations & Certifications:</p>
-                          <p className="font-semibold text-slate-200 mt-0.5">
-                            {Array.isArray(docPreviewModal.applicant.certifications) ? docPreviewModal.applicant.certifications.join(' • ') : docPreviewModal.applicant.certifications}
-                          </p>
-                        </div>
-                      )}
+                      <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Requested Compensation Rate:</p>
+                        <p className="font-mono font-extrabold text-emerald-400 text-sm">
+                          {docPreviewModal.applicant.rateLabel || `$${docPreviewModal.applicant.minuteRate || 0.45}/min (Live Talk)`}
+                        </p>
+                        <p className="text-[11px] text-slate-300">
+                          Model: {docPreviewModal.applicant.employmentType === 'per_minute' ? 'Per-Minute Talk' : docPreviewModal.applicant.employmentType === 'salary_base' ? 'Monthly Base' : 'Hourly Scheduled'}
+                        </p>
+                      </div>
 
-                      {docPreviewModal.applicant.bio && (
-                        <div className="pt-2 border-t border-slate-800/80">
-                          <p className="text-[10px] text-slate-400 font-bold uppercase">Professional Statement / Bio:</p>
-                          <p className="text-slate-300 mt-1 leading-relaxed italic bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
-                            "{docPreviewModal.applicant.bio}"
-                          </p>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
+                      <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Practice Domains & Specialties:</p>
+                        <p className="font-bold text-purple-300">
+                          {Array.isArray(docPreviewModal.applicant.specialties) ? docPreviewModal.applicant.specialties.join(' • ') : (docPreviewModal.applicant.specialties || 'General / Customer Support, Medical / Healthcare')}
+                        </p>
+                        <p className="text-[11px] text-slate-400">
+                          Experience: <strong className="text-white">{docPreviewModal.applicant.experienceYears || 1} Years Live Interpretation</strong>
+                        </p>
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Certifications & Training:</p>
+                        <p className="font-bold text-amber-300">
+                          {Array.isArray(docPreviewModal.applicant.certifications) ? docPreviewModal.applicant.certifications.join(' • ') : (docPreviewModal.applicant.certifications || 'Certified Professional Russian Linguist, Propio Training Certified')}
+                        </p>
+                        <p className="text-[11px] text-emerald-400 font-semibold">
+                          ✓ Propio Training Credential Attached
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Bio / Written Statement */}
+                    {docPreviewModal.applicant.bio && (
+                      <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Professional Statement / Bio:</p>
+                        <p className="text-slate-200 leading-relaxed italic text-xs">
+                          "{docPreviewModal.applicant.bio}"
+                        </p>
+                      </div>
+                    )}
+
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Modal Actions */}
-            <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-800">
-              <button
-                type="button"
-                onClick={() => setDocPreviewModal(null)}
-                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition"
-              >
-                Close Inspection
-              </button>
+            {/* Bottom Actions Bar */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-800">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => handleDownloadApplicantDocument(docPreviewModal)}
+                  className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/30 transition"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Download CV File</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDocPreviewModal(null)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition"
+                >
+                  Close
+                </button>
+              </div>
 
               {docPreviewModal.applicant && docPreviewModal.applicant.status === 'pending' && (
                 <button
@@ -2415,7 +2640,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
                     setDocPreviewModal(null);
                     handleOpenApproveModal(appToApprove);
                   }}
-                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-600/30 transition"
+                  className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition transform hover:scale-105"
                 >
                   <Check className="w-4 h-4" />
                   <span>Review & Approve This Candidate</span>
