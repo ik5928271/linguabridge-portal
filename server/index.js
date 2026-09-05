@@ -15,7 +15,8 @@ const io = new Server(server, {
 });
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Persistent JSON Storage File
 const DATA_DIR = path.join(process.cwd(), 'server', 'data');
@@ -179,31 +180,6 @@ const SEED_APPLICATIONS = [
     status: 'pending', // 'pending', 'approved', 'rejected'
     adminNotes: '',
     submittedAt: '2026-09-05T08:26:00.000Z'
-  },
-  {
-    id: 'app-ahmed-farooq',
-    name: 'Ahmed Farooq',
-    email: 'ahmed.farooq@linguabridge-applicant.com',
-    phone: '+1 (555) 234-8901',
-    country: 'United States',
-    primaryLang: 'Urdu',
-    languages: ['Urdu', 'Punjabi', 'English', 'Hindi'],
-    specialties: ['Medical / Healthcare', 'Legal / Court Certified', 'Immigration & Refugee'],
-    certifications: ['Certified Healthcare Interpreter (CCHI)', 'State Court Interpreter'],
-    experienceYears: 7,
-    employmentType: 'hourly',
-    hourlyRate: 5,
-    minuteRate: 0.30,
-    monthlySalary: 1200,
-    rateLabel: '$5/hr (Scheduled Shift)',
-    bio: 'Certified Urdu and Punjabi medical interpreter with 7+ years translating in emergency departments, trauma surgeries, and immigration court hearings.',
-    cvFileName: 'Ahmed_Farooq_Certified_Linguist_CV.pdf',
-    docFileName: 'CCHI_Healthcare_Certification_Farooq.pdf',
-    avatarPreset: 'male-1',
-    avatarEmoji: '👨‍💼',
-    status: 'pending',
-    adminNotes: '',
-    submittedAt: '2026-09-05T06:00:00.000Z'
   }
 ];
 
