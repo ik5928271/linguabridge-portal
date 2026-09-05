@@ -153,33 +153,65 @@ const SEED_WALLETS = {
   }
 };
 
+// Permanent Seed Applications (Preserved across all deployments & container restarts)
+const SEED_APPLICATIONS = [
+  {
+    id: 'app-elizaveta-khirevich',
+    name: 'Elizaveta Khirevich',
+    email: 'lkhirevich@gmail.com',
+    phone: '+971585829592',
+    country: 'United Arab Emirates',
+    primaryLang: 'Russian',
+    languages: ['Russian', 'English'],
+    specialties: ['General / Customer Support', 'Medical / Healthcare'],
+    certifications: ['Certified Professional Russian Linguist', 'Propio Training Certified'],
+    experienceYears: 1,
+    employmentType: 'per_minute',
+    minuteRate: 0.45,
+    hourlyRate: 8,
+    monthlySalary: 1200,
+    rateLabel: '$0.45/min (Live Talk)',
+    bio: 'Professional Russian and English interpreter based in United Arab Emirates with specialized Propio medical/client encounter training.',
+    cvFileName: 'Resume_CV_Submitted.pdf',
+    docFileName: 'Propio training.pdf',
+    avatarPreset: 'female-1',
+    avatarEmoji: '👩‍💼',
+    status: 'pending', // 'pending', 'approved', 'rejected'
+    adminNotes: '',
+    submittedAt: '2026-09-05T08:26:00.000Z'
+  },
+  {
+    id: 'app-ahmed-farooq',
+    name: 'Ahmed Farooq',
+    email: 'ahmed.farooq@linguabridge-applicant.com',
+    phone: '+1 (555) 234-8901',
+    country: 'United States',
+    primaryLang: 'Urdu',
+    languages: ['Urdu', 'Punjabi', 'English', 'Hindi'],
+    specialties: ['Medical / Healthcare', 'Legal / Court Certified', 'Immigration & Refugee'],
+    certifications: ['Certified Healthcare Interpreter (CCHI)', 'State Court Interpreter'],
+    experienceYears: 7,
+    employmentType: 'hourly',
+    hourlyRate: 5,
+    minuteRate: 0.30,
+    monthlySalary: 1200,
+    rateLabel: '$5/hr (Scheduled Shift)',
+    bio: 'Certified Urdu and Punjabi medical interpreter with 7+ years translating in emergency departments, trauma surgeries, and immigration court hearings.',
+    cvFileName: 'Ahmed_Farooq_Certified_Linguist_CV.pdf',
+    docFileName: 'CCHI_Healthcare_Certification_Farooq.pdf',
+    avatarPreset: 'male-1',
+    avatarEmoji: '👨‍💼',
+    status: 'pending',
+    adminNotes: '',
+    submittedAt: '2026-09-05T06:00:00.000Z'
+  }
+];
+
 // Initial State Structure
 let store = {
   users: [...SEED_USERS],
   interpreters: SEED_USERS.filter(u => u.role === 'interpreter'),
-  interpreterApplications: [
-    {
-      id: 'app-seed-1',
-      name: 'Ahmed Farooq',
-      email: 'ahmed.farooq@linguabridge-applicant.com',
-      phone: '+1 (555) 234-8901',
-      country: 'United States',
-      primaryLang: 'Urdu',
-      languages: ['Urdu', 'Punjabi', 'English', 'Hindi'],
-      specialties: ['Medical / Healthcare', 'Legal / Court Certified', 'Immigration & Refugee'],
-      certifications: ['Certified Healthcare Interpreter (CCHI)', 'State Court Interpreter'],
-      experienceYears: 7,
-      hourlyRate: 5,
-      bio: 'Certified Urdu and Punjabi medical interpreter with 7+ years translating in emergency departments, trauma surgeries, and immigration court hearings.',
-      cvFileName: 'Ahmed_Farooq_Certified_Linguist_CV.pdf',
-      cvFileData: 'data:application/pdf;base64,JVBERi0xLjQKJ...',
-      docFileName: 'CCHI_Healthcare_Certification_Farooq.pdf',
-      docFileData: 'data:application/pdf;base64,JVBERi0xLjQKJ...',
-      status: 'pending', // 'pending', 'approved', 'rejected'
-      adminNotes: '',
-      submittedAt: new Date(Date.now() - 3600000 * 2).toISOString()
-    }
-  ],
+  interpreterApplications: [...SEED_APPLICATIONS],
   appointments: [],
   callLogs: [],
   wallets: { ...SEED_WALLETS },
@@ -228,6 +260,16 @@ function loadStore() {
       Object.keys(SEED_WALLETS).forEach(uId => {
         if (!store.wallets[uId]) {
           store.wallets[uId] = { ...SEED_WALLETS[uId] };
+        }
+      });
+
+      // Ensure Seed Applications exist and are never lost
+      SEED_APPLICATIONS.forEach(seedApp => {
+        const existingAppIdx = store.interpreterApplications.findIndex(a => a.id === seedApp.id || (a.email && a.email.toLowerCase() === seedApp.email.toLowerCase()));
+        if (existingAppIdx >= 0) {
+          store.interpreterApplications[existingAppIdx] = { ...seedApp, ...store.interpreterApplications[existingAppIdx] };
+        } else {
+          store.interpreterApplications.unshift(seedApp);
         }
       });
 

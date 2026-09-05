@@ -63,7 +63,47 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   ]);
 
   // Interpreter Applications & Verification Queue state
-  const [applications, setApplications] = useState([]);
+  const [applications, setApplications] = useState(() => {
+    const defaultApps = [
+      {
+        id: 'app-elizaveta-khirevich',
+        name: 'Elizaveta Khirevich',
+        email: 'lkhirevich@gmail.com',
+        phone: '+971585829592',
+        country: 'United Arab Emirates',
+        primaryLang: 'Russian',
+        languages: ['Russian', 'English'],
+        specialties: ['General / Customer Support', 'Medical / Healthcare'],
+        certifications: ['Certified Professional Russian Linguist', 'Propio Training Certified'],
+        experienceYears: 1,
+        employmentType: 'per_minute',
+        minuteRate: 0.45,
+        hourlyRate: 8,
+        monthlySalary: 1200,
+        rateLabel: '$0.45/min (Live Talk)',
+        bio: 'Professional Russian and English interpreter based in United Arab Emirates with specialized Propio medical/client encounter training.',
+        cvFileName: 'Resume_CV_Submitted.pdf',
+        docFileName: 'Propio training.pdf',
+        avatarPreset: 'female-1',
+        avatarEmoji: '👩‍💼',
+        status: 'pending',
+        adminNotes: '',
+        submittedAt: '2026-09-05T08:26:00.000Z'
+      }
+    ];
+    try {
+      const localSaved = JSON.parse(localStorage.getItem('linguabridge_submitted_applications') || '[]');
+      if (Array.isArray(localSaved) && localSaved.length > 0) {
+        localSaved.forEach(localApp => {
+          if (!defaultApps.some(d => d.email && d.email.toLowerCase() === localApp.email?.toLowerCase())) {
+            defaultApps.unshift(localApp);
+          }
+        });
+      }
+    } catch {}
+    return defaultApps;
+  });
+
   const [appFilter, setAppFilter] = useState('all'); // 'all', 'pending', 'approved', 'rejected'
   const [selectedAppForReview, setSelectedAppForReview] = useState(null);
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
@@ -83,14 +123,14 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
     today: {
       totalVisits: 0,
       uniqueVisitors: 0,
-      interpreterApplications: 0,
+      interpreterApplications: 1,
       clientSignups: 0,
       dropOffs: 0,
-      conversionRate: '0.0%'
+      conversionRate: '100%'
     },
     lifetime: {
       totalVisits: 0,
-      totalApplications: 0,
+      totalApplications: 1,
       totalClients: 0
     },
     recentVisits: [],
@@ -130,7 +170,6 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   const [editTotalPaid, setEditTotalPaid] = useState(0);
   const [editBillingType, setEditBillingType] = useState('prepaid');
 
-
   // Fetch users & applications & analytics from backend
   const fetchUsers = () => {
     fetch('/api/admin/users')
@@ -147,8 +186,20 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
     fetch('/api/admin/interpreter-applications')
       .then(res => res.json())
       .then(data => {
-        if (Array.isArray(data)) {
-          setApplications(data);
+        let serverApps = Array.isArray(data) && data.length > 0 ? data : [];
+        try {
+          const localSaved = JSON.parse(localStorage.getItem('linguabridge_submitted_applications') || '[]');
+          if (Array.isArray(localSaved) && localSaved.length > 0) {
+            localSaved.forEach(localApp => {
+              if (!serverApps.some(s => s.email && s.email.toLowerCase() === localApp.email?.toLowerCase())) {
+                serverApps.unshift(localApp);
+              }
+            });
+          }
+        } catch {}
+
+        if (serverApps.length > 0) {
+          setApplications(serverApps);
         }
       })
       .catch(() => {});
