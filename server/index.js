@@ -197,7 +197,7 @@ let store = {
 import { MongoClient } from 'mongodb';
 
 let db = null;
-const MONGODB_URI = process.env.MONGODB_URI;
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://ik5928271_db_user:Tbe7ruMiqAmYmljz@cluster0.bumsmbw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
 
 // Load existing store if available
 function loadStore() {
@@ -311,8 +311,13 @@ async function initMongo() {
       store.callLogs = mongoCallLogs.map(({ _id, ...c }) => c);
     }
 
+    const mongoVisitorLogs = await db.collection('visitor_logs').find({}).toArray();
+    if (mongoVisitorLogs.length > 0) {
+      store.visitorLogs = mongoVisitorLogs.map(({ _id, ...v }) => v);
+    }
+
     store.interpreters = store.users.filter(u => u.role === 'interpreter');
-    console.log(`[MongoDB Sync Complete] Real Users: ${store.users.length}, Applications: ${store.interpreterApplications.length}, Wallets: ${Object.keys(store.wallets).length}`);
+    console.log(`[MongoDB Sync Complete] Real Users: ${store.users.length}, Applications: ${store.interpreterApplications.length}, Wallets: ${Object.keys(store.wallets).length}, Visitor Logs: ${store.visitorLogs.length}`);
   } catch (err) {
     console.error('❌ [MongoDB Connection Warning]:', err.message);
   }
@@ -336,6 +341,9 @@ async function saveStore() {
       }
       for (const c of store.callLogs) {
         await db.collection('call_logs').updateOne({ id: c.id }, { $set: c }, { upsert: true }).catch(() => {});
+      }
+      for (const v of store.visitorLogs.slice(-200)) {
+        await db.collection('visitor_logs').updateOne({ id: v.id }, { $set: v }, { upsert: true }).catch(() => {});
       }
     }
   } catch (err) {
