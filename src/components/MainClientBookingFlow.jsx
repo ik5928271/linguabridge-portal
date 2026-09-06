@@ -35,7 +35,8 @@ import {
   X,
   Gift,
   Tag,
-  Percent
+  Percent,
+  CalendarCheck
 } from 'lucide-react';
 import { LANGUAGES, ALL_100_LANGUAGES, SPECIALTIES, INITIAL_INTERPRETERS, getInterpretersForLanguage } from '../data/mockData';
 import PrepaidWalletModal from './PrepaidWalletModal';
@@ -97,11 +98,28 @@ export default function MainClientBookingFlow({
 
   // Filter registered interpreters for selected language
   const availableInterpreters = realInterpreters.filter(i => {
-    const lang = selectedLanguage.toLowerCase();
-    const pLang = (i.primaryLang || '').toLowerCase();
-    const allLangs = (i.languages || []).map(l => l.toLowerCase());
-    return pLang.includes(lang) || allLangs.some(l => l.includes(lang)) || lang.includes(pLang);
+    const lang = selectedLanguage.toLowerCase().trim();
+    const pLang = (i.primaryLang || '').toLowerCase().trim();
+    const allLangs = Array.isArray(i.languages) 
+      ? i.languages.map(l => (typeof l === 'string' ? l : l?.name || '').toLowerCase().trim()) 
+      : [];
+    return pLang === lang || pLang.includes(lang) || lang.includes(pLang) ||
+           allLangs.some(l => l === lang || l.includes(lang) || lang.includes(l));
   });
+
+  // Helper to count available interpreters for any language in real time
+  const getInterpreterCountForLang = (langName) => {
+    if (!langName) return 0;
+    const target = langName.toLowerCase().trim();
+    return realInterpreters.filter(i => {
+      const pLang = (i.primaryLang || '').toLowerCase().trim();
+      const allLangs = Array.isArray(i.languages) 
+        ? i.languages.map(l => (typeof l === 'string' ? l : l?.name || '').toLowerCase().trim()) 
+        : [];
+      return pLang === target || pLang.includes(target) || target.includes(pLang) ||
+             allLangs.some(l => l === target || l.includes(target) || target.includes(l));
+    }).length;
+  };
 
   // Keep selected interpreter in sync
   useEffect(() => {
@@ -473,81 +491,152 @@ END:VCALENDAR`;
           </div>
 
           <div className="space-y-3">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-300">Target Language:</label>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-300">Target Language:</label>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-              {LANGUAGES.map((lang) => (
-                <button
-                  key={lang.code}
-                  type="button"
-                  onClick={() => {
-                    setSelectedLanguage(lang.name);
-                    const matched = getInterpretersForLanguage(lang.name);
-                    if (matched && matched.length > 0) {
-                      setSelectedInterpreter(matched[0]);
-                    }
-                  }}
-                  className={`p-3 rounded-2xl border text-left transition flex items-center gap-2.5 ${
-                    selectedLanguage === lang.name 
-                      ? 'bg-brand-600/20 border-brand-500 text-white ring-1 ring-brand-500 shadow-lg shadow-brand-500/20' 
-                      : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:border-slate-700'
-                  }`}
-                >
-                  <span className="text-2xl">{lang.flag}</span>
-                  <div className="overflow-hidden">
-                    <p className="text-xs font-bold truncate">{lang.name}</p>
-                    <p className="text-[10px] text-slate-400 truncate">{lang.nativeName}</p>
-                  </div>
-                </button>
-              ))}
+              {LANGUAGES.map((lang) => {
+                const isSelected = selectedLanguage === lang.name;
+                const count = getInterpreterCountForLang(lang.name);
+                return (
+                  <button
+                    key={lang.code}
+                    type="button"
+                    onClick={() => {
+                      setSelectedLanguage(lang.name);
+                      const matched = getInterpretersForLanguage(lang.name);
+                      if (matched && matched.length > 0) {
+                        setSelectedInterpreter(matched[0]);
+                      }
+                    }}
+                    className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between gap-2 cursor-pointer ${
+                      isSelected 
+                        ? 'bg-brand-600/20 border-brand-500 ring-1 ring-brand-500 shadow-lg shadow-brand-500/20' 
+                        : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 w-full">
+                      <span className="text-2xl shrink-0">{lang.flag}</span>
+                      <div className="overflow-hidden min-w-0 flex-1">
+                        <p className={`text-xs font-bold truncate ${isSelected ? 'text-brand-700 dark:text-white' : 'text-slate-900 dark:text-white'}`}>
+                          {lang.name}
+                        </p>
+                        <p className={`text-[10px] truncate ${isSelected ? 'text-brand-600 dark:text-slate-300' : 'text-slate-500 dark:text-slate-400'}`}>
+                          {lang.nativeName}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Interpreter Availability Status */}
+                    <div className="w-full pt-1.5 border-t border-slate-800/40 flex items-center justify-between text-[10px]">
+                      {count > 0 ? (
+                        <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold truncate">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                          <span>{count} {count === 1 ? 'Interpreter' : 'Interpreters'} Available</span>
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium truncate">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400/80"></span>
+                          <span>No interpreter right now</span>
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
 
               {/* 18th Box: 100+ Global Languages Selector */}
-              <button
-                type="button"
-                onClick={() => setIs100LangModalOpen(true)}
-                className={`p-3 rounded-2xl border text-left transition flex items-center gap-2.5 relative ${
-                  !LANGUAGES.some(l => l.name === selectedLanguage)
-                    ? 'bg-purple-900/30 border-purple-500 text-white ring-2 ring-purple-400 shadow-lg shadow-purple-500/20'
-                    : 'bg-slate-900/90 border-purple-500/40 hover:border-purple-400 text-purple-200 hover:bg-slate-800/90'
-                }`}
-              >
-                <span className="text-2xl">🌐</span>
-                <div className="overflow-hidden min-w-0 flex-1">
-                  <p className="text-xs font-bold truncate text-white">
-                    {!LANGUAGES.some(l => l.name === selectedLanguage)
-                      ? selectedLanguage
-                      : '+ More Languages'}
+              {(() => {
+                const isCustomLangSelected = !LANGUAGES.some(l => l.name === selectedLanguage);
+                const customCount = isCustomLangSelected ? getInterpreterCountForLang(selectedLanguage) : 0;
+                return (
+                  <button
+                    type="button"
+                    onClick={() => setIs100LangModalOpen(true)}
+                    className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between gap-2 relative cursor-pointer ${
+                      isCustomLangSelected
+                        ? 'bg-purple-900/30 border-purple-500 ring-2 ring-purple-400 shadow-lg shadow-purple-500/20'
+                        : 'bg-slate-900/90 border-purple-500/40 hover:border-purple-400 hover:bg-slate-800/90'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 w-full">
+                      <span className="text-2xl shrink-0">🌐</span>
+                      <div className="overflow-hidden min-w-0 flex-1">
+                        <p className={`text-xs font-bold truncate ${isCustomLangSelected ? 'text-purple-800 dark:text-white' : 'text-slate-900 dark:text-white'}`}>
+                          {isCustomLangSelected ? selectedLanguage : '+ More Languages'}
+                        </p>
+                        <p className={`text-[10px] truncate font-semibold ${isCustomLangSelected ? 'text-purple-600 dark:text-purple-300' : 'text-purple-600 dark:text-purple-300'}`}>
+                          {isCustomLangSelected ? '✓ From 100+ Global List' : 'List of 100+ (A-Z)'}
+                        </p>
+                      </div>
+                      {isCustomLangSelected && (
+                        <span className="text-emerald-500 dark:text-emerald-400 font-black text-xs shrink-0">✓</span>
+                      )}
+                    </div>
+
+                    <div className="w-full pt-1.5 border-t border-purple-500/30 flex items-center justify-between text-[10px]">
+                      {isCustomLangSelected ? (
+                        customCount > 0 ? (
+                          <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold truncate">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            <span>{customCount} {customCount === 1 ? 'Interpreter' : 'Interpreters'} Available</span>
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium truncate">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400/80"></span>
+                            <span>No interpreter right now</span>
+                          </span>
+                        )
+                      ) : (
+                        <span className="text-purple-600 dark:text-purple-300 font-medium text-[9.5px]">
+                          Click to browse all 100+
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })()}
+            </div>
+
+            {/* Warning banner if selected language currently has 0 interpreters */}
+            {getInterpreterCountForLang(selectedLanguage) === 0 && (
+              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2.5 mt-2">
+                <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-amber-200">
+                    We don't have an active interpreter for {selectedLanguage} right now
                   </p>
-                  <p className="text-[10px] text-purple-300 truncate font-semibold">
-                    {!LANGUAGES.some(l => l.name === selectedLanguage)
-                      ? '✓ From 100+ Global List'
-                      : 'List of 100+ (A-Z)'}
+                  <p className="text-[11px] text-amber-300/80 mt-0.5">
+                    You can still schedule your appointment in advance. Our admin dispatch team will assign a certified {selectedLanguage} linguist before your session begins.
                   </p>
                 </div>
-                {!LANGUAGES.some(l => l.name === selectedLanguage) && (
-                  <span className="text-emerald-400 font-black text-xs shrink-0">✓</span>
-                )}
-              </button>
-            </div>
+              </div>
+            )}
           </div>
 
           <div className="space-y-3 pt-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-300">Industry / Domain Specialty:</label>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-300">Industry / Domain Specialty:</label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {SPECIALTIES.map((spec) => (
-                <button
-                  key={spec.id}
-                  type="button"
-                  onClick={() => setSelectedSpecialty(spec.name)}
-                  className={`p-3.5 rounded-2xl border text-left transition ${
-                    selectedSpecialty === spec.name
-                      ? 'bg-brand-600/20 border-brand-500 text-white ring-1 ring-brand-500 shadow-lg shadow-brand-500/20'
-                      : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:border-slate-700'
-                  }`}
-                >
-                  <p className="text-xs font-bold text-white">{spec.name}</p>
-                  <p className="text-[10px] text-slate-400 mt-1 line-clamp-2">{spec.desc}</p>
-                </button>
-              ))}
+              {SPECIALTIES.map((spec) => {
+                const isSelected = selectedSpecialty === spec.name;
+                return (
+                  <button
+                    key={spec.id}
+                    type="button"
+                    onClick={() => setSelectedSpecialty(spec.name)}
+                    className={`p-3.5 rounded-2xl border text-left transition cursor-pointer ${
+                      isSelected
+                        ? 'bg-brand-600/20 border-brand-500 ring-1 ring-brand-500 shadow-lg shadow-brand-500/20'
+                        : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <p className={`text-xs font-bold ${isSelected ? 'text-brand-700 dark:text-white' : 'text-slate-900 dark:text-white'}`}>
+                      {spec.name}
+                    </p>
+                    <p className={`text-[10px] mt-1 line-clamp-2 ${isSelected ? 'text-brand-600 dark:text-slate-300' : 'text-slate-500 dark:text-slate-400'}`}>
+                      {spec.desc}
+                    </p>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -1395,6 +1484,7 @@ END:VCALENDAR`;
                   (l.nativeName && l.nativeName.toLowerCase().includes(lang100Search.toLowerCase()))
                 ).map((lang) => {
                   const isSel = selectedLanguage === lang.name;
+                  const count = getInterpreterCountForLang(lang.name);
                   return (
                     <button
                       key={lang.code}
@@ -1408,20 +1498,35 @@ END:VCALENDAR`;
                         setIs100LangModalOpen(false);
                         setLang100Search('');
                       }}
-                      className={`p-3 rounded-2xl border text-left transition flex items-center gap-2.5 ${
+                      className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between gap-1.5 cursor-pointer ${
                         isSel
                           ? 'bg-purple-600/30 border-purple-500 text-white ring-1 ring-purple-400 shadow-md'
                           : 'bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white hover:border-slate-700'
                       }`}
                     >
-                      <span className="text-2xl shrink-0">{lang.flag}</span>
-                      <div className="overflow-hidden min-w-0 flex-1">
-                        <p className="text-xs font-bold truncate text-white">{lang.name}</p>
-                        <p className="text-[10px] text-slate-400 truncate">{lang.nativeName}</p>
+                      <div className="flex items-center gap-2.5 w-full">
+                        <span className="text-2xl shrink-0">{lang.flag}</span>
+                        <div className="overflow-hidden min-w-0 flex-1">
+                          <p className="text-xs font-bold truncate text-slate-900 dark:text-white">{lang.name}</p>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{lang.nativeName}</p>
+                        </div>
+                        {isSel && (
+                          <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                        )}
                       </div>
-                      {isSel && (
-                        <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                      )}
+                      <div className="w-full pt-1 border-t border-slate-800/40 text-[9.5px]">
+                        {count > 0 ? (
+                          <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            <span>{count} Available</span>
+                          </span>
+                        ) : (
+                          <span className="text-amber-600 dark:text-amber-400/90 font-medium flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400/80"></span>
+                            <span>No interpreter right now</span>
+                          </span>
+                        )}
+                      </div>
                     </button>
                   );
                 })}
