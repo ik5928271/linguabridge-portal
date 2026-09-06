@@ -315,9 +315,9 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   const [formLang, setFormLang] = useState('Spanish');
   const [formSpecialty, setFormSpecialty] = useState('Medical / Healthcare');
   const [formEmploymentType, setFormEmploymentType] = useState('hourly');
-  const [formHourlyRate, setFormHourlyRate] = useState(8);
-  const [formMinuteRate, setFormMinuteRate] = useState(0.30);
-  const [formMonthlySalary, setFormMonthlySalary] = useState(1200);
+  const [formHourlyRate, setFormHourlyRate] = useState(0);
+  const [formMinuteRate, setFormMinuteRate] = useState(0);
+  const [formMonthlySalary, setFormMonthlySalary] = useState(0);
   const [formInitialMinutes, setFormInitialMinutes] = useState(120);
   const [formBillingType, setFormBillingType] = useState('prepaid');
 
@@ -378,6 +378,28 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       .catch(() => {});
   };
 
+  // Payment Proof & Bank Transfer Verification State
+  const [paymentReceipts, setPaymentReceipts] = useState([]);
+  const [receiptFilter, setReceiptFilter] = useState('all'); // 'all', 'pending', 'approved', 'rejected'
+  const [receiptSearchTerm, setReceiptSearchTerm] = useState('');
+  const [receiptPreviewModal, setReceiptPreviewModal] = useState(null);
+  const [selectedReceiptForReview, setSelectedReceiptForReview] = useState(null);
+  const [isApproveReceiptModalOpen, setIsApproveReceiptModalOpen] = useState(false);
+  const [approveReceiptNotes, setApproveReceiptNotes] = useState('Payment verified by IK Enterprises Admin');
+  const [isRejectReceiptModalOpen, setIsRejectReceiptModalOpen] = useState(false);
+  const [rejectReceiptReason, setRejectReceiptReason] = useState('Deposit could not be verified with bank statement reference.');
+
+  const fetchReceipts = () => {
+    fetch('/api/payment-receipts')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setPaymentReceipts(data);
+        }
+      })
+      .catch(() => {});
+  };
+
   const fetchInquiries = () => {
     fetch('/api/inquiries')
       .then(res => res.json())
@@ -404,14 +426,60 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
     fetchUsers();
     fetchApplications();
     fetchInquiries();
+    fetchReceipts();
     fetchAnalytics();
     const timer = setInterval(() => {
       fetchApplications();
       fetchInquiries();
+      fetchReceipts();
       fetchAnalytics();
     }, 8000);
     return () => clearInterval(timer);
   }, []);
+
+  const handleApproveReceipt = (receiptId) => {
+    fetch(`/api/payment-receipts/${receiptId}/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminNotes: approveReceiptNotes })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setPaymentReceipts(prev => prev.map(r => r.id === receiptId ? { ...r, status: 'approved', adminNotes: approveReceiptNotes, verifiedAt: new Date().toISOString() } : r));
+          setIsApproveReceiptModalOpen(false);
+          setSelectedReceiptForReview(null);
+          fetchUsers();
+        }
+      })
+      .catch(() => {
+        setPaymentReceipts(prev => prev.map(r => r.id === receiptId ? { ...r, status: 'approved', adminNotes: approveReceiptNotes, verifiedAt: new Date().toISOString() } : r));
+        setIsApproveReceiptModalOpen(false);
+        setSelectedReceiptForReview(null);
+        fetchUsers();
+      });
+  };
+
+  const handleRejectReceipt = (receiptId) => {
+    fetch(`/api/payment-receipts/${receiptId}/reject`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rejectionReason: rejectReceiptReason })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setPaymentReceipts(prev => prev.map(r => r.id === receiptId ? { ...r, status: 'rejected', rejectionReason: rejectReceiptReason, verifiedAt: new Date().toISOString() } : r));
+          setIsRejectReceiptModalOpen(false);
+          setSelectedReceiptForReview(null);
+        }
+      })
+      .catch(() => {
+        setPaymentReceipts(prev => prev.map(r => r.id === receiptId ? { ...r, status: 'rejected', rejectionReason: rejectReceiptReason, verifiedAt: new Date().toISOString() } : r));
+        setIsRejectReceiptModalOpen(false);
+        setSelectedReceiptForReview(null);
+      });
+  };
 
   const handleCreateAccount = (e) => {
     e.preventDefault();
@@ -605,10 +673,10 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       : (app.preferredShiftType || 'fixed_9h');
 
     setReviewShiftType(existingSched.shiftType || defaultShift);
-    setReviewDailyHours(existingSched.dailyHours === 'Unlimited' ? 9 : (existingSched.dailyHours || (defaultShift === 'fixed_9h' ? 9 : defaultShift === 'fixed_6h' ? 6 : defaultShift === 'fixed_3h' ? 3 : 9)));
+    setReviewDailyHours(existingSched.dailyHours === 'Unlimited' ? 9 : (existingSched.dailyHours || (defaultShift === 'fixed_12h' ? 12 : defaultShift === 'fixed_9h' ? 9 : defaultShift === 'fixed_6h' ? 6 : defaultShift === 'fixed_3h' ? 3 : 9)));
     setReviewTimeZone(existingSched.timeZone || app.timeZone || 'PKT (UTC+5:00 - Pakistan / South Asia)');
     setReviewStartTime(existingSched.startTime || '09:00');
-    setReviewEndTime(existingSched.endTime || (defaultShift === 'fixed_6h' ? '15:00' : defaultShift === 'fixed_3h' ? '12:00' : '18:00'));
+    setReviewEndTime(existingSched.endTime || (defaultShift === 'fixed_12h' ? '21:00' : defaultShift === 'fixed_6h' ? '15:00' : defaultShift === 'fixed_3h' ? '12:00' : '18:00'));
 
     setIsApproveModalOpen(true);
   };
@@ -790,6 +858,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   };
 
   const newInquiriesCount = inquiriesList.filter(i => i.status === 'new').length;
+  const pendingReceiptsCount = paymentReceipts.filter(r => r.status === 'pending_verification').length;
 
   const filteredInquiries = inquiriesList.filter(inq => {
     const matchesSearch = 
@@ -803,6 +872,20 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
     if (inquiryFilter === 'resolved') return matchesSearch && inq.status === 'resolved';
     if (inquiryFilter === 'client') return matchesSearch && (inq.userRole === 'client' || inq.userRole === 'host');
     if (inquiryFilter === 'interpreter') return matchesSearch && inq.userRole === 'interpreter';
+    return matchesSearch;
+  });
+
+  const filteredReceipts = paymentReceipts.filter(r => {
+    const matchesSearch = 
+      (r.clientName && r.clientName.toLowerCase().includes(receiptSearchTerm.toLowerCase())) ||
+      (r.clientEmail && r.clientEmail.toLowerCase().includes(receiptSearchTerm.toLowerCase())) ||
+      (r.bankReference && r.bankReference.toLowerCase().includes(receiptSearchTerm.toLowerCase())) ||
+      (r.paymentMethod && r.paymentMethod.toLowerCase().includes(receiptSearchTerm.toLowerCase()));
+
+    if (receiptFilter === 'all') return matchesSearch;
+    if (receiptFilter === 'pending') return matchesSearch && r.status === 'pending_verification';
+    if (receiptFilter === 'approved') return matchesSearch && r.status === 'approved';
+    if (receiptFilter === 'rejected') return matchesSearch && r.status === 'rejected';
     return matchesSearch;
   });
 
@@ -1013,6 +1096,20 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
             {newInquiriesCount > 0 && (
               <span className="px-1.5 py-0.2 rounded-full bg-brand-400 text-slate-950 text-[10px] font-extrabold animate-pulse">
                 {newInquiriesCount}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('receipts')}
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+              activeTab === 'receipts' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Payment Receipts</span>
+            {pendingReceiptsCount > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-emerald-500 text-slate-950 text-[10px] font-extrabold animate-pulse">
+                {pendingReceiptsCount}
               </span>
             )}
           </button>
@@ -1381,44 +1478,94 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                             </button>
                           </div>
 
-                          {/* Certification Action Row */}
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <button
-                              type="button"
-                              onClick={() => setDocPreviewModal({
-                                title: 'Professional Certification & Credentials Inspection',
-                                fileName: app.docFileName || 'Certification_Proof.pdf',
-                                fileData: app.docFileData,
-                                applicant: app,
-                                type: 'cert'
-                              })}
-                              className="flex-1 min-w-0 px-2.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-purple-500/50 text-left flex items-center justify-between gap-2 text-[11px] text-slate-200 transition shadow-sm overflow-hidden"
-                              title={app.docFileName || 'Certification_Proof.pdf'}
-                            >
-                              <span className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
-                                <Award className="w-4 h-4 text-purple-400 shrink-0" />
-                                <span className="truncate font-semibold block min-w-0">{app.docFileName || 'Propio_training.pdf'}</span>
-                              </span>
-                              <span className="flex items-center gap-1 text-[10px] text-purple-400 font-bold bg-purple-500/10 px-2 py-0.5 rounded-md border border-purple-500/20 shrink-0">
-                                <Eye className="w-3 h-3" />
-                                <span>Preview</span>
-                              </span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDownloadApplicantDocument({
-                                title: 'Professional Certification & Credentials',
-                                fileName: app.docFileName || 'Certification_Proof.pdf',
-                                fileData: app.docFileData,
-                                applicant: app,
-                                type: 'cert'
-                              })}
-                              className="p-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/30 transition shrink-0 shadow-sm"
-                              title="Download Certification Document"
-                            >
-                              <Download className="w-4 h-4" />
-                            </button>
-                          </div>
+                          {/* Supporting Documents / Credentials List */}
+                          {Array.isArray(app.supportingDocs) && app.supportingDocs.length > 0 ? (
+                            <div className="space-y-1.5 pt-1 border-t border-slate-800/80">
+                              <div className="flex items-center justify-between text-[10px] text-purple-300 font-bold px-1">
+                                <span>Attached Credentials ({app.supportingDocs.length}):</span>
+                              </div>
+                              <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                                {app.supportingDocs.map((doc, dIdx) => (
+                                  <div key={doc.id || dIdx} className="flex items-center gap-1.5 min-w-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => setDocPreviewModal({
+                                        title: `Supporting Credential #${dIdx + 1}: ${doc.name}`,
+                                        fileName: doc.name || `Credential_${dIdx + 1}.pdf`,
+                                        fileData: doc.data,
+                                        applicant: app,
+                                        type: 'cert'
+                                      })}
+                                      className="flex-1 min-w-0 px-2 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-purple-500/30 hover:border-purple-500/60 text-left flex items-center justify-between gap-1.5 text-[11px] text-slate-200 transition shadow-sm overflow-hidden"
+                                      title={doc.name}
+                                    >
+                                      <span className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
+                                        <Award className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                                        <span className="truncate font-medium block min-w-0">{doc.name}</span>
+                                      </span>
+                                      <span className="flex items-center gap-1 text-[9px] text-purple-300 font-bold bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/20 shrink-0">
+                                        <Eye className="w-2.5 h-2.5" />
+                                        <span>Preview</span>
+                                      </span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDownloadApplicantDocument({
+                                        title: `Supporting Credential: ${doc.name}`,
+                                        fileName: doc.name || `Credential_${dIdx + 1}.pdf`,
+                                        fileData: doc.data,
+                                        applicant: app,
+                                        type: 'cert'
+                                      })}
+                                      className="p-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/30 transition shrink-0 shadow-sm"
+                                      title={`Download ${doc.name}`}
+                                    >
+                                      <Download className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : (
+                            /* Legacy / Single Certification Action Row */
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <button
+                                type="button"
+                                onClick={() => setDocPreviewModal({
+                                  title: 'Professional Certification & Credentials Inspection',
+                                  fileName: app.docFileName || 'Certification_Proof.pdf',
+                                  fileData: app.docFileData,
+                                  applicant: app,
+                                  type: 'cert'
+                                })}
+                                className="flex-1 min-w-0 px-2.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-purple-500/50 text-left flex items-center justify-between gap-2 text-[11px] text-slate-200 transition shadow-sm overflow-hidden"
+                                title={app.docFileName || 'Certification_Proof.pdf'}
+                              >
+                                <span className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
+                                  <Award className="w-4 h-4 text-purple-400 shrink-0" />
+                                  <span className="truncate font-semibold block min-w-0">{app.docFileName || 'Certification_Proof.pdf'}</span>
+                                </span>
+                                <span className="flex items-center gap-1 text-[10px] text-purple-400 font-bold bg-purple-500/10 px-2 py-0.5 rounded-md border border-purple-500/20 shrink-0">
+                                  <Eye className="w-3 h-3" />
+                                  <span>Preview</span>
+                                </span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadApplicantDocument({
+                                  title: 'Professional Certification & Credentials',
+                                  fileName: app.docFileName || 'Certification_Proof.pdf',
+                                  fileData: app.docFileData,
+                                  applicant: app,
+                                  type: 'cert'
+                                })}
+                                className="p-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/30 transition shrink-0 shadow-sm"
+                                title="Download Certification Document"
+                              >
+                                <Download className="w-4 h-4" />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -2027,7 +2174,14 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                           <Clock className="w-3.5 h-3.5 text-amber-400" />
                           <span>Assigned Shift Hours & Time Zone:</span>
                         </label>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => { setEditShiftType('fixed_12h'); setEditDailyHours(12); setEditStartTime('09:00'); setEditEndTime('21:00'); }}
+                            className={`p-1.5 rounded-lg border text-center font-bold text-[10px] transition ${editShiftType === 'fixed_12h' ? 'bg-amber-600/30 border-amber-500 text-white ring-1 ring-amber-500' : 'bg-slate-900 border-slate-800 text-slate-400'}`}
+                          >
+                            12h Daily
+                          </button>
                           <button
                             type="button"
                             onClick={() => { setEditShiftType('fixed_9h'); setEditDailyHours(9); setEditStartTime('09:00'); setEditEndTime('18:00'); }}
@@ -2237,17 +2391,17 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                 return (
                   <div
                     key={inq.id}
-                    className={`p-6 rounded-3xl border transition space-y-4 relative ${
+                    className={`p-6 rounded-3xl border transition space-y-4 relative shadow-xl ${
                       isNew 
-                        ? 'bg-slate-900/90 border-brand-500/40 ring-1 ring-brand-500/20 shadow-xl' 
-                        : 'bg-slate-900/50 border-slate-800 opacity-90'
+                        ? 'bg-slate-900 border-purple-500/50 ring-1 ring-purple-500/30' 
+                        : 'bg-slate-900 border-slate-700'
                     }`}
                   >
                     {/* Top Row: User identity & Category & Status */}
-                    <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                    <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-slate-700 pb-4">
                       <div className="flex items-start gap-3.5">
                         <div className={`w-11 h-11 rounded-2xl font-black flex items-center justify-center text-white text-base shadow-lg shrink-0 ${
-                          isClient ? 'bg-gradient-to-tr from-brand-600 to-indigo-600' :
+                          isClient ? 'bg-gradient-to-tr from-blue-600 to-indigo-600' :
                           isInterpreter ? 'bg-gradient-to-tr from-emerald-600 to-teal-600' :
                           'bg-gradient-to-tr from-purple-600 to-pink-600'
                         }`}>
@@ -2257,24 +2411,24 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                           <div className="flex items-center gap-2.5 flex-wrap">
                             <h4 className="text-base font-extrabold text-white">{inq.userName}</h4>
                             <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider border ${
-                              isClient ? 'bg-brand-500/20 text-brand-300 border-brand-500/30' :
-                              isInterpreter ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' :
-                              'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                              isClient ? 'bg-blue-500/20 text-blue-300 border-blue-500/40 font-bold' :
+                              isInterpreter ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-bold' :
+                              'bg-purple-500/20 text-purple-300 border border-purple-500/40 font-bold'
                             }`}>
                               {isClient ? '👤 Client / Host' : isInterpreter ? '🎧 Linguist / Interpreter' : '🌐 Visitor'}
                             </span>
-                            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+                            <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border ${
                               isNew 
-                                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse' 
-                                : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 animate-pulse' 
+                                : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
                             }`}>
                               {isNew ? '● New / Pending Review' : '✓ Resolved'}
                             </span>
                           </div>
-                          <p className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-2">
-                            <span className="font-mono text-purple-300">{inq.userEmail}</span>
-                            <span>• Category: <strong className="text-slate-200">{inq.category || 'General Support'}</strong></span>
-                            <span>• Received {new Date(inq.createdAt || Date.now()).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>
+                          <p className="text-xs text-slate-300 mt-1 flex flex-wrap items-center gap-2">
+                            <span className="font-mono text-cyan-300 font-semibold">{inq.userEmail}</span>
+                            <span>• Category: <strong className="text-amber-300">{inq.category || 'General Support'}</strong></span>
+                            <span className="text-slate-400">• Received {new Date(inq.createdAt || Date.now()).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>
                           </p>
                         </div>
                       </div>
@@ -2286,7 +2440,7 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                             setReplyModalInquiry(inq);
                             setAdminReplyText(inq.adminReply || '');
                           }}
-                          className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-purple-600/30 transition"
+                          className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-md shadow-purple-600/40 transition"
                         >
                           <Send className="w-3.5 h-3.5" />
                           <span>{inq.adminReply ? 'Edit Reply' : 'Send Admin Reply'}</span>
@@ -2294,10 +2448,10 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
 
                         <button
                           onClick={() => handleToggleInquiryStatus(inq.id, inq.status)}
-                          className={`px-3 py-2 rounded-xl text-xs font-bold border transition ${
+                          className={`px-4 py-2.5 rounded-xl text-xs font-extrabold border transition ${
                             isNew 
-                              ? 'bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white border-emerald-500/30' 
-                              : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                              ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-600/30' 
+                              : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-600'
                           }`}
                         >
                           {isNew ? '✓ Mark as Resolved' : '↩ Reopen Ticket'}
@@ -2308,7 +2462,7 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                             navigator.clipboard.writeText(inq.userEmail);
                             alert(`Copied ${inq.userEmail} to clipboard!`);
                           }}
-                          className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                          className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
                           title="Copy User Email"
                         >
                           <Copy className="w-3.5 h-3.5" />
@@ -2316,7 +2470,7 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
 
                         <button
                           onClick={() => handleDeleteInquiry(inq.id)}
-                          className="p-2 rounded-xl bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 border border-slate-700 transition"
+                          className="p-2.5 rounded-xl bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 border border-slate-700 transition"
                           title="Delete Record"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -2332,19 +2486,19 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                           <span>{inq.subject || 'Platform Inquiry'}</span>
                         </h5>
                       </div>
-                      <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs text-slate-200 leading-relaxed">
+                      <div className="p-4 rounded-2xl bg-slate-950 border border-slate-700 text-xs text-slate-100 leading-relaxed font-medium">
                         {inq.message}
                       </div>
                     </div>
 
                     {/* Admin Response Box (if resolved/replied) */}
                     {inq.adminReply && (
-                      <div className="p-4 rounded-2xl bg-purple-950/40 border border-purple-500/40 space-y-1.5 text-xs">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
+                      <div className="p-4 rounded-2xl bg-indigo-950/80 border border-indigo-500/60 space-y-1.5 text-xs shadow-inner">
+                        <span className="text-[11px] font-extrabold uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
                           <ShieldCheck className="w-4 h-4 text-purple-400" />
                           <span>Official Dispatch Reply from IK Enterprises:</span>
                         </span>
-                        <p className="text-white font-medium leading-relaxed">
+                        <p className="text-white font-semibold text-xs leading-relaxed">
                           {inq.adminReply}
                         </p>
                       </div>
@@ -2356,23 +2510,23 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                         <button
                           type="button"
                           onClick={() => setExpandedInquiryId(isExpanded ? null : inq.id)}
-                          className="text-[11px] font-bold text-brand-400 hover:text-brand-300 flex items-center gap-1.5 transition"
+                          className="text-xs font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1.5 transition"
                         >
                           <span>{isExpanded ? 'Hide Chat Transcript' : `View Full Conversation Transcript (${inq.messages.length} messages)`}</span>
                           <ChevronRight className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                         </button>
 
                         {isExpanded && (
-                          <div className="mt-3 p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2.5 text-xs">
+                          <div className="mt-3 p-4 rounded-2xl bg-slate-950 border border-slate-700 space-y-2.5 text-xs">
                             {inq.messages.map((msg, mIdx) => (
-                              <div key={mIdx} className={`p-2.5 rounded-xl ${msg.sender === 'user' ? 'bg-slate-900 border border-slate-800' : 'bg-purple-950/40 border border-purple-800/40'}`}>
-                                <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 mb-1">
-                                  <span className={msg.sender === 'user' ? 'text-brand-300' : 'text-purple-300'}>
+                              <div key={mIdx} className={`p-3 rounded-xl ${msg.sender === 'user' ? 'bg-slate-900 border border-slate-700' : 'bg-purple-950/60 border border-purple-700/60'}`}>
+                                <div className="flex items-center justify-between text-[11px] font-bold text-slate-300 mb-1">
+                                  <span className={msg.sender === 'user' ? 'text-cyan-300' : 'text-purple-300'}>
                                     {msg.sender === 'user' ? `👤 ${inq.userName}` : '🤖 LinguaBot / Admin Dispatch'}
                                   </span>
-                                  <span>{msg.time || ''}</span>
+                                  <span className="text-slate-400">{msg.time || ''}</span>
                                 </div>
-                                <p className="text-slate-200 leading-relaxed whitespace-pre-line text-xs">
+                                <p className="text-white leading-relaxed whitespace-pre-line text-xs font-medium">
                                   {msg.text}
                                 </p>
                               </div>
@@ -2388,6 +2542,467 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
             </div>
           )}
 
+        </div>
+      )}
+
+      {/* ========================================================== */}
+      {/* TAB: PAYMENT RECEIPTS & BANK DEPOSIT VERIFICATION */}
+      {/* ========================================================== */}
+      {activeTab === 'receipts' && (
+        <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-emerald-500/30 space-y-6 shadow-2xl">
+          
+          {/* Header */}
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                  <CreditCard className="w-4 h-4" />
+                  <span>Client Payment Proofs & Bank Deposit Verification</span>
+                </span>
+                {pendingReceiptsCount > 0 && (
+                  <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-amber-500 text-slate-950 animate-pulse">
+                    {pendingReceiptsCount} Pending Verification
+                  </span>
+                )}
+              </div>
+              <h3 className="text-xl font-black text-white mt-1">Incoming Bank Transfers & Wallet Top-Up Claims</h3>
+              <p className="text-xs text-slate-400">
+                Review receipts submitted by clients. Once verified against your bank statement, click <strong>Approve</strong> to credit minutes to the client's wallet.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={fetchReceipts}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Refresh Receipts</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Search & Filter Controls */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setReceiptFilter('all')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                  receiptFilter === 'all' ? 'bg-emerald-600 text-white shadow' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                }`}
+              >
+                All Receipts ({paymentReceipts.length})
+              </button>
+              <button
+                onClick={() => setReceiptFilter('pending')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                  receiptFilter === 'pending' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                }`}
+              >
+                <span>Pending Verification</span>
+                {pendingReceiptsCount > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-slate-950 text-amber-300 text-[10px] font-black">
+                    {pendingReceiptsCount}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setReceiptFilter('approved')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                  receiptFilter === 'approved' ? 'bg-emerald-600 text-white shadow' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                }`}
+              >
+                Approved & Credited ({paymentReceipts.filter(r => r.status === 'approved').length})
+              </button>
+              <button
+                onClick={() => setReceiptFilter('rejected')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                  receiptFilter === 'rejected' ? 'bg-red-600 text-white shadow' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                }`}
+              >
+                Rejected ({paymentReceipts.filter(r => r.status === 'rejected').length})
+              </button>
+            </div>
+
+            <div className="relative w-full sm:w-64">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={receiptSearchTerm}
+                onChange={(e) => setReceiptSearchTerm(e.target.value)}
+                placeholder="Search by client, email, ref..."
+                className="w-full glass-input pl-9 pr-3 py-1.5 rounded-xl text-xs text-white focus:outline-none bg-slate-950 border border-slate-800"
+              />
+            </div>
+          </div>
+
+          {/* Receipts List */}
+          {filteredReceipts.length === 0 ? (
+            <div className="p-12 rounded-3xl bg-slate-950/60 border border-slate-800 text-center space-y-3">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto">
+                <CreditCard className="w-7 h-7" />
+              </div>
+              <h4 className="text-base font-bold text-white">No Payment Receipts Found</h4>
+              <p className="text-xs text-slate-400 max-w-md mx-auto">
+                When clients send payment proof via Card (Remitly), UK Bank, or IBAN Wire, their deposit receipts and verification requests will appear here.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredReceipts.map((rcpt) => {
+                const isPending = rcpt.status === 'pending_verification';
+                const isApproved = rcpt.status === 'approved';
+                const isRejected = rcpt.status === 'rejected';
+
+                return (
+                  <div
+                    key={rcpt.id}
+                    className={`p-5 sm:p-6 rounded-3xl border transition-all space-y-4 ${
+                      isPending 
+                        ? 'bg-slate-900/90 border-amber-500/40 ring-1 ring-amber-500/20 shadow-xl' 
+                        : isApproved 
+                          ? 'bg-slate-900/60 border-emerald-500/30' 
+                          : 'bg-slate-900/40 border-slate-800'
+                    }`}
+                  >
+                    {/* Top Row: Client Info & Status Badge */}
+                    <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
+                      <div className="flex items-start gap-3.5">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-600 text-white font-black flex items-center justify-center text-lg shadow-lg shrink-0">
+                          {rcpt.clientName?.charAt(0) || 'C'}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2.5 flex-wrap">
+                            <h4 className="text-base font-black text-white">{rcpt.clientName}</h4>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                              {rcpt.clientOrg || 'Client Account'}
+                            </span>
+                            <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border uppercase tracking-wider ${
+                              isPending 
+                                ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 animate-pulse' 
+                                : isApproved 
+                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50' 
+                                  : 'bg-red-500/20 text-red-300 border-red-500/50'
+                            }`}>
+                              {isPending ? '⏳ Verification Pending' : isApproved ? '✓ Verified & Credited' : '✗ Rejected'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-300 mt-1 flex flex-wrap items-center gap-2">
+                            <span className="font-mono text-cyan-300 font-semibold">{rcpt.clientEmail}</span>
+                            {rcpt.clientPhone && <span>• Tel: <strong className="text-slate-200">{rcpt.clientPhone}</strong></span>}
+                            <span className="text-slate-400">• Submitted {new Date(rcpt.submittedAt || Date.now()).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Top Action Buttons */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {isPending && (
+                          <>
+                            <button
+                              onClick={() => {
+                                setSelectedReceiptForReview(rcpt);
+                                setApproveReceiptNotes(`Payment of $${rcpt.amountPaid.toFixed(2)} verified by IK Enterprises Admin`);
+                                setIsApproveReceiptModalOpen(true);
+                              }}
+                              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-600/30 transition cursor-pointer"
+                            >
+                              <CheckCircle2 className="w-4 h-4" />
+                              <span>Approve & Credit +{rcpt.packageMinutes} Mins</span>
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                setSelectedReceiptForReview(rcpt);
+                                setIsRejectReceiptModalOpen(true);
+                              }}
+                              className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-300 text-xs font-bold border border-slate-700 transition cursor-pointer"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              <span>Reject Proof</span>
+                            </button>
+                          </>
+                        )}
+
+                        {rcpt.receiptFileData && (
+                          <button
+                            onClick={() => setReceiptPreviewModal(rcpt)}
+                            className="px-3.5 py-2.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>View Attachment</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Middle Details Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                      <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80">
+                        <span className="text-[10px] uppercase font-bold text-slate-400">Package & Amount</span>
+                        <div className="flex items-baseline gap-1.5 mt-0.5">
+                          <p className="text-base font-black text-white">{rcpt.packageMinutes} Minutes</p>
+                          <span className="text-xs font-black text-emerald-400">${rcpt.amountPaid?.toFixed(2)}</span>
+                        </div>
+                        {rcpt.discountApplied > 0 && (
+                          <span className="text-[9px] font-black text-amber-300 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20 mt-1 inline-block">
+                            20% Discount Applied
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80">
+                        <span className="text-[10px] uppercase font-bold text-slate-400">Payment Option</span>
+                        <p className="text-xs font-bold text-white mt-1 flex items-center gap-1">
+                          <Landmark className="w-3.5 h-3.5 text-sky-400" />
+                          <span>{rcpt.paymentMethod}</span>
+                        </p>
+                        <span className="text-[10px] text-slate-400 mt-0.5 block">IK Enterprises Account</span>
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80">
+                        <span className="text-[10px] uppercase font-bold text-slate-400">Bank / Tracking Ref</span>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="font-mono text-xs font-extrabold text-amber-300 truncate max-w-[140px]">
+                            {rcpt.bankReference}
+                          </span>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(rcpt.bankReference);
+                              alert(`Copied reference: ${rcpt.bankReference}`);
+                            }}
+                            className="text-slate-400 hover:text-white"
+                            title="Copy Reference"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80">
+                        <span className="text-[10px] uppercase font-bold text-slate-400">Attached File</span>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-xs text-slate-200 truncate max-w-[130px]" title={rcpt.receiptFileName}>
+                            {rcpt.receiptFileName || 'No file attached'}
+                          </span>
+                          {rcpt.receiptFileData && (
+                            <button
+                              onClick={() => setReceiptPreviewModal(rcpt)}
+                              className="text-emerald-400 hover:text-emerald-300 font-bold text-[10px]"
+                            >
+                              Inspect
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Client Notes & Admin Verification Result */}
+                    {rcpt.clientNotes && (
+                      <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs">
+                        <span className="text-slate-400 font-bold">Client Note:</span>{' '}
+                        <span className="text-slate-200">{rcpt.clientNotes}</span>
+                      </div>
+                    )}
+
+                    {isApproved && (
+                      <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-xs text-emerald-300 flex items-center justify-between">
+                        <span>✓ Verified & Credited to Client Wallet on {new Date(rcpt.verifiedAt || Date.now()).toLocaleString()}</span>
+                        <span className="font-mono font-bold text-emerald-400">+{rcpt.packageMinutes} MINS ACTIVE</span>
+                      </div>
+                    )}
+
+                    {isRejected && (
+                      <div className="p-3 rounded-xl bg-red-950/40 border border-red-500/30 text-xs text-red-300">
+                        <strong>Rejection Reason:</strong> {rcpt.rejectionReason}
+                      </div>
+                    )}
+
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+        </div>
+      )}
+
+      {/* MODAL: APPROVE PAYMENT RECEIPT */}
+      {isApproveReceiptModalOpen && selectedReceiptForReview && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-emerald-500/50 rounded-3xl p-6 sm:p-8 max-w-lg w-full space-y-5 text-white shadow-2xl relative">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-lg font-bold">Confirm Deposit & Credit Minutes</h3>
+              </div>
+              <button onClick={() => setIsApproveReceiptModalOpen(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Client Name:</span>
+                <span className="font-bold text-white">{selectedReceiptForReview.clientName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Client Email:</span>
+                <span className="font-mono text-cyan-300">{selectedReceiptForReview.clientEmail}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Package to Credit:</span>
+                <span className="font-black text-emerald-400">+{selectedReceiptForReview.packageMinutes} Minutes</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Amount Verified:</span>
+                <span className="font-black text-emerald-400">${selectedReceiptForReview.amountPaid?.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Transfer Reference:</span>
+                <span className="font-mono font-bold text-amber-300">{selectedReceiptForReview.bankReference}</span>
+              </div>
+            </div>
+
+            <div className="space-y-1.5 text-xs">
+              <label className="text-slate-300 font-semibold">Admin Verification Note (Sent to Client):</label>
+              <input
+                type="text"
+                value={approveReceiptNotes}
+                onChange={(e) => setApproveReceiptNotes(e.target.value)}
+                className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none border border-slate-700 bg-slate-950"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsApproveReceiptModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleApproveReceipt(selectedReceiptForReview.id)}
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold shadow-lg shadow-emerald-600/30 transition cursor-pointer"
+              >
+                ✓ Confirm & Add {selectedReceiptForReview.packageMinutes} Minutes to Wallet
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: REJECT PAYMENT RECEIPT */}
+      {isRejectReceiptModalOpen && selectedReceiptForReview && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-red-500/50 rounded-3xl p-6 sm:p-8 max-w-lg w-full space-y-5 text-white shadow-2xl relative">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2 text-red-400">
+                <AlertCircle className="w-5 h-5" />
+                <h3 className="text-lg font-bold">Reject Payment Proof</h3>
+              </div>
+              <button onClick={() => setIsRejectReceiptModalOpen(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Specify reason why the transfer proof for <strong>{selectedReceiptForReview.clientName}</strong> could not be verified.
+            </p>
+
+            <div className="space-y-1.5 text-xs">
+              <label className="text-slate-300 font-semibold">Reason for Rejection *</label>
+              <textarea
+                rows={3}
+                value={rejectReceiptReason}
+                onChange={(e) => setRejectReceiptReason(e.target.value)}
+                className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none border border-slate-700 bg-slate-950"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsRejectReceiptModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleRejectReceipt(selectedReceiptForReview.id)}
+                className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-extrabold shadow-lg shadow-red-600/30 transition cursor-pointer"
+              >
+                Confirm Rejection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: INSPECT RECEIPT ATTACHMENT */}
+      {receiptPreviewModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 sm:p-8 max-w-2xl w-full space-y-4 text-white shadow-2xl relative max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-base font-bold">Payment Attachment: {receiptPreviewModal.receiptFileName}</h3>
+              </div>
+              <button onClick={() => setReceiptPreviewModal(null)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-4">
+              {receiptPreviewModal.receiptFileData && receiptPreviewModal.receiptFileData.startsWith('data:image') ? (
+                <div className="rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 flex items-center justify-center p-2">
+                  <img
+                    src={receiptPreviewModal.receiptFileData}
+                    alt="Payment Screenshot"
+                    className="max-h-[60vh] object-contain rounded-xl"
+                  />
+                </div>
+              ) : (
+                <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800 font-mono text-xs space-y-2">
+                  <p className="text-emerald-400 font-bold uppercase">Official Verified Deposit Receipt Details</p>
+                  <p><span className="text-slate-400">Client:</span> {receiptPreviewModal.clientName} ({receiptPreviewModal.clientEmail})</p>
+                  <p><span className="text-slate-400">Package:</span> {receiptPreviewModal.packageMinutes} Minutes (${receiptPreviewModal.amountPaid?.toFixed(2)})</p>
+                  <p><span className="text-slate-400">Method:</span> {receiptPreviewModal.paymentMethod}</p>
+                  <p><span className="text-slate-400">Reference:</span> {receiptPreviewModal.bankReference}</p>
+                  <p><span className="text-slate-400">Date:</span> {new Date(receiptPreviewModal.submittedAt).toLocaleString()}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-between items-center pt-3 border-t border-slate-800">
+              <span className="text-xs text-slate-400">
+                Status: <strong className="text-amber-300 capitalize">{receiptPreviewModal.status}</strong>
+              </span>
+              <div className="flex gap-2">
+                {receiptPreviewModal.status === 'pending_verification' && (
+                  <button
+                    onClick={() => {
+                      const id = receiptPreviewModal.id;
+                      setReceiptPreviewModal(null);
+                      handleApproveReceipt(id);
+                    }}
+                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow transition cursor-pointer"
+                  >
+                    ✓ Quick Approve & Credit
+                  </button>
+                )}
+                <button
+                  onClick={() => setReceiptPreviewModal(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -2927,7 +3542,25 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                 </div>
 
                 {/* Shift Timing Mode Selector */}
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+                <div className="grid grid-cols-2 sm:grid-cols-6 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReviewShiftType('fixed_12h');
+                      setReviewDailyHours(12);
+                      setReviewStartTime('09:00');
+                      setReviewEndTime('21:00');
+                    }}
+                    className={`p-2 rounded-xl border text-center transition ${
+                      reviewShiftType === 'fixed_12h'
+                        ? 'bg-amber-600/30 border-amber-500 text-white font-bold ring-1 ring-amber-500'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-[11px] font-bold">🏢 12 Hours</p>
+                    <p className="text-[9px] text-slate-400">Extended Shift</p>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => {

@@ -14,6 +14,7 @@ import AuthModal from './components/AuthModal';
 import InterpreterApplicationModal from './components/InterpreterApplicationModal';
 import AppointmentNotificationManager from './components/AppointmentNotificationManager';
 import AIAssistantWidget from './components/AIAssistantWidget';
+import { getSocket } from './services/socket';
 
 export default function App() {
   // Theme state ('dark' or 'light')
@@ -158,6 +159,29 @@ export default function App() {
         sessionId: sId
       })
     }).catch(() => {});
+
+    // Listen for real-time payment approvals from Admin
+    const socket = getSocket();
+    if (socket) {
+      socket.on('payment-receipt-approved', (data) => {
+        if (data && data.minutesAdded) {
+          setClientWallet(prev => {
+            const updated = {
+              ...prev,
+              totalMinutesPurchased: (prev.totalMinutesPurchased || 0) + data.minutesAdded,
+              minutesRemaining: (prev.minutesRemaining || 0) + data.minutesAdded,
+              totalPaid: (prev.totalPaid || 0) + (data.amountPaid || 0),
+              paymentStatus: 'verified',
+              pendingMinutes: 0
+            };
+            try {
+              localStorage.setItem('linguabridge_wallet', JSON.stringify(updated));
+            } catch {}
+            return updated;
+          });
+        }
+      });
+    }
   }, []);
 
   // Read URL query parameters for direct guest join links (e.g. ?view=guest&roomId=xyz&lang=es)
@@ -193,6 +217,32 @@ export default function App() {
 
   // End live conference room
   const handleEndCall = (completedData) => {
+    const seconds = completedData?.seconds || 0;
+    // 30-second grace period: If user enters and quits within 30 seconds, 0 minutes deducted (Test Check-in)
+    const actualMinutesUsed = seconds < 30 ? 0 : Math.ceil(seconds / 60);
+
+    if (actualMinutesUsed > 0) {
+      setClientWallet(prev => {
+        const updated = {
+          ...prev,
+          minutesUsed: (prev?.minutesUsed || 0) + actualMinutesUsed,
+          minutesRemaining: Math.max(0, (prev?.minutesRemaining || 0) - actualMinutesUsed)
+        };
+        try {
+          localStorage.setItem('linguabridge_wallet', JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+
+      if (currentUser?.id) {
+        fetch('/api/wallet/deduct', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: currentUser.id, minutesDeducted: actualMinutesUsed })
+        }).catch(() => {});
+      }
+    }
+
     const newLog = {
       id: `log-${Date.now()}`,
       date: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
@@ -203,7 +253,7 @@ export default function App() {
       language: completedData.targetLanguage,
       specialty: completedData.specialty,
       duration: completedData.duration,
-      cost: `$${((completedData.seconds / 60) * 0.95 + 2.50).toFixed(2)}`,
+      cost: actualMinutesUsed > 0 ? `$${((seconds / 60) * 0.95 + 2.50).toFixed(2)}` : '$0.00 (Test Check-in)',
       rating: completedData.rating || 5,
       notes: completedData.notes
     };

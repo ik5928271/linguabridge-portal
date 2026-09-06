@@ -324,7 +324,8 @@ let store = {
   callLogs: [],
   wallets: { ...SEED_WALLETS },
   visitorLogs: [],
-  inquiries: [...SEED_INQUIRIES]
+  inquiries: [...SEED_INQUIRIES],
+  paymentReceipts: []
 };
 
 let db = null;
@@ -347,6 +348,10 @@ function loadStore() {
 
       if (!Array.isArray(store.inquiries)) {
         store.inquiries = [];
+      }
+
+      if (!Array.isArray(store.paymentReceipts)) {
+        store.paymentReceipts = [];
       }
 
       // Ensure Owner Account always exists with latest credentials
@@ -397,7 +402,7 @@ function loadStore() {
       // Ensure Interpreters collection is synchronized
       store.interpreters = store.users.filter(u => u.role === 'interpreter');
 
-      console.log(`[Database Loaded] Users: ${store.users.length}, Interpreters: ${store.interpreters.length}, Applications: ${store.interpreterApplications.length}, Inquiries: ${store.inquiries.length}, Appointments: ${store.appointments.length}`);
+      console.log(`[Database Loaded] Users: ${store.users.length}, Interpreters: ${store.interpreters.length}, Applications: ${store.interpreterApplications.length}, Inquiries: ${store.inquiries.length}, Receipts: ${store.paymentReceipts.length}, Appointments: ${store.appointments.length}`);
     } else {
       saveStore();
     }
@@ -455,6 +460,12 @@ async function initMongo() {
       }
     }
 
+    // Sync Payment Receipts from MongoDB
+    const mongoReceipts = await db.collection('payment_receipts').find({}).toArray();
+    if (mongoReceipts.length > 0) {
+      store.paymentReceipts = mongoReceipts.map(({ _id, ...r }) => r);
+    }
+
     // Sync Appointments & Call Logs
     const mongoAppointments = await db.collection('appointments').find({}).toArray();
     if (mongoAppointments.length > 0) {
@@ -472,7 +483,7 @@ async function initMongo() {
     }
 
     store.interpreters = store.users.filter(u => u.role === 'interpreter');
-    console.log(`[MongoDB Sync Complete] Real Users: ${store.users.length}, Applications: ${store.interpreterApplications.length}, Inquiries: ${store.inquiries.length}, Wallets: ${Object.keys(store.wallets).length}, Visitor Logs: ${store.visitorLogs.length}`);
+    console.log(`[MongoDB Sync Complete] Users: ${store.users.length}, Apps: ${store.interpreterApplications.length}, Inquiries: ${store.inquiries.length}, Receipts: ${store.paymentReceipts.length}, Wallets: ${Object.keys(store.wallets).length}`);
   } catch (err) {
     console.error('❌ [MongoDB Connection Warning]:', err.message);
   }
@@ -490,6 +501,9 @@ async function saveStore() {
       }
       for (const inq of (store.inquiries || [])) {
         await db.collection('inquiries').updateOne({ id: inq.id }, { $set: inq }, { upsert: true }).catch(() => {});
+      }
+      for (const rcpt of (store.paymentReceipts || [])) {
+        await db.collection('payment_receipts').updateOne({ id: rcpt.id }, { $set: rcpt }, { upsert: true }).catch(() => {});
       }
       for (const uId of Object.keys(store.wallets)) {
         await db.collection('wallets').updateOne({ userId: uId }, { $set: store.wallets[uId] }, { upsert: true }).catch(() => {});
@@ -982,15 +996,16 @@ app.post('/api/interpreter-applications', (req, res) => {
     certifications = ['Certified Professional Linguist'],
     experienceYears = 3,
     employmentType = 'hourly', // 'salary_base', 'hourly', 'per_minute'
-    hourlyRate = 8,
-    minuteRate = 0.30,
-    monthlySalary = 1200,
+    hourlyRate = 0,
+    minuteRate = 0,
+    monthlySalary = 0,
     rateLabel = '',
     bio = '',
     cvFileName = '',
     cvFileData = '',
     docFileName = '',
     docFileData = '',
+    supportingDocs = [],
     shiftSchedule = null
   } = req.body;
 
@@ -1002,12 +1017,16 @@ app.post('/api/interpreter-applications', (req, res) => {
   const cleanEmail = email.toLowerCase().trim();
   const existingAppIndex = store.interpreterApplications.findIndex(a => a.email.toLowerCase() === cleanEmail);
 
+  const parsedHourly = parseInt(hourlyRate) !== undefined && !isNaN(parseInt(hourlyRate)) ? parseInt(hourlyRate) : 0;
+  const parsedMinute = parseFloat(minuteRate) !== undefined && !isNaN(parseFloat(minuteRate)) ? parseFloat(minuteRate) : 0;
+  const parsedMonthly = parseInt(monthlySalary) !== undefined && !isNaN(parseInt(monthlySalary)) ? parseInt(monthlySalary) : 0;
+
   const resolvedRateLabel = rateLabel || (
     employmentType === 'salary_base' 
-      ? `$${parseInt(monthlySalary) || 1200}/mo (Salary Base)`
+      ? `$${parsedMonthly}/mo (Salary Base)`
       : employmentType === 'per_minute' 
-        ? `$${(parseFloat(minuteRate) || 0.30).toFixed(2)}/min (Live Talk)`
-        : `$${parseInt(hourlyRate) || 8}/hr (Scheduled Shift)`
+        ? `$${parsedMinute.toFixed(2)}/min (Live Talk)`
+        : `$${parsedHourly}/hr (Scheduled Shift)`
   );
 
   const resolvedSchedule = shiftSchedule || {
@@ -1046,6 +1065,7 @@ app.post('/api/interpreter-applications', (req, res) => {
     cvFileData: cvFileData || null,
     docFileName: docFileName || 'Credentials_Certificate.pdf',
     docFileData: docFileData || null,
+    supportingDocs: Array.isArray(supportingDocs) ? supportingDocs : (docFileName ? [{ name: docFileName, data: docFileData }] : []),
     status: 'pending', // 'pending', 'approved', 'rejected'
     adminNotes: '',
     submittedAt: new Date().toISOString()
@@ -1523,6 +1543,243 @@ app.post('/api/wallet/topup', (req, res) => {
 
   saveStore();
   res.json({ success: true, wallet: w });
+});
+
+app.post('/api/wallet/deduct', (req, res) => {
+  const { userId, minutesDeducted } = req.body;
+  if (!userId) return res.status(400).json({ success: false, message: 'User ID is required' });
+
+  if (store.wallets[userId]) {
+    const w = store.wallets[userId];
+    const mins = parseInt(minutesDeducted) || 0;
+    w.minutesUsed = (w.minutesUsed || 0) + mins;
+    w.minutesRemaining = Math.max(0, (w.minutesRemaining || 0) - mins);
+    saveStore();
+    return res.json({ success: true, wallet: w });
+  }
+  res.json({ success: false, message: 'Wallet not found' });
+});
+
+// 8b. Client Payment Proof & Bank Receipt Verification System
+app.get('/api/payment-receipts', (req, res) => {
+  res.json(store.paymentReceipts || []);
+});
+
+app.post('/api/payment-receipts', (req, res) => {
+  const {
+    userId,
+    clientName,
+    clientEmail,
+    clientOrg,
+    clientPhone,
+    packageMinutes,
+    amountPaid,
+    discountApplied = 0,
+    paymentMethod,
+    bankReference,
+    receiptFileName,
+    receiptFileData,
+    clientNotes
+  } = req.body;
+
+  if (!clientName || !clientEmail || !packageMinutes) {
+    return res.status(400).json({ error: 'Client name, email, and package minutes are required.' });
+  }
+
+  const receiptId = `rcpt-${Date.now().toString(36)}`;
+  const cleanEmail = clientEmail.toLowerCase().trim();
+
+  const newReceipt = {
+    id: receiptId,
+    userId: userId || `usr-${Date.now().toString(36)}`,
+    clientName: clientName.trim(),
+    clientEmail: cleanEmail,
+    clientOrg: clientOrg || 'Client Account',
+    clientPhone: clientPhone || '',
+    packageMinutes: parseInt(packageMinutes) || 60,
+    amountPaid: parseFloat(amountPaid) || 0,
+    discountApplied: parseInt(discountApplied) || 0,
+    paymentMethod: paymentMethod || 'Card / Remitly',
+    bankReference: bankReference || `REF-${Date.now().toString(36).toUpperCase()}`,
+    receiptFileName: receiptFileName || 'Bank_Deposit_Receipt.pdf',
+    receiptFileData: receiptFileData || null,
+    clientNotes: clientNotes || '',
+    status: 'pending_verification', // 'pending_verification', 'approved', 'rejected'
+    submittedAt: new Date().toISOString()
+  };
+
+  if (!Array.isArray(store.paymentReceipts)) {
+    store.paymentReceipts = [];
+  }
+
+  store.paymentReceipts.unshift(newReceipt);
+
+  // Set wallet state to pending_verification if exists or init
+  if (newReceipt.userId) {
+    if (!store.wallets[newReceipt.userId]) {
+      store.wallets[newReceipt.userId] = {
+        userId: newReceipt.userId,
+        totalPaid: 0.00,
+        totalMinutesPurchased: 0,
+        minutesUsed: 0,
+        minutesRemaining: 0,
+        billingType: 'prepaid',
+        paymentStatus: 'pending_verification',
+        pendingMinutes: newReceipt.packageMinutes,
+        pendingAmount: newReceipt.amountPaid
+      };
+    } else {
+      store.wallets[newReceipt.userId].paymentStatus = 'pending_verification';
+      store.wallets[newReceipt.userId].pendingMinutes = newReceipt.packageMinutes;
+      store.wallets[newReceipt.userId].pendingAmount = newReceipt.amountPaid;
+    }
+  }
+
+  // Also create a linked inquiry so it appears in Admin Messages Box
+  const paymentInquiry = {
+    id: `inq-rcpt-${Date.now().toString(36)}`,
+    userName: newReceipt.clientName,
+    userEmail: newReceipt.clientEmail,
+    userRole: 'client',
+    subject: `💳 Payment Receipt: ${newReceipt.packageMinutes} Mins Package ($${newReceipt.amountPaid.toFixed(2)}) via ${newReceipt.paymentMethod}`,
+    message: `Payment of $${newReceipt.amountPaid.toFixed(2)} submitted for ${newReceipt.packageMinutes} Minutes package via ${newReceipt.paymentMethod}. Reference: ${newReceipt.bankReference}. Receipt file: ${newReceipt.receiptFileName}.${newReceipt.clientNotes ? ' Notes: ' + newReceipt.clientNotes : ''}`,
+    category: 'Payment Verification',
+    status: 'new',
+    receiptId: newReceipt.id,
+    adminReply: '',
+    createdAt: new Date().toISOString(),
+    messages: [
+      {
+        sender: 'user',
+        text: `I have completed the transfer of $${newReceipt.amountPaid.toFixed(2)} for ${newReceipt.packageMinutes} Minutes via ${newReceipt.paymentMethod}. Transaction Reference: ${newReceipt.bankReference}. Please verify and credit my account.`,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+    ]
+  };
+
+  store.inquiries.unshift(paymentInquiry);
+
+  saveStore();
+  io.emit('new-payment-receipt', newReceipt);
+  io.emit('new-inquiry', paymentInquiry);
+
+  res.json({
+    success: true,
+    message: 'Payment proof submitted successfully. LinguaBridge administration will verify your deposit and credit minutes promptly.',
+    receipt: newReceipt
+  });
+});
+
+// Admin: Approve Payment Receipt & Credit Wallet Minutes
+app.post('/api/payment-receipts/:id/approve', (req, res) => {
+  const { id } = req.params;
+  const { adminNotes } = req.body;
+
+  const receipt = (store.paymentReceipts || []).find(r => r.id === id);
+  if (!receipt) {
+    return res.status(404).json({ error: 'Payment receipt not found.' });
+  }
+
+  receipt.status = 'approved';
+  receipt.verifiedAt = new Date().toISOString();
+  receipt.adminNotes = adminNotes || 'Payment verified by IK Enterprises Admin';
+
+  // Find user by userId or email
+  let user = store.users.find(u => u.id === receipt.userId || (u.email && u.email.toLowerCase() === receipt.clientEmail.toLowerCase()));
+  const targetUserId = user ? user.id : receipt.userId;
+
+  if (!store.wallets[targetUserId]) {
+    store.wallets[targetUserId] = {
+      userId: targetUserId,
+      totalPaid: 0.00,
+      totalMinutesPurchased: 0,
+      minutesUsed: 0,
+      minutesRemaining: 0,
+      billingType: 'prepaid'
+    };
+  }
+
+  const w = store.wallets[targetUserId];
+  w.totalPaid += parseFloat(receipt.amountPaid) || 0;
+  w.totalMinutesPurchased += parseInt(receipt.packageMinutes) || 0;
+  w.minutesRemaining += parseInt(receipt.packageMinutes) || 0;
+  w.paymentStatus = 'verified';
+  w.pendingMinutes = 0;
+  w.pendingAmount = 0;
+
+  // Resolve linked inquiry if exists
+  const linkedInq = (store.inquiries || []).find(i => i.receiptId === receipt.id || i.userEmail.toLowerCase() === receipt.clientEmail.toLowerCase() && i.category === 'Payment Verification');
+  if (linkedInq) {
+    linkedInq.status = 'resolved';
+    linkedInq.adminReply = `Payment of $${receipt.amountPaid.toFixed(2)} verified! +${receipt.packageMinutes} minutes have been credited to your account. Your dashboard is now fully unlocked for live interpreter calls.`;
+    linkedInq.messages.push({
+      sender: 'bot',
+      text: `**Payment Confirmed:** Your payment of $${receipt.amountPaid.toFixed(2)} has been verified by administration. +${receipt.packageMinutes} minutes credited to your wallet. You can now use all interpreters!`,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    });
+  }
+
+  saveStore();
+  io.emit('payment-receipt-approved', {
+    receiptId: receipt.id,
+    userId: targetUserId,
+    minutesAdded: receipt.packageMinutes,
+    amountPaid: receipt.amountPaid,
+    wallet: w
+  });
+
+  res.json({
+    success: true,
+    message: `Payment verified. +${receipt.packageMinutes} minutes credited to ${receipt.clientName}.`,
+    receipt,
+    wallet: w
+  });
+});
+
+// Admin: Reject Payment Receipt
+app.post('/api/payment-receipts/:id/reject', (req, res) => {
+  const { id } = req.params;
+  const { rejectionReason } = req.body;
+
+  const receipt = (store.paymentReceipts || []).find(r => r.id === id);
+  if (!receipt) {
+    return res.status(404).json({ error: 'Payment receipt not found.' });
+  }
+
+  receipt.status = 'rejected';
+  receipt.rejectionReason = rejectionReason || 'Deposit could not be verified with bank reference.';
+  receipt.verifiedAt = new Date().toISOString();
+
+  let targetUserId = receipt.userId;
+  if (store.wallets[targetUserId]) {
+    store.wallets[targetUserId].paymentStatus = 'rejected';
+    store.wallets[targetUserId].pendingMinutes = 0;
+  }
+
+  // Update linked inquiry
+  const linkedInq = (store.inquiries || []).find(i => i.receiptId === receipt.id);
+  if (linkedInq) {
+    linkedInq.status = 'resolved';
+    linkedInq.adminReply = `Payment verification issue: ${receipt.rejectionReason}. Please contact support or provide updated proof.`;
+    linkedInq.messages.push({
+      sender: 'bot',
+      text: `**Verification Notice:** ${receipt.rejectionReason}. Please reach out if you need assistance.`,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    });
+  }
+
+  saveStore();
+  io.emit('payment-receipt-rejected', {
+    receiptId: receipt.id,
+    userId: targetUserId,
+    reason: receipt.rejectionReason
+  });
+
+  res.json({
+    success: true,
+    message: 'Payment receipt marked as rejected.',
+    receipt
+  });
 });
 
 // 9. Terminology Glossary

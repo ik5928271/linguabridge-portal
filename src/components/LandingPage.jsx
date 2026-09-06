@@ -158,15 +158,36 @@ export default function LandingPage({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           
           {/* Service 1: Audio OPI */}
-          <div className="glass-panel p-8 rounded-3xl border border-slate-800 hover:border-brand-500/50 hover:bg-slate-800/40 transition-all flex flex-col justify-between space-y-6">
+          <div className="glass-panel p-8 rounded-3xl border border-slate-800 hover:border-brand-500/50 hover:bg-slate-800/40 transition-all flex flex-col justify-between space-y-6 relative overflow-hidden">
             <div className="space-y-4">
-              <div className="w-14 h-14 rounded-2xl bg-brand-500/20 text-brand-400 flex items-center justify-center">
-                <PhoneCall className="w-7 h-7" />
-              </div>
               <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold text-white">On-Demand Audio (OPI)</h3>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-brand-500/20 text-brand-300">Default Mode</span>
+                <div className="w-14 h-14 rounded-2xl bg-brand-500/20 text-brand-400 flex items-center justify-center">
+                  <PhoneCall className="w-7 h-7" />
+                </div>
+                <div className="text-right space-y-1">
+                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-brand-500/20 text-brand-300 border border-brand-500/30 block">
+                    Default Mode
+                  </span>
+                  <span className="text-[9px] font-extrabold text-emerald-400 font-mono block">
+                    ⚡ 24/7/365 Live
+                  </span>
+                </div>
               </div>
+
+              <div>
+                <h3 className="text-xl font-bold text-white">On-Demand Audio (OPI)</h3>
+                <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+                    <Clock className="w-3 h-3 text-amber-400" />
+                    <span>Instant 24/7 Connect</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-cyan-300 bg-cyan-500/10 px-2 py-0.5 rounded-md border border-cyan-500/20">
+                    <Globe className="w-3 h-3 text-cyan-400" />
+                    <span>All Time Zones</span>
+                  </span>
+                </div>
+              </div>
+
               <p className="text-sm text-slate-300 leading-relaxed">
                 Instant over-the-phone voice interpretation accessible 24/7. Crystal-clear WebRTC audio with zero delay, ideal for emergency triage, telephone intake, and fast customer inquiries.
               </p>
@@ -177,7 +198,7 @@ export default function LandingPage({
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-emerald-400" />
-                  <span>Connects in under 12 seconds</span>
+                  <span>Connects in under 12 seconds across all time zones</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-emerald-400" />
@@ -188,7 +209,7 @@ export default function LandingPage({
 
             <button 
               onClick={() => onSelectRole('host')}
-              className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition flex items-center justify-center gap-2"
+              className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition flex items-center justify-center gap-2 shadow"
             >
               <span>Launch Audio Session</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -196,15 +217,36 @@ export default function LandingPage({
           </div>
 
           {/* Service 2: Video Remote Interpretation */}
-          <div className="glass-panel p-8 rounded-3xl border border-slate-800 hover:border-emerald-500/50 hover:bg-slate-800/40 transition-all flex flex-col justify-between space-y-6">
+          <div className="glass-panel p-8 rounded-3xl border border-slate-800 hover:border-emerald-500/50 hover:bg-slate-800/40 transition-all flex flex-col justify-between space-y-6 relative overflow-hidden">
             <div className="space-y-4">
-              <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                <Video className="w-7 h-7" />
-              </div>
               <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold text-white">Video Remote (VRI)</h3>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">1080p HD</span>
+                <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                  <Video className="w-7 h-7" />
+                </div>
+                <div className="text-right space-y-1">
+                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 block">
+                    1080p HD
+                  </span>
+                  <span className="text-[9px] font-extrabold text-amber-300 font-mono block">
+                    🏢 12h & 9h Shifts
+                  </span>
+                </div>
               </div>
+
+              <div>
+                <h3 className="text-xl font-bold text-white">Video Remote (VRI)</h3>
+                <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+                    <Clock className="w-3 h-3 text-amber-400" />
+                    <span>12h / 9h Shift Rosters</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-cyan-300 bg-cyan-500/10 px-2 py-0.5 rounded-md border border-cyan-500/20">
+                    <Globe className="w-3 h-3 text-cyan-400" />
+                    <span>UTC-8 to UTC+12</span>
+                  </span>
+                </div>
+              </div>
+
               <p className="text-sm text-slate-300 leading-relaxed">
                 High-definition multi-party video rooms allowing visual nuances, facial expressions, document sharing, and American Sign Language (ASL) interpretation.
               </p>
@@ -226,7 +268,7 @@ export default function LandingPage({
 
             <button 
               onClick={() => onSelectRole('host')}
-              className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition flex items-center justify-center gap-2"
+              className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition flex items-center justify-center gap-2 shadow"
             >
               <span>Explore Video Portal</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -234,15 +276,36 @@ export default function LandingPage({
           </div>
 
           {/* Service 3: Scheduled Consecutive Sessions */}
-          <div className="glass-panel p-8 rounded-3xl border border-slate-800 hover:border-purple-500/50 hover:bg-slate-800/40 transition-all flex flex-col justify-between space-y-6">
+          <div className="glass-panel p-8 rounded-3xl border border-slate-800 hover:border-purple-500/50 hover:bg-slate-800/40 transition-all flex flex-col justify-between space-y-6 relative overflow-hidden">
             <div className="space-y-4">
-              <div className="w-14 h-14 rounded-2xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
-                <Calendar className="w-7 h-7" />
-              </div>
               <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold text-white">Scheduled Appointments</h3>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">Pre-Booked</span>
+                <div className="w-14 h-14 rounded-2xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
+                  <Calendar className="w-7 h-7" />
+                </div>
+                <div className="text-right space-y-1">
+                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 block">
+                    Pre-Booked
+                  </span>
+                  <span className="text-[9px] font-extrabold text-purple-300 font-mono block">
+                    📅 Calendar Sync
+                  </span>
+                </div>
               </div>
+
+              <div>
+                <h3 className="text-xl font-bold text-white">Scheduled Appointments</h3>
+                <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded-md border border-purple-500/20">
+                    <Clock className="w-3 h-3 text-purple-400" />
+                    <span>Custom 3h / 6h / 9h / 12h</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                    <Globe className="w-3 h-3 text-emerald-400" />
+                    <span>Auto Local Timezone</span>
+                  </span>
+                </div>
+              </div>
+
               <p className="text-sm text-slate-300 leading-relaxed">
                 Pre-book certified specialist interpreters for planned surgeries, court depositions, patent hearings, and parent-teacher IEP conferences with calendar integration.
               </p>
@@ -264,13 +327,119 @@ export default function LandingPage({
 
             <button 
               onClick={onOpenSchedule}
-              className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition flex items-center justify-center gap-2"
+              className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition flex items-center justify-center gap-2 shadow"
             >
               <span>Schedule an Appointment</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
+        </div>
+
+        {/* Global Shift Timing & Time Zone Coverage Network Bar */}
+        <div className="p-6 sm:p-8 rounded-3xl bg-slate-900/90 border border-slate-800 shadow-2xl space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs font-bold uppercase tracking-wider mb-2">
+                <Clock className="w-3.5 h-3.5" />
+                <span>Global Shift Timing & 24/7 Coverage</span>
+              </div>
+              <h3 className="text-xl sm:text-2xl font-extrabold text-white">
+                Synchronized Shift Windows & Worldwide Time Zones
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                Linguists operate across structured daily shifts and 24/7 on-demand standby across all continental time zones.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-emerald-400 flex items-center gap-1.5 shadow">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                <span>Platform Status: 100% Operational (24/7)</span>
+              </span>
+            </div>
+          </div>
+
+          {/* 5 Shift Timing Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="p-3.5 rounded-2xl bg-slate-950 border border-amber-500/30 space-y-1 text-center">
+              <span className="text-lg">🏢</span>
+              <p className="text-xs font-extrabold text-white">12 Hours / Day</p>
+              <p className="text-[10px] text-amber-400 font-mono font-bold">09:00 - 21:00</p>
+              <p className="text-[9px] text-slate-400">Extended Full Shift</p>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1 text-center">
+              <span className="text-lg">🏢</span>
+              <p className="text-xs font-extrabold text-white">9 Hours / Day</p>
+              <p className="text-[10px] text-brand-400 font-mono font-bold">09:00 - 18:00</p>
+              <p className="text-[9px] text-slate-400">Full Standard Shift</p>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1 text-center">
+              <span className="text-lg">💼</span>
+              <p className="text-xs font-extrabold text-white">6 Hours / Day</p>
+              <p className="text-[10px] text-indigo-400 font-mono font-bold">09:00 - 15:00</p>
+              <p className="text-[9px] text-slate-400">Standard Shift</p>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1 text-center">
+              <span className="text-lg">⏱️</span>
+              <p className="text-xs font-extrabold text-white">3 Hours / Day</p>
+              <p className="text-[10px] text-purple-400 font-mono font-bold">09:00 - 12:00</p>
+              <p className="text-[9px] text-slate-400">Part-Time Slot</p>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-slate-950 border border-emerald-500/30 space-y-1 text-center col-span-2 sm:col-span-1">
+              <span className="text-lg">⚡</span>
+              <p className="text-xs font-extrabold text-emerald-300">Open 24/7</p>
+              <p className="text-[10px] text-emerald-400 font-mono font-bold">Always Active</p>
+              <p className="text-[9px] text-slate-400">Unlimited On-Demand</p>
+            </div>
+          </div>
+
+          {/* Time Zone Coverage Network */}
+          <div className="pt-2">
+            <p className="text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <Globe className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Active Regional Time Zone Alignments:</span>
+            </p>
+            <div className="flex flex-wrap gap-2 text-[11px]">
+              <span className="px-3 py-1 rounded-xl bg-slate-950 border border-slate-800 text-slate-300">
+                🇺🇸 <strong>US Eastern (EST):</strong> UTC-5
+              </span>
+              <span className="px-3 py-1 rounded-xl bg-slate-950 border border-slate-800 text-slate-300">
+                🇺🇸 <strong>US Central (CST):</strong> UTC-6
+              </span>
+              <span className="px-3 py-1 rounded-xl bg-slate-950 border border-slate-800 text-slate-300">
+                🇺🇸 <strong>US Pacific (PST):</strong> UTC-8
+              </span>
+              <span className="px-3 py-1 rounded-xl bg-slate-950 border border-slate-800 text-slate-300">
+                🇬🇧 <strong>London (GMT/UTC):</strong> UTC+0
+              </span>
+              <span className="px-3 py-1 rounded-xl bg-slate-950 border border-slate-800 text-slate-300">
+                🇪🇺 <strong>Europe (CET):</strong> UTC+1
+              </span>
+              <span className="px-3 py-1 rounded-xl bg-slate-950 border border-slate-800 text-slate-300">
+                🇸🇦 <strong>Riyadh (AST):</strong> UTC+3
+              </span>
+              <span className="px-3 py-1 rounded-xl bg-slate-950 border border-slate-800 text-slate-300">
+                🇦🇪 <strong>Dubai (GST):</strong> UTC+4
+              </span>
+              <span className="px-3 py-1 rounded-xl bg-slate-950 border border-slate-800 text-slate-300">
+                🇵🇰 <strong>Pakistan (PKT):</strong> UTC+5
+              </span>
+              <span className="px-3 py-1 rounded-xl bg-slate-950 border border-slate-800 text-slate-300">
+                🇮🇳 <strong>India (IST):</strong> UTC+5:30
+              </span>
+              <span className="px-3 py-1 rounded-xl bg-slate-950 border border-slate-800 text-slate-300">
+                🇸🇬 <strong>Singapore (SGT):</strong> UTC+8
+              </span>
+              <span className="px-3 py-1 rounded-xl bg-slate-950 border border-slate-800 text-slate-300">
+                🇦🇺 <strong>Sydney (AEST):</strong> UTC+10
+              </span>
+            </div>
+          </div>
         </div>
       </section>
 

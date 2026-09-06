@@ -31,10 +31,13 @@ import {
   AlertCircle,
   Plus,
   Download,
-  CalendarCheck,
-  Building2
+  Building2,
+  X,
+  Gift,
+  Tag,
+  Percent
 } from 'lucide-react';
-import { LANGUAGES, SPECIALTIES, INITIAL_INTERPRETERS, getInterpretersForLanguage } from '../data/mockData';
+import { LANGUAGES, ALL_100_LANGUAGES, SPECIALTIES, INITIAL_INTERPRETERS, getInterpretersForLanguage } from '../data/mockData';
 import PrepaidWalletModal from './PrepaidWalletModal';
 import { getSocket } from '../services/socket';
 
@@ -67,6 +70,8 @@ export default function MainClientBookingFlow({
   const [matchMode, setMatchMode] = useState('auto');
   const [realInterpreters, setRealInterpreters] = useState([]);
   const [selectedInterpreter, setSelectedInterpreter] = useState(null);
+  const [is100LangModalOpen, setIs100LangModalOpen] = useState(false);
+  const [lang100Search, setLang100Search] = useState('');
 
   // Fetch real registered interpreters from database
   useEffect(() => {
@@ -138,21 +143,14 @@ export default function MainClientBookingFlow({
   // Has sufficient minutes in prepaid wallet?
   const hasSufficientPrepaid = (wallet?.minutesRemaining || 0) >= durationMinutes;
 
-  // Handle Payment / Minute Deduction & Create Link
+  // Handle Payment / Minute Verification & Create Link (Minutes are deducted post-call based on actual talk time)
   const handleConfirmAndPay = () => {
     setIsProcessingPayment(true);
     setTimeout(() => {
       setIsProcessingPayment(false);
 
-      // Deduct minutes if prepaid
-      if (clientBillingType === 'prepaid') {
-        if (onUpdateWallet) {
-          onUpdateWallet({
-            minutesUsed: (wallet?.minutesUsed || 0) + durationMinutes,
-            minutesRemaining: Math.max(0, (wallet?.minutesRemaining || 0) - durationMinutes)
-          });
-        }
-      }
+      // Note: Minutes are billed upon actual call completion (in handleEndCall),
+      // ensuring clients are not charged for brief test check-ins or unjoined bookings.
 
       const roomId = `room-${Date.now().toString(36).slice(-6)}`;
       const guestPin = Math.floor(1000 + Math.random() * 9000).toString();
@@ -207,13 +205,26 @@ export default function MainClientBookingFlow({
     }, 1200);
   };
 
-  const handleTopUpSuccess = ({ minutesAdded, amountPaid }) => {
+  const handleTopUpSuccess = (payload) => {
     if (onUpdateWallet) {
-      onUpdateWallet({
-        totalPaid: (wallet?.totalPaid || 0) + amountPaid,
-        totalMinutesPurchased: (wallet?.totalMinutesPurchased || 0) + minutesAdded,
-        minutesRemaining: (wallet?.minutesRemaining || 0) + minutesAdded
-      });
+      if (payload && payload.status === 'pending_verification') {
+        onUpdateWallet({
+          paymentStatus: 'pending_verification',
+          pendingMinutes: payload.pendingMinutes || 0,
+          pendingAmount: payload.amountPaid || 0,
+          paymentReceipt: payload.paymentReceipt || null
+        });
+      } else {
+        const mins = payload?.minutesAdded || 0;
+        const paid = payload?.amountPaid || 0;
+        onUpdateWallet({
+          totalPaid: (wallet?.totalPaid || 0) + paid,
+          totalMinutesPurchased: (wallet?.totalMinutesPurchased || 0) + mins,
+          minutesRemaining: (wallet?.minutesRemaining || 0) + mins,
+          paymentStatus: 'verified',
+          pendingMinutes: 0
+        });
+      }
     }
   };
 
@@ -300,6 +311,33 @@ END:VCALENDAR`;
             </div>
           </div>
         </div>
+
+        {/* ⏳ PENDING PAYMENT RECEIPT VERIFICATION BANNER */}
+        {wallet?.paymentStatus === 'pending_verification' && (
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-yellow-500/15 to-emerald-500/15 border border-amber-500/40 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-amber-200">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-300 ring-2 ring-amber-400/30 flex items-center justify-center shrink-0">
+                <Clock className="w-5 h-5 animate-pulse" />
+              </div>
+              <div>
+                <span className="font-extrabold text-amber-300 text-xs uppercase tracking-wider block">
+                  ⏳ Payment Proof Submitted • Verification Pending
+                </span>
+                <p className="text-[11px] text-slate-200 mt-0.5 leading-relaxed">
+                  Your deposit receipt for <strong className="text-emerald-300">+{wallet.pendingMinutes || 60} Minutes (${(wallet.pendingAmount || 43.20).toFixed(2)})</strong> is being verified by IK Enterprises admin. You can browse all dashboard features and view rates. Live interpreter calls will be enabled upon confirmation.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsWalletModalOpen(true)}
+              className="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 font-bold text-xs shrink-0 transition cursor-pointer"
+            >
+              View Payment Details
+            </button>
+          </div>
+        )}
 
         {/* 4 Live Ledger Metrics */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -461,6 +499,34 @@ END:VCALENDAR`;
                   </div>
                 </button>
               ))}
+
+              {/* 18th Box: 100+ Global Languages Selector */}
+              <button
+                type="button"
+                onClick={() => setIs100LangModalOpen(true)}
+                className={`p-3 rounded-2xl border text-left transition flex items-center gap-2.5 relative ${
+                  !LANGUAGES.some(l => l.name === selectedLanguage)
+                    ? 'bg-purple-900/30 border-purple-500 text-white ring-2 ring-purple-400 shadow-lg shadow-purple-500/20'
+                    : 'bg-slate-900/90 border-purple-500/40 hover:border-purple-400 text-purple-200 hover:bg-slate-800/90'
+                }`}
+              >
+                <span className="text-2xl">🌐</span>
+                <div className="overflow-hidden min-w-0 flex-1">
+                  <p className="text-xs font-bold truncate text-white">
+                    {!LANGUAGES.some(l => l.name === selectedLanguage)
+                      ? selectedLanguage
+                      : '+ More Languages'}
+                  </p>
+                  <p className="text-[10px] text-purple-300 truncate font-semibold">
+                    {!LANGUAGES.some(l => l.name === selectedLanguage)
+                      ? '✓ From 100+ Global List'
+                      : 'List of 100+ (A-Z)'}
+                  </p>
+                </div>
+                {!LANGUAGES.some(l => l.name === selectedLanguage) && (
+                  <span className="text-emerald-400 font-black text-xs shrink-0">✓</span>
+                )}
+              </button>
             </div>
           </div>
 
@@ -913,11 +979,52 @@ END:VCALENDAR`;
             </p>
           </div>
 
+          {/* 🎁 2026 FOUNDING CLIENT 6-MONTH DISCOUNT PROMOTION BANNER */}
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-emerald-500/15 to-teal-500/15 border border-emerald-500/40 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/25 text-amber-300 ring-2 ring-amber-400/40 flex items-center justify-center shrink-0">
+                <Gift className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-amber-300 uppercase tracking-wider flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5" /> 2026 Client Promotion
+                  </span>
+                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950">
+                    Up to 35% OFF • 6 Months
+                  </span>
+                </div>
+                <p className="text-xs text-slate-200 mt-0.5 font-medium">
+                  Lock in <strong className="text-emerald-300">15%–35% discount for 6 Months</strong> from join date on all prepaid & custom minute packages.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsWalletModalOpen(true)}
+              className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/30 flex items-center gap-1.5 transition shrink-0 cursor-pointer"
+            >
+              <Tag className="w-3.5 h-3.5 text-slate-950" />
+              <span>Claim Promo (Up to 35% OFF)</span>
+            </button>
+          </div>
+
           {/* Prepaid Balance Breakdown */}
           <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
             <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800">
               <span className="text-slate-400">Available Prepaid Balance:</span>
-              <span className="font-black text-emerald-400">{wallet?.minutesRemaining || 0} Minutes</span>
+              <div className="flex items-center gap-3">
+                <span className="font-black text-emerald-400">{wallet?.minutesRemaining || 0} Minutes</span>
+                <button
+                  type="button"
+                  onClick={() => setIsWalletModalOpen(true)}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 font-bold text-[10px] flex items-center gap-1 transition cursor-pointer"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>Top-Up (Up to 35% OFF)</span>
+                </button>
+              </div>
             </div>
             <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800">
               <span className="text-slate-400">Minutes Required for this Session:</span>
@@ -931,17 +1038,17 @@ END:VCALENDAR`;
             </div>
 
             {!hasSufficientPrepaid && (
-              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-300 flex items-center justify-between">
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-                  <span>Insufficient minutes in wallet ({wallet?.minutesRemaining || 0} min available). Please top up to proceed.</span>
+                  <span>Insufficient minutes ({wallet?.minutesRemaining || 0} min available). Claim up to 35% promo discount to top up.</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsWalletModalOpen(true)}
-                  className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold text-[11px] shadow-lg shadow-emerald-600/30"
+                  className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] shadow-lg shadow-emerald-600/30 shrink-0 cursor-pointer"
                 >
-                  Top-Up Now
+                  Top-Up (Up to 35% OFF)
                 </button>
               </div>
             )}
@@ -1219,7 +1326,125 @@ END:VCALENDAR`;
         onClose={() => setIsWalletModalOpen(false)}
         onTopUpSuccess={handleTopUpSuccess}
         currentBalance={wallet?.minutesRemaining || 0}
+        currentUser={currentUser}
       />
+
+      {/* 100+ Global Languages Alphabetical Selection Modal */}
+      {is100LangModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl p-6 sm:p-7 max-w-3xl w-full shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold text-lg">
+                  🌐
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Full Language Directory (100+ Languages)</h3>
+                  <p className="text-xs text-slate-400">Strictly sorted in alphabetical order (A to Z)</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setIs100LangModalOpen(false); setLang100Search(''); }}
+                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Live Search Input */}
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+              <input
+                type="text"
+                value={lang100Search}
+                onChange={(e) => setLang100Search(e.target.value)}
+                placeholder="Search languages by name or native script (e.g. Somali, Swedish, Bengali, Kurdish...)"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition"
+                autoFocus
+              />
+              {lang100Search && (
+                <button
+                  type="button"
+                  onClick={() => setLang100Search('')}
+                  className="absolute right-3 top-2.5 text-xs text-slate-400 hover:text-white"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
+            {/* Language Count Badge */}
+            <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
+              <span>Alphabetical List (A to Z)</span>
+              <span className="text-purple-300 font-semibold font-mono">
+                {ALL_100_LANGUAGES.filter(l => 
+                  l.name.toLowerCase().includes(lang100Search.toLowerCase()) || 
+                  (l.nativeName && l.nativeName.toLowerCase().includes(lang100Search.toLowerCase()))
+                ).length} languages matching
+              </span>
+            </div>
+
+            {/* Scrollable Language Grid */}
+            <div className="flex-1 overflow-y-auto pr-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                {ALL_100_LANGUAGES.filter(l => 
+                  l.name.toLowerCase().includes(lang100Search.toLowerCase()) || 
+                  (l.nativeName && l.nativeName.toLowerCase().includes(lang100Search.toLowerCase()))
+                ).map((lang) => {
+                  const isSel = selectedLanguage === lang.name;
+                  return (
+                    <button
+                      key={lang.code}
+                      type="button"
+                      onClick={() => {
+                        setSelectedLanguage(lang.name);
+                        const matched = getInterpretersForLanguage(lang.name);
+                        if (matched && matched.length > 0) {
+                          setSelectedInterpreter(matched[0]);
+                        }
+                        setIs100LangModalOpen(false);
+                        setLang100Search('');
+                      }}
+                      className={`p-3 rounded-2xl border text-left transition flex items-center gap-2.5 ${
+                        isSel
+                          ? 'bg-purple-600/30 border-purple-500 text-white ring-1 ring-purple-400 shadow-md'
+                          : 'bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white hover:border-slate-700'
+                      }`}
+                    >
+                      <span className="text-2xl shrink-0">{lang.flag}</span>
+                      <div className="overflow-hidden min-w-0 flex-1">
+                        <p className="text-xs font-bold truncate text-white">{lang.name}</p>
+                        <p className="text-[10px] text-slate-400 truncate">{lang.nativeName}</p>
+                      </div>
+                      {isSel && (
+                        <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
+              <span className="text-slate-400">
+                Selected: <strong className="text-white">{selectedLanguage}</strong>
+              </span>
+              <button
+                type="button"
+                onClick={() => { setIs100LangModalOpen(false); setLang100Search(''); }}
+                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold transition"
+              >
+                Close
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
 
     </div>
   );

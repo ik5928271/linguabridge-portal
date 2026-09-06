@@ -68,14 +68,14 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
   
   // 3-Tier Compensation & Employment Preference
   const [employmentType, setEmploymentType] = useState('hourly'); // 'hourly', 'per_minute', 'salary_base'
-  const [hourlyRate, setHourlyRate] = useState(8);
-  const [minuteRate, setMinuteRate] = useState(0.30);
-  const [monthlySalary, setMonthlySalary] = useState(1200);
+  const [hourlyRate, setHourlyRate] = useState(0);
+  const [minuteRate, setMinuteRate] = useState(0);
+  const [monthlySalary, setMonthlySalary] = useState(0);
   const [bio, setBio] = useState('');
   
   // File uploads
   const [cvFile, setCvFile] = useState(null);
-  const [docFile, setDocFile] = useState(null);
+  const [supportingDocs, setSupportingDocs] = useState([]); // Multiple supporting documents (up to 15)
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -138,11 +138,14 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
   const handleCvChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+      const formattedSize = file.size > 1024 * 1024 
+        ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` 
+        : `${(file.size / 1024).toFixed(1)} KB`;
       const reader = new FileReader();
       reader.onload = (uploadEvent) => {
         setCvFile({
           name: file.name,
-          size: `${(file.size / 1024).toFixed(1)} KB`,
+          size: formattedSize,
           type: file.type,
           data: uploadEvent.target.result
         });
@@ -151,20 +154,45 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
     }
   };
 
-  const handleDocChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      const reader = new FileReader();
-      reader.onload = (uploadEvent) => {
-        setDocFile({
-          name: file.name,
-          size: `${(file.size / 1024).toFixed(1)} KB`,
-          type: file.type,
-          data: uploadEvent.target.result
-        });
-      };
-      reader.readAsDataURL(file);
+  const handleSupportingDocsChange = (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const newFiles = Array.from(e.target.files);
+      if (supportingDocs.length + newFiles.length > 15) {
+        setErrorMessage('You can attach up to 15 supporting documents in total.');
+      }
+      const allowedCount = Math.max(0, 15 - supportingDocs.length);
+      const toProcess = newFiles.slice(0, allowedCount);
+
+      toProcess.forEach(file => {
+        const reader = new FileReader();
+        const formattedSize = file.size > 1024 * 1024 
+          ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` 
+          : `${(file.size / 1024).toFixed(1)} KB`;
+        reader.onload = (uploadEvent) => {
+          setSupportingDocs(prev => {
+            if (prev.some(d => d.name === file.name && d.size === formattedSize)) {
+              return prev;
+            }
+            return [
+              ...prev,
+              {
+                id: `doc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                name: file.name,
+                size: formattedSize,
+                type: file.type,
+                data: uploadEvent.target.result
+              }
+            ];
+          });
+        };
+        reader.readAsDataURL(file);
+      });
+      e.target.value = '';
     }
+  };
+
+  const handleRemoveSupportingDoc = (idToRemove) => {
+    setSupportingDocs(prev => prev.filter(d => d.id !== idToRemove));
   };
 
   const handleSubmit = async (e) => {
@@ -199,7 +227,7 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
         ? `$${minuteRate.toFixed(2)}/min (Live Talk)`
         : `$${hourlyRate}/hr (Scheduled Shift)`;
 
-    const dailyHrs = preferredShiftType === 'open_unlimited' ? 'Unlimited' : preferredShiftType === 'fixed_3h' ? 3 : preferredShiftType === 'fixed_6h' ? 6 : 9;
+    const dailyHrs = preferredShiftType === 'open_unlimited' ? 'Unlimited' : preferredShiftType === 'fixed_12h' ? 12 : preferredShiftType === 'fixed_3h' ? 3 : preferredShiftType === 'fixed_6h' ? 6 : 9;
     const scheduleLabel = preferredShiftType === 'open_unlimited'
       ? 'Open & Flexible (Unlimited On-Demand 24/7)'
       : `${dailyHrs} Hours Daily (${timeZone.split(' ')[0]})`;
@@ -217,7 +245,7 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
         dailyHours: dailyHrs,
         timeZone: timeZone,
         startTime: preferredShiftType === 'open_unlimited' ? null : '09:00',
-        endTime: preferredShiftType === 'open_unlimited' ? null : (preferredShiftType === 'fixed_3h' ? '12:00' : preferredShiftType === 'fixed_6h' ? '15:00' : '18:00'),
+        endTime: preferredShiftType === 'open_unlimited' ? null : (preferredShiftType === 'fixed_12h' ? '21:00' : preferredShiftType === 'fixed_3h' ? '12:00' : preferredShiftType === 'fixed_6h' ? '15:00' : '18:00'),
         scheduleLabel
       },
       avatarType: avatarType,
@@ -235,17 +263,17 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
         : ['Certified Professional Linguist'],
       experienceYears: parseInt(experienceYears) || 1,
       employmentType: employmentType, // 'salary_base', 'hourly', 'per_minute'
-      hourlyRate: parseInt(hourlyRate) || 8,
-      minuteRate: parseFloat(minuteRate) || 0.30,
-      monthlySalary: parseInt(monthlySalary) || 1200,
+      hourlyRate: parseInt(hourlyRate) !== undefined && !isNaN(parseInt(hourlyRate)) ? parseInt(hourlyRate) : 0,
+      minuteRate: parseFloat(minuteRate) !== undefined && !isNaN(parseFloat(minuteRate)) ? parseFloat(minuteRate) : 0,
+      monthlySalary: parseInt(monthlySalary) !== undefined && !isNaN(parseInt(monthlySalary)) ? parseInt(monthlySalary) : 0,
       rateLabel: resolvedRateLabel,
       bio: bio.trim() || `Professional ${resolvedPrimary} interpreter with ${experienceYears} years experience under ${resolvedRateLabel}.`,
       cvFileName: cvFile ? cvFile.name : 'Resume_CV_Submitted.pdf',
       cvFileData: cvFile?.data || null,
-      docFileName: docFile ? docFile.name : 'Certification_Proof.pdf',
-      docFileData: docFile?.data || null
+      docFileName: supportingDocs.length > 0 ? supportingDocs[0].name : 'Certification_Proof.pdf',
+      docFileData: supportingDocs.length > 0 ? supportingDocs[0].data : null,
+      supportingDocs: supportingDocs
     };
-
 
     try {
       // Local safety backup first
@@ -284,7 +312,7 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
     setCustomPrimaryLang('');
     setCustomWorkingLangInput('');
     setCvFile(null);
-    setDocFile(null);
+    setSupportingDocs([]);
     setCustomPhotoData(null);
     setCustomPhotoName('');
     setAvatarType('preset');
@@ -778,135 +806,107 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
               </div>
             </div>
 
-            {/* SECTION 3: EMPLOYMENT & COMPENSATION MODEL */}
+            {/* SECTION 3: COMPENSATION, SHIFTS & BIO */}
             <div className="space-y-4 pt-2 border-t border-slate-800">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-brand-400 flex items-center gap-1.5">
-                  <Award className="w-3.5 h-3.5" />
-                  <span>3. Preferred Employment & Compensation Model</span>
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>3. Compensation Model & Shift Availability</span>
                 </h3>
-                <span className="text-[10px] text-slate-400">
-                  Select how you wish to be engaged & compensated
+                <span className="text-[10px] text-amber-400 font-semibold bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20 w-fit">
+                  Choose Your Preferred Billing & Work Structure
                 </span>
               </div>
 
-              {/* 3 Model Cards */}
+              {/* 3 Compensation Model Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {/* Model 2: Hourly Shift */}
-                <div 
+                <button
+                  type="button"
                   onClick={() => setEmploymentType('hourly')}
-                  className={`p-3.5 rounded-2xl border cursor-pointer transition relative flex flex-col justify-between ${
+                  className={`p-3.5 rounded-2xl border text-left transition relative flex flex-col justify-between ${
                     employmentType === 'hourly'
-                      ? 'bg-brand-950/40 border-brand-500 ring-2 ring-brand-500/50'
-                      : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                      ? 'bg-brand-950/80 border-brand-500 ring-2 ring-brand-400/50 shadow-lg shadow-brand-500/10'
+                      : 'bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-300'
                   }`}
                 >
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs font-bold text-white flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5 text-brand-400" />
-                        <span>Hourly Rate</span>
-                      </span>
-                      {employmentType === 'hourly' && (
-                        <span className="w-4 h-4 rounded-full bg-brand-500 flex items-center justify-center text-white text-[10px]">✓</span>
-                      )}
+                      <span className="text-xs font-bold text-white">Hourly Scheduled</span>
+                      {employmentType === 'hourly' && <Check className="w-4 h-4 text-brand-400" />}
                     </div>
-                    <span className="text-[10px] font-bold text-brand-300 bg-brand-500/10 px-2 py-0.5 rounded-md border border-brand-500/20 block w-fit mb-1.5">
-                      Scheduled Shifts
-                    </span>
                     <p className="text-[10px] text-slate-400 leading-relaxed">
-                      For Interpreters with dedicated shifts, confirmed assignment queues, QA specialists, and consultants.
+                      Fixed rate per scheduled shift hour (e.g. 9h, 6h, or 3h shift blocks).
                     </p>
                   </div>
-                </div>
+                  <div className="mt-3 pt-2 border-t border-slate-800/80 font-mono font-extrabold text-sm text-brand-400">
+                    ${hourlyRate}/hr
+                  </div>
+                </button>
 
-                {/* Model 3: Per-Minute Talk Rate */}
-                <div 
+                <button
+                  type="button"
                   onClick={() => setEmploymentType('per_minute')}
-                  className={`p-3.5 rounded-2xl border cursor-pointer transition relative flex flex-col justify-between ${
+                  className={`p-3.5 rounded-2xl border text-left transition relative flex flex-col justify-between ${
                     employmentType === 'per_minute'
-                      ? 'bg-emerald-950/40 border-emerald-500 ring-2 ring-emerald-500/50'
-                      : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                      ? 'bg-brand-950/80 border-brand-500 ring-2 ring-brand-400/50 shadow-lg shadow-brand-500/10'
+                      : 'bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-300'
                   }`}
                 >
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs font-bold text-white flex items-center gap-1">
-                        <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>Per-Minute Talk</span>
-                      </span>
-                      {employmentType === 'per_minute' && (
-                        <span className="w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center text-white text-[10px]">✓</span>
-                      )}
+                      <span className="text-xs font-bold text-white">Per-Minute Live</span>
+                      {employmentType === 'per_minute' && <Check className="w-4 h-4 text-brand-400" />}
                     </div>
-                    <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 block w-fit mb-1.5">
-                      On-Demand Flex
-                    </span>
                     <p className="text-[10px] text-slate-400 leading-relaxed">
-                      For On-Demand Interpreters with flexible standby volume. Paid strictly per live call minute.
+                      Pay-per-minute for on-demand calls and instantaneous hospital bridging.
                     </p>
                   </div>
-                </div>
+                  <div className="mt-3 pt-2 border-t border-slate-800/80 font-mono font-extrabold text-sm text-emerald-400">
+                    ${minuteRate.toFixed(2)}/min
+                  </div>
+                </button>
 
-                {/* Model 1: Salary Base */}
-                <div 
+                <button
+                  type="button"
                   onClick={() => setEmploymentType('salary_base')}
-                  className={`p-3.5 rounded-2xl border cursor-pointer transition relative flex flex-col justify-between ${
+                  className={`p-3.5 rounded-2xl border text-left transition relative flex flex-col justify-between ${
                     employmentType === 'salary_base'
-                      ? 'bg-purple-950/40 border-purple-500 ring-2 ring-purple-500/50'
-                      : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                      ? 'bg-brand-950/80 border-brand-500 ring-2 ring-brand-400/50 shadow-lg shadow-brand-500/10'
+                      : 'bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-300'
                   }`}
                 >
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs font-bold text-white flex items-center gap-1">
-                        <Building2 className="w-3.5 h-3.5 text-purple-400" />
-                        <span>Salary Base</span>
-                      </span>
-                      {employmentType === 'salary_base' && (
-                        <span className="w-4 h-4 rounded-full bg-purple-500 flex items-center justify-center text-white text-[10px]">✓</span>
-                      )}
+                      <span className="text-xs font-bold text-white">Monthly Base Salary</span>
+                      {employmentType === 'salary_base' && <Check className="w-4 h-4 text-brand-400" />}
                     </div>
-                    <span className="text-[10px] font-bold text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded-md border border-purple-500/20 block w-fit mb-1.5">
-                      Fixed Full-Time / Dedicated
-                    </span>
                     <p className="text-[10px] text-slate-400 leading-relaxed">
-                      For Full-Time In-House Interpreters, Admin staff, Accounts, and dedicated shift operations with fixed monthly pay.
+                      Guaranteed monthly contract retainer for dedicated platform availability.
                     </p>
                   </div>
-                </div>
+                  <div className="mt-3 pt-2 border-t border-slate-800/80 font-mono font-extrabold text-sm text-purple-400">
+                    ${monthlySalary}/mo
+                  </div>
+                </button>
               </div>
 
-              {/* Dynamic Rate Input according to selected model */}
-              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="text-[11px] font-semibold text-slate-300 block mb-1">Years of Experience</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="40"
-                    value={experienceYears}
-                    onChange={(e) => setExperienceYears(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white focus:outline-none focus:border-brand-500"
-                  />
-                </div>
-
+              {/* Dynamic Rate Input & Shift Selection */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-2xl bg-slate-950/70 border border-slate-800">
                 {employmentType === 'hourly' && (
                   <div>
                     <label className="text-[11px] font-semibold text-slate-300 block mb-1">
-                      Desired Hourly Rate ($/hr) *
+                      Requested Hourly Shift Rate ($/hour)
                     </label>
                     <div className="relative">
-                      <span className="absolute left-3 top-2.5 text-xs text-brand-400 font-bold">$</span>
+                      <span className="absolute left-3 top-2.5 text-slate-400 font-mono text-xs">$</span>
                       <input
                         type="number"
-                        min="5"
-                        max="200"
+                        min="0"
+                        max="500"
                         value={hourlyRate}
-                        onChange={(e) => setHourlyRate(e.target.value)}
-                        className="w-full pl-7 pr-12 py-2.5 rounded-xl bg-slate-900 border border-brand-500/50 text-xs text-white font-bold focus:outline-none focus:border-brand-500"
+                        onChange={(e) => setHourlyRate(e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
+                        className="w-full pl-7 pr-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white font-mono focus:outline-none focus:border-brand-500"
                       />
-                      <span className="absolute right-3 top-2.5 text-xs text-slate-400">/ hr</span>
                     </div>
                   </div>
                 )}
@@ -914,20 +914,19 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
                 {employmentType === 'per_minute' && (
                   <div>
                     <label className="text-[11px] font-semibold text-slate-300 block mb-1">
-                      Desired Live Talk Rate ($/min) *
+                      Requested Live Call Rate ($/minute)
                     </label>
                     <div className="relative">
-                      <span className="absolute left-3 top-2.5 text-xs text-emerald-400 font-bold">$</span>
+                      <span className="absolute left-3 top-2.5 text-slate-400 font-mono text-xs">$</span>
                       <input
                         type="number"
-                        step="0.05"
-                        min="0.10"
-                        max="5.00"
+                        step="0.01"
+                        min="0"
+                        max="50.00"
                         value={minuteRate}
-                        onChange={(e) => setMinuteRate(parseFloat(e.target.value) || 0)}
-                        className="w-full pl-7 pr-12 py-2.5 rounded-xl bg-slate-900 border border-emerald-500/50 text-xs text-white font-bold focus:outline-none focus:border-emerald-500"
+                        onChange={(e) => setMinuteRate(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
+                        className="w-full pl-7 pr-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white font-mono focus:outline-none focus:border-brand-500"
                       />
-                      <span className="absolute right-3 top-2.5 text-xs text-slate-400">/ min</span>
                     </div>
                   </div>
                 )}
@@ -935,110 +934,126 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
                 {employmentType === 'salary_base' && (
                   <div>
                     <label className="text-[11px] font-semibold text-slate-300 block mb-1">
-                      Desired Monthly Salary ($/mo) *
+                      Requested Monthly Salary Retainer ($/month)
                     </label>
                     <div className="relative">
-                      <span className="absolute left-3 top-2.5 text-xs text-purple-400 font-bold">$</span>
+                      <span className="absolute left-3 top-2.5 text-slate-400 font-mono text-xs">$</span>
                       <input
                         type="number"
-                        min="300"
-                        max="15000"
-                        step="50"
+                        min="0"
+                        max="50000"
                         value={monthlySalary}
-                        onChange={(e) => setMonthlySalary(e.target.value)}
-                        className="w-full pl-7 pr-12 py-2.5 rounded-xl bg-slate-900 border border-purple-500/50 text-xs text-white font-bold focus:outline-none focus:border-purple-500"
+                        onChange={(e) => setMonthlySalary(e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
+                        className="w-full pl-7 pr-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white font-mono focus:outline-none focus:border-brand-500"
                       />
-                      <span className="absolute right-3 top-2.5 text-xs text-slate-400">/ mo</span>
                     </div>
                   </div>
                 )}
 
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-300 block mb-1">Certifications (comma separated)</label>
+                  <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                    Years of Active Interpretation Experience
+                  </label>
                   <input
-                    type="text"
-                    placeholder="CCHI, NBCMI, Court Certified..."
-                    value={certificationsText}
-                    onChange={(e) => setCertificationsText(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500"
+                    type="number"
+                    min="0"
+                    max="50"
+                    value={experienceYears}
+                    onChange={(e) => setExperienceYears(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-brand-500"
                   />
                 </div>
               </div>
 
-              {/* Shift Duration & Time Zone Preference */}
-              <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+              {/* Preferred Daily Shift Timing & Working Hours (Interactive Tabs with 12 Hours First) */}
+              <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5 text-amber-400" />
+                  <label className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                    <Clock className="w-4 h-4 text-amber-400" />
                     <span>Preferred Daily Shift Timing & Working Hours</span>
                   </label>
-                  <span className="text-[10px] text-amber-300 font-bold bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
-                    {preferredShiftType === 'open_unlimited' ? '⚡ Open 24/7 Unlimited' : preferredShiftType === 'fixed_3h' ? '⏱️ 3 Hours/Day' : preferredShiftType === 'fixed_6h' ? '💼 6 Hours/Day' : '🏢 9 Hours/Day'}
+                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-300 font-mono flex items-center gap-1">
+                    <span>🏢</span>
+                    <span>{preferredShiftType === 'open_unlimited' ? 'Open 24/7' : preferredShiftType === 'fixed_12h' ? '12 Hours/Day' : preferredShiftType === 'fixed_6h' ? '6 Hours/Day' : preferredShiftType === 'fixed_3h' ? '3 Hours/Day' : '9 Hours/Day'}</span>
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPreferredShiftType('fixed_12h')}
+                    className={`p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center ${
+                      preferredShiftType === 'fixed_12h'
+                        ? 'bg-amber-600/30 border-amber-500 ring-2 ring-amber-400 text-white shadow-lg'
+                        : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700'
+                    }`}
+                  >
+                    <p className="text-xs font-extrabold flex items-center gap-1">🏢 12 Hours</p>
+                    <p className="text-[9px] text-slate-400 mt-0.5">Extended Shift Daily</p>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => setPreferredShiftType('fixed_9h')}
-                    className={`p-2 rounded-xl border text-center transition ${
+                    className={`p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center ${
                       preferredShiftType === 'fixed_9h'
-                        ? 'bg-amber-600/30 border-amber-500 text-white font-bold ring-1 ring-amber-500'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                        ? 'bg-amber-600/30 border-amber-500 ring-2 ring-amber-400 text-white shadow-lg'
+                        : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700'
                     }`}
                   >
-                    <p className="text-[11px] font-bold">🏢 9 Hours</p>
-                    <p className="text-[9px] text-slate-400">Full Shift Daily</p>
+                    <p className="text-xs font-extrabold flex items-center gap-1">🏢 9 Hours</p>
+                    <p className="text-[9px] text-slate-400 mt-0.5">Full Shift Daily</p>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setPreferredShiftType('fixed_6h')}
-                    className={`p-2 rounded-xl border text-center transition ${
+                    className={`p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center ${
                       preferredShiftType === 'fixed_6h'
-                        ? 'bg-amber-600/30 border-amber-500 text-white font-bold ring-1 ring-amber-500'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                        ? 'bg-amber-600/30 border-amber-500 ring-2 ring-amber-400 text-white shadow-lg'
+                        : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700'
                     }`}
                   >
-                    <p className="text-[11px] font-bold">💼 6 Hours</p>
-                    <p className="text-[9px] text-slate-400">Standard Shift</p>
+                    <p className="text-xs font-extrabold flex items-center gap-1">💼 6 Hours</p>
+                    <p className="text-[9px] text-slate-400 mt-0.5">Standard Shift</p>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setPreferredShiftType('fixed_3h')}
-                    className={`p-2 rounded-xl border text-center transition ${
+                    className={`p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center ${
                       preferredShiftType === 'fixed_3h'
-                        ? 'bg-amber-600/30 border-amber-500 text-white font-bold ring-1 ring-amber-500'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                        ? 'bg-amber-600/30 border-amber-500 ring-2 ring-amber-400 text-white shadow-lg'
+                        : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700'
                     }`}
                   >
-                    <p className="text-[11px] font-bold">⏱️ 3 Hours</p>
-                    <p className="text-[9px] text-slate-400">Part-Time Shift</p>
+                    <p className="text-xs font-extrabold flex items-center gap-1">⏱️ 3 Hours</p>
+                    <p className="text-[9px] text-slate-400 mt-0.5">Part-Time Shift</p>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setPreferredShiftType('open_unlimited')}
-                    className={`p-2 rounded-xl border text-center transition ${
+                    className={`p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center col-span-2 sm:col-span-1 ${
                       preferredShiftType === 'open_unlimited'
-                        ? 'bg-emerald-600/30 border-emerald-500 text-white font-bold ring-1 ring-emerald-500'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                        ? 'bg-emerald-600/30 border-emerald-500 ring-2 ring-emerald-400 text-white shadow-lg'
+                        : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700'
                     }`}
                   >
-                    <p className="text-[11px] font-bold">⚡ Open 24/7</p>
-                    <p className="text-[9px] text-slate-400">Unlimited / Flex</p>
+                    <p className="text-xs font-extrabold flex items-center gap-1 text-emerald-400">⚡ Open 24/7</p>
+                    <p className="text-[9px] text-slate-400 mt-0.5">Unlimited / Flex</p>
                   </button>
                 </div>
 
-                <div>
-                  <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                {/* Local Time Zone Selection */}
+                <div className="space-y-1 pt-1.5 border-t border-slate-800/80">
+                  <label className="text-[11px] font-semibold text-slate-300 block">
                     Your Local Time Zone (for Shift Scheduling)
                   </label>
                   <select
                     value={timeZone}
                     onChange={(e) => setTimeZone(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white focus:outline-none focus:border-brand-500"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-brand-500"
                   >
                     {TIMEZONES.map((tz, idx) => (
                       <option key={idx} value={tz.value}>{tz.label}</option>
@@ -1048,35 +1063,53 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">Professional Bio / Summary</label>
+                <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                  Certifications & Accreditations (Comma Separated)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. CCHI, NBCMI, ATA Certified, HIPAA Trained, Propio Training..."
+                  value={certificationsText}
+                  onChange={(e) => setCertificationsText(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                  Professional Bio & Statement
+                </label>
                 <textarea
-                  rows="2"
-                  placeholder="Briefly describe your translation background, medical/court setting experience, and shift availability..."
+                  rows={2}
+                  placeholder="Brief summary of your interpretation background, medical/legal experience, and customer handling..."
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500"
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 resize-none"
                 />
               </div>
             </div>
 
-
-            {/* SECTION 4: DOCUMENT & CV ATTACHMENTS */}
-            <div className="space-y-3 pt-2 border-t border-slate-800">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-brand-400 flex items-center gap-1.5">
-                <Upload className="w-3.5 h-3.5" />
-                <span>4. CV / Resume & Supporting Document Uploads</span>
-              </h3>
+            {/* SECTION 4: DOCUMENT SUBMISSION */}
+            <div className="space-y-4 pt-2 border-t border-slate-800">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-brand-400 flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>4. Supporting Credentials & Document Submission</span>
+                </h3>
+                <span className="text-[10px] text-purple-300 font-bold bg-purple-500/10 px-2 py-0.5 rounded-md border border-purple-500/20">
+                  {supportingDocs.length} / 15 Documents Attached
+                </span>
+              </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* CV Upload */}
                 <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 hover:border-brand-500/50 transition text-center space-y-2 relative">
                   <div className="w-10 h-10 rounded-xl bg-brand-500/10 text-brand-400 flex items-center justify-center mx-auto">
                     <FileText className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-white">Upload CV / Resume (PDF / DOCX)</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">
-                      {cvFile ? `${cvFile.name} (${cvFile.size})` : 'Click or browse file to attach'}
+                    <p className="text-xs font-bold text-white">1. Upload CV / Resume (PDF / DOCX)</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5 truncate max-w-[220px] mx-auto">
+                      {cvFile ? `${cvFile.name} (${cvFile.size})` : 'Attach main CV / Resume'}
                     </p>
                   </div>
                   <input
@@ -1092,33 +1125,69 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
                   )}
                 </div>
 
-                {/* Supporting Certification / ID Upload */}
-                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 hover:border-brand-500/50 transition text-center space-y-2 relative">
+                <div className="p-4 rounded-2xl bg-slate-950 border border-purple-500/30 hover:border-purple-500/60 transition text-center space-y-2 relative">
                   <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center mx-auto">
                     <Award className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-white">Upload Certification / ID Document</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">
-                      {docFile ? `${docFile.name} (${docFile.size})` : 'Attach credential certificate or diploma'}
+                    <p className="text-xs font-bold text-white">2. Add Certifications & ID Documents</p>
+                    <p className="text-[10px] text-purple-300 font-semibold mt-0.5">
+                      Upload up to 15 Files (Certificates, Diplomas, Licensure, Passports)
                     </p>
                   </div>
                   <input
                     type="file"
-                    accept=".pdf,.png,.jpg,.jpeg"
-                    onChange={handleDocChange}
+                    multiple
+                    accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                    onChange={handleSupportingDocsChange}
                     className="absolute inset-0 opacity-0 cursor-pointer"
                   />
-                  {docFile && (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
-                      <Check className="w-3 h-3" /> Certificate Attached
-                    </span>
-                  )}
+                  <span className="inline-flex items-center gap-1 text-[10px] text-purple-300 font-bold bg-purple-500/10 px-2.5 py-0.5 rounded-full border border-purple-500/30">
+                    + Click or Drop Files
+                  </span>
                 </div>
               </div>
+
+              {supportingDocs.length > 0 && (
+                <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
+                      <FileCheck className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Attached Supporting Credentials ({supportingDocs.length} Files):</span>
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                    {supportingDocs.map((doc, idx) => (
+                      <div 
+                        key={doc.id || idx}
+                        className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-2 text-xs"
+                      >
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className="w-5 h-5 rounded-md bg-purple-500/20 text-purple-300 font-mono text-[9px] font-black flex items-center justify-center shrink-0">
+                            #{idx + 1}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-white truncate text-[11px]">{doc.name}</p>
+                            <p className="text-[9px] text-slate-400">{doc.size}</p>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveSupportingDoc(doc.id || idx)}
+                          className="p-1 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition shrink-0"
+                          title="Remove this document"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Bottom Error Notice if any */}
             {errorMessage && (
               <div className="p-3.5 rounded-2xl bg-red-950/60 border border-red-500/50 text-red-300 text-xs flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
