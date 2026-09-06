@@ -1,15 +1,17 @@
 // Supported Languages with Native Names, Codes, and Flags
 export const LANGUAGES = [
+  { code: 'ps', name: 'Pashto', nativeName: 'پښتو', flag: '🇦🇫', popular: true },
   { code: 'ur', name: 'Urdu', nativeName: 'اردو', flag: '🇵🇰', popular: true },
   { code: 'pa', name: 'Punjabi', nativeName: 'ਪੰਜਾਬੀ / پنجابی', flag: '🇵🇰', popular: true },
   { code: 'es', name: 'Spanish', nativeName: 'Español', flag: '🇪🇸', popular: true },
   { code: 'zh', name: 'Mandarin Chinese', nativeName: '中文 (普通话)', flag: '🇨🇳', popular: true },
   { code: 'ar', name: 'Arabic', nativeName: 'العربية', flag: '🇸🇦', popular: true },
+  { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी', flag: '🇮🇳', popular: true },
+  { code: 'fa', name: 'Farsi / Dari', nativeName: 'فارسی / دری', flag: '🇦🇫', popular: true },
   { code: 'vi', name: 'Vietnamese', nativeName: 'Tiếng Việt', flag: '🇻🇳', popular: true },
   { code: 'fr', name: 'French', nativeName: 'Français', flag: '🇫🇷', popular: true },
   { code: 'ru', name: 'Russian', nativeName: 'Русский', flag: '🇷🇺', popular: true },
   { code: 'pt', name: 'Portuguese', nativeName: 'Português', flag: '🇧🇷', popular: false },
-  { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी', flag: '🇮🇳', popular: true },
   { code: 'uk', name: 'Ukrainian', nativeName: 'Українська', flag: '🇺🇦', popular: false },
   { code: 'tl', name: 'Tagalog / Filipino', nativeName: 'Tagalog', flag: '🇵🇭', popular: false },
   { code: 'ht', name: 'Haitian Creole', nativeName: 'Kreyòl Ayisyen', flag: '🇭🇹', popular: false },
@@ -208,9 +210,7 @@ export const EMPLOYMENT_MODELS = [
     badge: 'Fixed Salary',
     rateUnit: '/ month',
     roles: ['Admin Operations', 'Accounts & Finance', 'Full-Time In-House Interpreters', 'Shift Supervisors'],
-    description: 'Fixed monthly salary, confirmed shift timings, predictable roster and guaranteed monthly compensation.',
-    defaultAmount: 1200,
-    exampleRate: '$1,200 - $3,500 / month'
+    description: 'Fixed monthly salary, confirmed shift timings, predictable roster and guaranteed monthly compensation.'
   },
   {
     id: 'hourly',
@@ -218,9 +218,7 @@ export const EMPLOYMENT_MODELS = [
     badge: 'Hourly Shift',
     rateUnit: '/ hr',
     roles: ['Scheduled Interpreters (Long Shifts)', 'Consultants', 'QA Specialists', 'Shift Interpreters'],
-    description: 'Scheduled long shifts and confirmed assignment queues. Paid per confirmed shift hour worked.',
-    defaultAmount: 8,
-    exampleRate: '$6 - $25 / hr'
+    description: 'Scheduled long shifts and confirmed assignment queues. Paid per confirmed shift hour worked.'
   },
   {
     id: 'per_minute',
@@ -228,9 +226,7 @@ export const EMPLOYMENT_MODELS = [
     badge: 'Per-Minute Live Talk',
     rateUnit: '/ min',
     roles: ['On-Demand Flex Interpreters', 'Standby Medical/Legal Linguists'],
-    description: 'Flexible standby queue with variable call volumes. Paid strictly per live call talk-time minute at a higher/double effective rate.',
-    defaultAmount: 0.30,
-    exampleRate: '$0.20 - $0.75 / min (~$12 - $45/hr active talk)'
+    description: 'Flexible standby queue with variable call volumes. Paid strictly per live call talk-time minute.'
   }
 ];
 

@@ -37,9 +37,30 @@ import {
   Printer,
   Copy,
   MessageSquare,
-  HelpCircle
+  HelpCircle,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
-import { LANGUAGES, SPECIALTIES, EMPLOYMENT_MODELS } from '../data/mockData';
+const TIMEZONES = [
+  { value: 'PKT (UTC+5:00 - Pakistan / South Asia)', label: '🇵🇰 PKT (UTC+5:00 - Pakistan / South Asia)' },
+  { value: 'GST (UTC+4:00 - UAE / Dubai / Gulf)', label: '🇦🇪 GST (UTC+4:00 - UAE / Dubai / Gulf)' },
+  { value: 'EST (UTC-5:00 - US Eastern / New York)', label: '🇺🇸 EST (UTC-5:00 - US Eastern / New York)' },
+  { value: 'CST (UTC-6:00 - US Central / Chicago)', label: '🇺🇸 CST (UTC-6:00 - US Central / Chicago)' },
+  { value: 'MST (UTC-7:00 - US Mountain / Denver)', label: '🇺🇸 MST (UTC-7:00 - US Mountain / Denver)' },
+  { value: 'PST (UTC-8:00 - US Pacific / Los Angeles)', label: '🇺🇸 PST (UTC-8:00 - US Pacific / Los Angeles)' },
+  { value: 'GMT/UTC (UTC+0:00 - London / Western Europe)', label: '🇬🇧 GMT/UTC (UTC+0:00 - London / Western Europe)' },
+  { value: 'CET (UTC+1:00 - Paris / Berlin / Madrid)', label: '🇪🇺 CET (UTC+1:00 - Paris / Berlin / Madrid)' },
+  { value: 'EET (UTC+2:00 - Cairo / Athens / Istanbul)', label: '🇪🇬 EET (UTC+2:00 - Cairo / Athens / Istanbul)' },
+  { value: 'AST (UTC+3:00 - Saudi Arabia / Riyadh)', label: '🇸🇦 AST (UTC+3:00 - Saudi Arabia / Riyadh)' },
+  { value: 'IST (UTC+5:30 - India / New Delhi / Mumbai)', label: '🇮🇳 IST (UTC+5:30 - India / New Delhi / Mumbai)' },
+  { value: 'BST (UTC+6:00 - Bangladesh / Dhaka)', label: '🇧🇩 BST (UTC+6:00 - Bangladesh / Dhaka)' },
+  { value: 'ICT (UTC+7:00 - Thailand / Vietnam / Jakarta)', label: '🇹🇭 ICT (UTC+7:00 - Thailand / Vietnam / Jakarta)' },
+  { value: 'SGT (UTC+8:00 - Singapore / Philippines / China)', label: '🇸🇬 SGT (UTC+8:00 - Singapore / Philippines / China)' },
+  { value: 'JST (UTC+9:00 - Japan / Tokyo / Seoul)', label: '🇯🇵 JST (UTC+9:00 - Japan / Tokyo / Seoul)' },
+  { value: 'AEST (UTC+10:00 - Australia / Sydney / Melbourne)', label: '🇦🇺 AEST (UTC+10:00 - Australia / Sydney / Melbourne)' },
+  { value: 'NZST (UTC+12:00 - New Zealand / Auckland)', label: '🇳🇿 NZST (UTC+12:00 - New Zealand / Auckland)' }
+];
 
 export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'users', 'applications', 'roster', 'billing'
@@ -69,6 +90,56 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   // Interpreter Applications & Verification Queue state
   const [applications, setApplications] = useState(() => {
     const defaultApps = [
+      {
+        id: 'app-talha-khan',
+        name: 'Muhammad Talha Khan',
+        email: 'talhakhan.interpreter@gmail.com',
+        phone: '+923358544432',
+        country: 'Pakistan',
+        primaryLang: 'Pashto',
+        languages: ['Pashto', 'Urdu', 'Hindi', 'English'],
+        specialties: ['General / Customer Support', 'Medical / Healthcare'],
+        certifications: ['Certified Interpreter (OPI/VRI)', 'Bilingual Pashto-Urdu-Hindi Specialist'],
+        experienceYears: 4,
+        employmentType: 'hourly',
+        minuteRate: 0.30,
+        hourlyRate: 8,
+        monthlySalary: 1200,
+        rateLabel: '$8/hr (Scheduled Shift)',
+        bio: 'Professional certified OPI/VRI interpreter fluent in Pashto, Urdu, Hindi, and English. Available Mon-Fri for live hospital and customer support encounters.',
+        cvFileName: 'Muhammad_Talha_Khan_CV.pdf',
+        docFileName: 'OPI_VRI_Certification.pdf',
+        avatarPreset: 'male-1',
+        avatarEmoji: '👨‍💼',
+        status: 'pending',
+        adminNotes: 'Application received via LinkedIn dispatch (+92 3358544432) - ready for verification review.',
+        submittedAt: '2026-09-06T14:37:00.000Z'
+      },
+      {
+        id: 'app-ahmed-ali',
+        name: 'Dr. Ahmed Atef Ahmed Ali',
+        email: 'ahmed.atef.ali@gmail.com',
+        phone: '+201000000000',
+        country: 'Egypt / Global',
+        primaryLang: 'Arabic',
+        languages: ['Arabic', 'English'],
+        specialties: ['Medical / Healthcare', 'General / Customer Support'],
+        certifications: ['Certified Medical Doctor & Healthcare Interpreter', 'Propio Healthcare Training Certified'],
+        experienceYears: 5,
+        employmentType: 'hourly',
+        minuteRate: 0.35,
+        hourlyRate: 8,
+        monthlySalary: 1200,
+        rateLabel: '$8/hr (Scheduled Shift)',
+        bio: 'Certified Medical Doctor and bilingual Arabic/English medical interpreter with extensive clinical encounter and telehealth translation experience.',
+        cvFileName: 'Dr_Ahmed_Ali_Medical_CV.pdf',
+        docFileName: 'Medical_Degree_Propio_Certificate.pdf',
+        avatarPreset: 'male-2',
+        avatarEmoji: '👨‍⚕️',
+        status: 'pending',
+        adminNotes: 'Application received via email dispatch - ready for verification review.',
+        submittedAt: '2026-09-06T01:35:00.000Z'
+      },
       {
         id: 'app-elizaveta-khirevich',
         name: 'Elizaveta Khirevich',
@@ -115,6 +186,11 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   const [reviewApprovedRate, setReviewApprovedRate] = useState(8);
   const [reviewApprovedMinuteRate, setReviewApprovedMinuteRate] = useState(0.30);
   const [reviewApprovedMonthlySalary, setReviewApprovedMonthlySalary] = useState(1200);
+  const [reviewShiftType, setReviewShiftType] = useState('fixed_9h'); // 'fixed_9h', 'fixed_6h', 'fixed_3h', 'custom', 'open_unlimited'
+  const [reviewDailyHours, setReviewDailyHours] = useState(9);
+  const [reviewTimeZone, setReviewTimeZone] = useState('PKT (UTC+5:00 - Pakistan / South Asia)');
+  const [reviewStartTime, setReviewStartTime] = useState('09:00');
+  const [reviewEndTime, setReviewEndTime] = useState('18:00');
   const [reviewPassword, setReviewPassword] = useState('interp2026!');
   const [reviewNotes, setReviewNotes] = useState('');
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
@@ -181,6 +257,11 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   const [editMinutes, setEditMinutes] = useState(60);
   const [editTotalPaid, setEditTotalPaid] = useState(0);
   const [editBillingType, setEditBillingType] = useState('prepaid');
+  const [editShiftType, setEditShiftType] = useState('fixed_9h');
+  const [editDailyHours, setEditDailyHours] = useState(9);
+  const [editTimeZone, setEditTimeZone] = useState('PKT (UTC+5:00 - Pakistan / South Asia)');
+  const [editStartTime, setEditStartTime] = useState('09:00');
+  const [editEndTime, setEditEndTime] = useState('18:00');
 
   // Fetch users & applications & inquiries & analytics from backend
   const fetchUsers = () => {
@@ -314,13 +395,22 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
     setEditRole(u.role || 'host');
     setEditLang(u.primaryLang || 'Spanish');
     setEditSpecialty(u.specialty || 'General');
-    setEditEmploymentType(u.employmentType || (u.interpreterProfile?.employmentType || 'hourly'));
+    const empType = u.employmentType || (u.interpreterProfile?.employmentType || 'hourly');
+    setEditEmploymentType(empType);
     setEditHourlyRate(u.hourlyRate !== undefined ? u.hourlyRate : (u.interpreterProfile?.hourlyRate !== undefined ? u.interpreterProfile.hourlyRate : 8));
     setEditMinuteRate(u.minuteRate !== undefined ? u.minuteRate : (u.interpreterProfile?.minuteRate !== undefined ? u.interpreterProfile.minuteRate : 0.30));
     setEditMonthlySalary(u.monthlySalary !== undefined ? u.monthlySalary : (u.interpreterProfile?.monthlySalary !== undefined ? u.interpreterProfile.monthlySalary : 1200));
     setEditMinutes(u.wallet?.minutesRemaining !== undefined ? u.wallet.minutesRemaining : 60);
     setEditTotalPaid(u.wallet?.totalPaid !== undefined ? u.wallet.totalPaid : 0);
     setEditBillingType(u.wallet?.billingType || u.billingType || 'prepaid');
+
+    const sched = u.shiftSchedule || u.interpreterProfile?.shiftSchedule || {};
+    setEditShiftType(sched.shiftType || (empType === 'salary_base' ? 'fixed_9h' : empType === 'per_minute' ? 'open_unlimited' : 'fixed_6h'));
+    setEditDailyHours(sched.dailyHours === 'Unlimited' ? 9 : (sched.dailyHours || 9));
+    setEditTimeZone(sched.timeZone || 'PKT (UTC+5:00 - Pakistan / South Asia)');
+    setEditStartTime(sched.startTime || '09:00');
+    setEditEndTime(sched.endTime || '18:00');
+
     setIsEditModalOpen(true);
   };
 
@@ -331,6 +421,20 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       : editEmploymentType === 'per_minute'
         ? `$${(parseFloat(editMinuteRate) || 0.30).toFixed(2)}/min (Live Talk)`
         : `$${parseInt(editHourlyRate) || 8}/hr (Scheduled Shift)`;
+
+    const tzShort = editTimeZone.split(' ')[0] || 'PKT';
+    const scheduleLabel = editShiftType === 'open_unlimited'
+      ? 'Open & Flexible (Unlimited On-Demand 24/7)'
+      : `${editDailyHours} Hours Daily (${editStartTime} - ${editEndTime} ${tzShort})`;
+
+    const shiftSchedulePayload = {
+      shiftType: editShiftType,
+      dailyHours: editShiftType === 'open_unlimited' ? 'Unlimited' : (parseInt(editDailyHours) || 9),
+      timeZone: editTimeZone,
+      startTime: editShiftType === 'open_unlimited' ? null : editStartTime,
+      endTime: editShiftType === 'open_unlimited' ? null : editEndTime,
+      scheduleLabel
+    };
 
     const payload = {
       name: editName,
@@ -344,6 +448,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       minuteRate: parseFloat(editMinuteRate) || 0.30,
       monthlySalary: parseInt(editMonthlySalary) || 1200,
       rateLabel: resolvedRateLabel,
+      shiftSchedule: shiftSchedulePayload,
       minutesRemaining: parseInt(editMinutes) || 0,
       totalPaid: parseFloat(editTotalPaid) || 0,
       billingType: editBillingType
@@ -405,18 +510,46 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   // Application Handlers
   const handleOpenApproveModal = (app) => {
     setSelectedAppForReview(app);
-    setReviewApprovedType(app.employmentType || 'hourly');
+    const resolvedType = app.employmentType || 'hourly';
+    setReviewApprovedType(resolvedType);
     setReviewApprovedRate(app.hourlyRate || 8);
     setReviewApprovedMinuteRate(app.minuteRate !== undefined ? app.minuteRate : 0.30);
     setReviewApprovedMonthlySalary(app.monthlySalary || 1200);
     setReviewPassword(`interp${Math.floor(100 + Math.random() * 900)}!`);
     setReviewNotes('Approved by IK Enterprises Administration');
+
+    // Setup shift timing & timezone
+    const existingSched = app.shiftSchedule || {};
+    const defaultShift = resolvedType === 'salary_base' ? 'fixed_9h' 
+      : resolvedType === 'per_minute' ? 'open_unlimited' 
+      : (app.preferredShiftType || 'fixed_9h');
+
+    setReviewShiftType(existingSched.shiftType || defaultShift);
+    setReviewDailyHours(existingSched.dailyHours === 'Unlimited' ? 9 : (existingSched.dailyHours || (defaultShift === 'fixed_9h' ? 9 : defaultShift === 'fixed_6h' ? 6 : defaultShift === 'fixed_3h' ? 3 : 9)));
+    setReviewTimeZone(existingSched.timeZone || app.timeZone || 'PKT (UTC+5:00 - Pakistan / South Asia)');
+    setReviewStartTime(existingSched.startTime || '09:00');
+    setReviewEndTime(existingSched.endTime || (defaultShift === 'fixed_6h' ? '15:00' : defaultShift === 'fixed_3h' ? '12:00' : '18:00'));
+
     setIsApproveModalOpen(true);
   };
 
   const handleConfirmApproval = (e) => {
     e.preventDefault();
     if (!selectedAppForReview) return;
+
+    const tzShort = reviewTimeZone.split(' ')[0] || 'PKT';
+    const scheduleLabel = reviewShiftType === 'open_unlimited'
+      ? 'Open & Flexible (Unlimited On-Demand 24/7)'
+      : `${reviewDailyHours} Hours Daily (${reviewStartTime} - ${reviewEndTime} ${tzShort})`;
+
+    const shiftSchedulePayload = {
+      shiftType: reviewShiftType,
+      dailyHours: reviewShiftType === 'open_unlimited' ? 'Unlimited' : (parseInt(reviewDailyHours) || 9),
+      timeZone: reviewTimeZone,
+      startTime: reviewShiftType === 'open_unlimited' ? null : reviewStartTime,
+      endTime: reviewShiftType === 'open_unlimited' ? null : reviewEndTime,
+      scheduleLabel
+    };
 
     fetch(`/api/admin/interpreter-applications/${selectedAppForReview.id}/approve`, {
       method: 'POST',
@@ -427,7 +560,8 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
         approvedMinuteRate: parseFloat(reviewApprovedMinuteRate) || 0.30,
         approvedMonthlySalary: parseInt(reviewApprovedMonthlySalary) || 1200,
         initialPassword: reviewPassword,
-        adminNotes: reviewNotes
+        adminNotes: reviewNotes,
+        shiftSchedule: shiftSchedulePayload
       })
     })
       .then(res => res.json())
@@ -1107,18 +1241,29 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                         <p className="text-[10px] text-slate-400 truncate">
                           Certifications: {Array.isArray(app.certifications) ? app.certifications.join(', ') : app.certifications}
                         </p>
+                        {app.shiftSchedule && (
+                          <div className="pt-1.5 border-t border-slate-800/80 flex items-center justify-between gap-1 text-[10px]">
+                            <span className="text-slate-400 flex items-center gap-1 shrink-0">
+                              <Clock className="w-3 h-3 text-amber-400" />
+                              <span>Shift:</span>
+                            </span>
+                            <span className="font-bold text-amber-300 truncate font-mono">
+                              {app.shiftSchedule.scheduleLabel || (app.shiftSchedule.shiftType === 'open_unlimited' ? '⚡ Open 24/7 Unlimited' : `${app.shiftSchedule.dailyHours}h/day (${app.shiftSchedule.timeZone?.split(' ')?.[0]})`)}
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Column 3: Submitted CV & Documents */}
-                      <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-2">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1">
-                          <FileCheck className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>Submitted Files & Attachments</span>
+                      <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-2 min-w-0 overflow-hidden">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1 min-w-0">
+                          <FileCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <span className="truncate">Submitted Files & Attachments</span>
                         </span>
                         
-                        <div className="space-y-2">
+                        <div className="space-y-2 min-w-0">
                           {/* CV Action Row */}
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 min-w-0">
                             <button
                               type="button"
                               onClick={() => setDocPreviewModal({
@@ -1128,13 +1273,14 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                                 applicant: app,
                                 type: 'cv'
                               })}
-                              className="flex-1 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-brand-500/50 text-left flex items-center justify-between text-[11px] text-slate-200 transition shadow-sm"
+                              className="flex-1 min-w-0 px-2.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-brand-500/50 text-left flex items-center justify-between gap-2 text-[11px] text-slate-200 transition shadow-sm overflow-hidden"
+                              title={app.cvFileName || 'Applicant_Resume_CV.pdf'}
                             >
-                              <span className="flex items-center gap-1.5 truncate">
+                              <span className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
                                 <FileText className="w-4 h-4 text-brand-400 shrink-0" />
-                                <span className="truncate font-semibold">{app.cvFileName || 'CV_Resume.pdf'}</span>
+                                <span className="truncate font-semibold block min-w-0">{app.cvFileName || 'CV_Resume.pdf'}</span>
                               </span>
-                              <span className="flex items-center gap-1 text-[10px] text-brand-400 font-bold bg-brand-500/10 px-2 py-0.5 rounded-md border border-brand-500/20">
+                              <span className="flex items-center gap-1 text-[10px] text-brand-400 font-bold bg-brand-500/10 px-2 py-0.5 rounded-md border border-brand-500/20 shrink-0">
                                 <Eye className="w-3 h-3" />
                                 <span>Preview</span>
                               </span>
@@ -1156,7 +1302,7 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                           </div>
 
                           {/* Certification Action Row */}
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 min-w-0">
                             <button
                               type="button"
                               onClick={() => setDocPreviewModal({
@@ -1166,13 +1312,14 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                                 applicant: app,
                                 type: 'cert'
                               })}
-                              className="flex-1 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-purple-500/50 text-left flex items-center justify-between text-[11px] text-slate-200 transition shadow-sm"
+                              className="flex-1 min-w-0 px-2.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-purple-500/50 text-left flex items-center justify-between gap-2 text-[11px] text-slate-200 transition shadow-sm overflow-hidden"
+                              title={app.docFileName || 'Certification_Proof.pdf'}
                             >
-                              <span className="flex items-center gap-1.5 truncate">
+                              <span className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
                                 <Award className="w-4 h-4 text-purple-400 shrink-0" />
-                                <span className="truncate font-semibold">{app.docFileName || 'Propio_training.pdf'}</span>
+                                <span className="truncate font-semibold block min-w-0">{app.docFileName || 'Propio_training.pdf'}</span>
                               </span>
-                              <span className="flex items-center gap-1 text-[10px] text-purple-400 font-bold bg-purple-500/10 px-2 py-0.5 rounded-md border border-purple-500/20">
+                              <span className="flex items-center gap-1 text-[10px] text-purple-400 font-bold bg-purple-500/10 px-2 py-0.5 rounded-md border border-purple-500/20 shrink-0">
                                 <Eye className="w-3 h-3" />
                                 <span>Preview</span>
                               </span>
@@ -1793,6 +1940,57 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                           />
                         </div>
                       )}
+
+                      {/* Shift Timing & Time Zone Edit Controls */}
+                      <div className="space-y-2.5 pt-2 border-t border-slate-800">
+                        <label className="font-semibold text-amber-300 flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Assigned Shift Hours & Time Zone:</span>
+                        </label>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => { setEditShiftType('fixed_9h'); setEditDailyHours(9); setEditStartTime('09:00'); setEditEndTime('18:00'); }}
+                            className={`p-1.5 rounded-lg border text-center font-bold text-[10px] transition ${editShiftType === 'fixed_9h' ? 'bg-amber-600/30 border-amber-500 text-white ring-1 ring-amber-500' : 'bg-slate-900 border-slate-800 text-slate-400'}`}
+                          >
+                            9h Daily
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setEditShiftType('fixed_6h'); setEditDailyHours(6); setEditStartTime('09:00'); setEditEndTime('15:00'); }}
+                            className={`p-1.5 rounded-lg border text-center font-bold text-[10px] transition ${editShiftType === 'fixed_6h' ? 'bg-amber-600/30 border-amber-500 text-white ring-1 ring-amber-500' : 'bg-slate-900 border-slate-800 text-slate-400'}`}
+                          >
+                            6h Daily
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setEditShiftType('fixed_3h'); setEditDailyHours(3); setEditStartTime('09:00'); setEditEndTime('12:00'); }}
+                            className={`p-1.5 rounded-lg border text-center font-bold text-[10px] transition ${editShiftType === 'fixed_3h' ? 'bg-amber-600/30 border-amber-500 text-white ring-1 ring-amber-500' : 'bg-slate-900 border-slate-800 text-slate-400'}`}
+                          >
+                            3h Daily
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setEditShiftType('open_unlimited'); }}
+                            className={`p-1.5 rounded-lg border text-center font-bold text-[10px] transition ${editShiftType === 'open_unlimited' ? 'bg-emerald-600/30 border-emerald-500 text-white ring-1 ring-emerald-500' : 'bg-slate-900 border-slate-800 text-slate-400'}`}
+                          >
+                            ⚡ Open 24/7
+                          </button>
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] text-slate-400 block mb-1">Time Zone:</label>
+                          <select
+                            value={editTimeZone}
+                            onChange={(e) => setEditTimeZone(e.target.value)}
+                            className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none bg-slate-900"
+                          >
+                            {TIMEZONES.map((tz, idx) => (
+                              <option key={idx} value={tz.value}>{tz.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -2632,6 +2830,181 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                 </div>
               )}
 
+              {/* Approved Working Schedule & Daily Shift Timing */}
+              <div className="space-y-3 pt-2.5 border-t border-slate-800">
+                <div className="flex items-center justify-between">
+                  <label className="font-semibold text-slate-200 flex items-center gap-1.5 text-xs">
+                    <Clock className="w-4 h-4 text-amber-400" />
+                    <span>Interpreter Shift Timing & Working Hours:</span>
+                  </label>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    reviewShiftType === 'open_unlimited'
+                      ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                      : 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                  }`}>
+                    {reviewShiftType === 'open_unlimited' ? '⚡ Open 24/7 Unlimited' : `⏰ ${reviewDailyHours}h / Day`}
+                  </span>
+                </div>
+
+                {/* Shift Timing Mode Selector */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReviewShiftType('fixed_9h');
+                      setReviewDailyHours(9);
+                      setReviewStartTime('09:00');
+                      setReviewEndTime('18:00');
+                    }}
+                    className={`p-2 rounded-xl border text-center transition ${
+                      reviewShiftType === 'fixed_9h'
+                        ? 'bg-amber-600/30 border-amber-500 text-white font-bold ring-1 ring-amber-500'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-[11px] font-bold">🏢 9 Hours</p>
+                    <p className="text-[9px] text-slate-400">Full Shift</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReviewShiftType('fixed_6h');
+                      setReviewDailyHours(6);
+                      setReviewStartTime('09:00');
+                      setReviewEndTime('15:00');
+                    }}
+                    className={`p-2 rounded-xl border text-center transition ${
+                      reviewShiftType === 'fixed_6h'
+                        ? 'bg-amber-600/30 border-amber-500 text-white font-bold ring-1 ring-amber-500'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-[11px] font-bold">💼 6 Hours</p>
+                    <p className="text-[9px] text-slate-400">Standard</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReviewShiftType('fixed_3h');
+                      setReviewDailyHours(3);
+                      setReviewStartTime('09:00');
+                      setReviewEndTime('12:00');
+                    }}
+                    className={`p-2 rounded-xl border text-center transition ${
+                      reviewShiftType === 'fixed_3h'
+                        ? 'bg-amber-600/30 border-amber-500 text-white font-bold ring-1 ring-amber-500'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-[11px] font-bold">⏱️ 3 Hours</p>
+                    <p className="text-[9px] text-slate-400">Part-Time</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReviewShiftType('custom');
+                    }}
+                    className={`p-2 rounded-xl border text-center transition ${
+                      reviewShiftType === 'custom'
+                        ? 'bg-amber-600/30 border-amber-500 text-white font-bold ring-1 ring-amber-500'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-[11px] font-bold">⚙️ Custom</p>
+                    <p className="text-[9px] text-slate-400">Set Hours</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReviewShiftType('open_unlimited');
+                    }}
+                    className={`p-2 rounded-xl border text-center transition col-span-2 sm:col-span-1 ${
+                      reviewShiftType === 'open_unlimited'
+                        ? 'bg-emerald-600/30 border-emerald-500 text-white font-bold ring-1 ring-emerald-500'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-[11px] font-bold">⚡ Open 24/7</p>
+                    <p className="text-[9px] text-slate-400">Unlimited</p>
+                  </button>
+                </div>
+
+                {/* Time Zone Selection */}
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1">
+                    <Globe className="w-3.5 h-3.5 text-brand-400" />
+                    <span>Interpreter Time Zone:</span>
+                  </label>
+                  <select
+                    value={reviewTimeZone}
+                    onChange={(e) => setReviewTimeZone(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-amber-500 font-medium"
+                  >
+                    {TIMEZONES.map((tz, idx) => (
+                      <option key={idx} value={tz.value}>{tz.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Shift Hours / Window Details (When not unlimited) */}
+                {reviewShiftType !== 'open_unlimited' ? (
+                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80 space-y-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-center">
+                      {reviewShiftType === 'custom' && (
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Daily Hours:</label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="24"
+                            value={reviewDailyHours}
+                            onChange={(e) => setReviewDailyHours(parseInt(e.target.value) || 1)}
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white font-bold focus:outline-none focus:border-amber-500"
+                          />
+                        </div>
+                      )}
+
+                      <div className={reviewShiftType === 'custom' ? '' : 'sm:col-span-1.5'}>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Shift Start Time:</label>
+                        <input
+                          type="time"
+                          value={reviewStartTime}
+                          onChange={(e) => setReviewStartTime(e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white font-mono focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+
+                      <div className={reviewShiftType === 'custom' ? '' : 'sm:col-span-1.5'}>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Shift End Time:</label>
+                        <input
+                          type="time"
+                          value={reviewEndTime}
+                          onChange={(e) => setReviewEndTime(e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white font-mono focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                    </div>
+
+                    <p className="text-[10px] text-amber-300 flex items-center gap-1.5">
+                      <span>✓ Assigned Duty:</span>
+                      <strong>{reviewDailyHours} Hours Daily ({reviewStartTime} to {reviewEndTime} {reviewTimeZone.split(' ')[0]})</strong>
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30 text-[11px] text-emerald-300 flex items-start gap-2">
+                    <span className="text-base shrink-0">⚡</span>
+                    <div>
+                      <strong className="block font-bold">Open & Unlimited Availability:</strong>
+                      <span className="text-slate-300 text-[10px]">The interpreter is free to sit for work anytime and for as long as they wish. They can go online / standby 24/7 on demand in {reviewTimeZone.split(' ')[0]}.</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Set Initial Password */}
               <div className="space-y-1">
                 <label className="font-semibold text-slate-300">Initial Login Password:</label>
@@ -2779,6 +3152,10 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                   <p className="text-white">🔑 Temporary Password: <span className="font-bold text-amber-400">{emailDispatchModal.temporaryPassword}</span></p>
                   <p className="text-white">📋 Contract Model: <span className="font-bold text-purple-300">{emailDispatchModal.employmentType || 'Hourly Rate (Scheduled Shifts)'}</span></p>
                   <p className="text-white">💵 Approved Terms: <span className="font-bold text-emerald-400">{emailDispatchModal.compensationTerms || emailDispatchModal.hourlyRate}</span></p>
+                  <p className="text-white">⏰ Shift Timing: <span className="font-bold text-amber-300">{emailDispatchModal.shiftSchedule || 'Flexible On-Demand (24/7)'}</span></p>
+                  {emailDispatchModal.timeZone && (
+                    <p className="text-white">🌐 Time Zone: <span className="font-bold text-slate-300">{emailDispatchModal.timeZone}</span></p>
+                  )}
                   <p className="text-white">🌐 Portal Access: <a href={emailDispatchModal.portalUrl} target="_blank" rel="noreferrer" className="text-brand-400 underline">{emailDispatchModal.portalUrl}</a></p>
                 </div>
 
