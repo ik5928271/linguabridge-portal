@@ -158,6 +158,31 @@ const SEED_WALLETS = {
 // Permanent Seed Applications (Preserved across all deployments & container restarts)
 const SEED_APPLICATIONS = [
   {
+    id: 'app-talha-khan',
+    name: 'Muhammad Talha Khan',
+    email: 'talhakhan.interpreter@gmail.com',
+    phone: '+923358544432',
+    country: 'Pakistan',
+    primaryLang: 'Pashto',
+    languages: ['Pashto', 'Urdu', 'Hindi', 'English'],
+    specialties: ['General / Customer Support', 'Medical / Healthcare'],
+    certifications: ['Certified Interpreter (OPI/VRI)', 'Bilingual Pashto-Urdu-Hindi Specialist'],
+    experienceYears: 4,
+    employmentType: 'hourly',
+    minuteRate: 0.30,
+    hourlyRate: 8,
+    monthlySalary: 1200,
+    rateLabel: '$8/hr (Scheduled Shift)',
+    bio: 'Professional certified OPI/VRI interpreter fluent in Pashto, Urdu, Hindi, and English. Available Mon-Fri for live hospital and customer support encounters.',
+    cvFileName: 'Muhammad_Talha_Khan_CV.pdf',
+    docFileName: 'OPI_VRI_Certification.pdf',
+    avatarPreset: 'male-1',
+    avatarEmoji: '👨‍💼',
+    status: 'pending',
+    adminNotes: 'Application received via LinkedIn dispatch (+92 3358544432) - ready for verification review.',
+    submittedAt: '2026-09-06T14:37:00.000Z'
+  },
+  {
     id: 'app-ahmed-ali',
     name: 'Dr. Ahmed Atef Ahmed Ali',
     email: 'ahmed.atef.ali@gmail.com',
@@ -787,7 +812,8 @@ app.put('/api/admin/users/:id', (req, res) => {
     minutesRemaining, 
     totalPaid, 
     password, 
-    billingType 
+    billingType,
+    shiftSchedule
   } = req.body;
 
   const user = store.users.find(u => u.id === id);
@@ -806,6 +832,7 @@ app.put('/api/admin/users/:id', (req, res) => {
   if (hourlyRate !== undefined) user.hourlyRate = parseInt(hourlyRate);
   if (minuteRate !== undefined) user.minuteRate = parseFloat(minuteRate);
   if (monthlySalary !== undefined) user.monthlySalary = parseInt(monthlySalary);
+  if (shiftSchedule) user.shiftSchedule = shiftSchedule;
   
   const resolvedType = user.employmentType || 'hourly';
   user.rateLabel = resolvedType === 'salary_base'
@@ -829,6 +856,7 @@ app.put('/api/admin/users/:id', (req, res) => {
     if (hourlyRate !== undefined) interp.hourlyRate = parseInt(hourlyRate);
     if (minuteRate !== undefined) interp.minuteRate = parseFloat(minuteRate);
     if (monthlySalary !== undefined) interp.monthlySalary = parseInt(monthlySalary);
+    if (shiftSchedule) interp.shiftSchedule = shiftSchedule;
     interp.rateLabel = user.rateLabel;
   }
 
@@ -899,6 +927,9 @@ app.post('/api/interpreter-applications', (req, res) => {
     email,
     phone = '',
     country = 'United States',
+    timeZone = 'PKT (UTC+5:00 - Pakistan / South Asia)',
+    preferredShiftType = 'fixed_9h',
+    preferredDailyHours = 9,
     primaryLang = 'Spanish',
     languages = ['Spanish', 'English'],
     specialties = ['General / Customer Support'],
@@ -913,21 +944,17 @@ app.post('/api/interpreter-applications', (req, res) => {
     cvFileName = '',
     cvFileData = '',
     docFileName = '',
-    docFileData = ''
+    docFileData = '',
+    shiftSchedule = null
   } = req.body;
 
   if (!name || !email) {
     return res.status(400).json({ error: 'Full name and email are required.' });
   }
 
-  // Check if email already registered as an active user
-  const existingUser = store.users.find(u => u.email.toLowerCase() === email.toLowerCase().trim());
-  if (existingUser) {
-    return res.status(400).json({ error: 'An active account with this email already exists in our system.' });
-  }
-
   // Check if an application already exists for this email
-  const existingAppIndex = store.interpreterApplications.findIndex(a => a.email.toLowerCase() === email.toLowerCase().trim());
+  const cleanEmail = email.toLowerCase().trim();
+  const existingAppIndex = store.interpreterApplications.findIndex(a => a.email.toLowerCase() === cleanEmail);
 
   const resolvedRateLabel = rateLabel || (
     employmentType === 'salary_base' 
@@ -937,12 +964,27 @@ app.post('/api/interpreter-applications', (req, res) => {
         : `$${parseInt(hourlyRate) || 8}/hr (Scheduled Shift)`
   );
 
+  const resolvedSchedule = shiftSchedule || {
+    shiftType: preferredShiftType || (employmentType === 'per_minute' ? 'open_unlimited' : 'fixed_9h'),
+    dailyHours: preferredDailyHours || (preferredShiftType === 'open_unlimited' ? 'Unlimited' : 9),
+    timeZone: timeZone || 'PKT (UTC+5:00 - Pakistan / South Asia)',
+    startTime: '09:00',
+    endTime: '18:00',
+    scheduleLabel: (preferredShiftType === 'open_unlimited' || employmentType === 'per_minute')
+      ? 'Open & Flexible (Unlimited On-Demand 24/7)'
+      : `${preferredDailyHours || 9} Hours Daily (09:00 - 18:00 ${timeZone?.split(' ')?.[0] || 'PKT'})`
+  };
+
   const newApp = {
     id: `app-${Date.now().toString(36)}`,
     name: name.trim(),
     email: email.toLowerCase().trim(),
     phone: phone.trim(),
     country: country.trim(),
+    timeZone: timeZone,
+    preferredShiftType: preferredShiftType,
+    preferredDailyHours: preferredDailyHours,
+    shiftSchedule: resolvedSchedule,
     primaryLang,
     languages: Array.isArray(languages) && languages.length > 0 ? languages : [primaryLang, 'English'],
     specialties: Array.isArray(specialties) && specialties.length > 0 ? specialties : ['General / Customer Support'],
@@ -993,7 +1035,8 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
     approvedMinuteRate, 
     approvedMonthlySalary, 
     initialPassword, 
-    adminNotes 
+    adminNotes,
+    shiftSchedule
   } = req.body;
 
   const appItem = store.interpreterApplications.find(a => a.id === id);
@@ -1014,6 +1057,17 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
 
   const passwordToSet = initialPassword || 'interp2026!';
 
+  const resolvedShiftSchedule = shiftSchedule || appItem.shiftSchedule || {
+    shiftType: finalType === 'per_minute' ? 'open_unlimited' : 'fixed_9h',
+    dailyHours: finalType === 'per_minute' ? 'Unlimited' : 9,
+    timeZone: 'PKT (UTC+5:00 - Pakistan / South Asia)',
+    startTime: '09:00',
+    endTime: '18:00',
+    scheduleLabel: finalType === 'per_minute' 
+      ? 'Open & Flexible (Unlimited On-Demand 24/7)' 
+      : '9 Hours Daily (09:00 - 18:00 PKT / UTC+5)'
+  };
+
   // Mark application as approved
   appItem.status = 'approved';
   appItem.employmentType = finalType;
@@ -1021,6 +1075,7 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
   appItem.minuteRate = finalMinuteRate;
   appItem.monthlySalary = finalMonthlySalary;
   appItem.rateLabel = finalRateLabel;
+  appItem.shiftSchedule = resolvedShiftSchedule;
   appItem.adminNotes = adminNotes || 'Approved by IK Enterprises Administration';
   appItem.approvedAt = new Date().toISOString();
 
@@ -1043,6 +1098,7 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
     minuteRate: finalMinuteRate,
     monthlySalary: finalMonthlySalary,
     rateLabel: finalRateLabel,
+    shiftSchedule: resolvedShiftSchedule,
     certifications: appItem.certifications,
     bio: appItem.bio,
     phone: appItem.phone,
@@ -1076,6 +1132,7 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
     minuteRate: finalMinuteRate,
     monthlySalary: finalMonthlySalary,
     rateLabel: finalRateLabel,
+    shiftSchedule: resolvedShiftSchedule,
     certifications: appItem.certifications,
     bio: appItem.bio,
     isVerified: true
@@ -1098,9 +1155,10 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
     temporaryPassword: passwordToSet,
     employmentType: finalType === 'salary_base' ? 'Salary Base (Fixed Full-Time)' : finalType === 'per_minute' ? 'Per-Minute Talk Rate (On-Demand Flex)' : 'Hourly Rate (Scheduled Shifts)',
     compensationTerms: finalRateLabel,
+    shiftSchedule: resolvedShiftSchedule.scheduleLabel || (resolvedShiftSchedule.shiftType === 'open_unlimited' ? 'Open & Flexible (Unlimited On-Demand 24/7)' : `${resolvedShiftSchedule.dailyHours} Hours Daily (${resolvedShiftSchedule.startTime} - ${resolvedShiftSchedule.endTime} ${resolvedShiftSchedule.timeZone})`),
+    timeZone: resolvedShiftSchedule.timeZone || 'UTC',
     portalUrl: 'https://linguabridge-portal.onrender.com'
   };
-
 
   appItem.emailDispatch = emailDispatch;
 
