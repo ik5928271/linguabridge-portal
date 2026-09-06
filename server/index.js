@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
+import { MongoClient } from 'mongodb';
 
 const app = express();
 const server = http.createServer(app);
@@ -157,6 +158,31 @@ const SEED_WALLETS = {
 // Permanent Seed Applications (Preserved across all deployments & container restarts)
 const SEED_APPLICATIONS = [
   {
+    id: 'app-ahmed-ali',
+    name: 'Dr. Ahmed Atef Ahmed Ali',
+    email: 'ahmed.atef.ali@gmail.com',
+    phone: '+201000000000',
+    country: 'Egypt / Global',
+    primaryLang: 'Arabic',
+    languages: ['Arabic', 'English'],
+    specialties: ['Medical / Healthcare', 'General / Customer Support'],
+    certifications: ['Certified Medical Doctor & Healthcare Interpreter', 'Propio Healthcare Training Certified'],
+    experienceYears: 5,
+    employmentType: 'hourly',
+    minuteRate: 0.35,
+    hourlyRate: 8,
+    monthlySalary: 1200,
+    rateLabel: '$8/hr (Scheduled Shift)',
+    bio: 'Certified Medical Doctor and bilingual Arabic/English medical interpreter with extensive clinical encounter and telehealth translation experience.',
+    cvFileName: 'Dr_Ahmed_Ali_Medical_CV.pdf',
+    docFileName: 'Medical_Degree_Propio_Certificate.pdf',
+    avatarPreset: 'male-2',
+    avatarEmoji: '👨‍⚕️',
+    status: 'pending', // 'pending', 'approved', 'rejected'
+    adminNotes: 'Application received via email dispatch - ready for verification review.',
+    submittedAt: '2026-09-06T01:35:00.000Z'
+  },
+  {
     id: 'app-elizaveta-khirevich',
     name: 'Elizaveta Khirevich',
     email: 'lkhirevich@gmail.com',
@@ -230,8 +256,6 @@ let store = {
   inquiries: [...SEED_INQUIRIES]
 };
 
-import { MongoClient } from 'mongodb';
-
 let db = null;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://ik5928271_db_user:Tbe7ruMiqAmYmljz@cluster0.bumsmbw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
 
@@ -287,6 +311,8 @@ function loadStore() {
         } else {
           store.interpreterApplications.unshift(seedApp);
         }
+      });
+
       // Ensure Seed Inquiries exist and are never lost
       SEED_INQUIRIES.forEach(seedInq => {
         const existingInqIdx = store.inquiries.findIndex(i => i.id === seedInq.id || (i.subject && i.subject.toLowerCase() === seedInq.subject.toLowerCase()));
