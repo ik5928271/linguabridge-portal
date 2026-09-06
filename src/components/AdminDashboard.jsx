@@ -35,7 +35,9 @@ import {
   Briefcase,
   Building2,
   Printer,
-  Copy
+  Copy,
+  MessageSquare,
+  HelpCircle
 } from 'lucide-react';
 import { LANGUAGES, SPECIALTIES, EMPLOYMENT_MODELS } from '../data/mockData';
 
@@ -120,6 +122,14 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   const [emailDispatchModal, setEmailDispatchModal] = useState(null);
   const [docPreviewModal, setDocPreviewModal] = useState(null);
 
+  // Inquiries & Support Messages Box State
+  const [inquiriesList, setInquiriesList] = useState([]);
+  const [inquiryFilter, setInquiryFilter] = useState('all'); // 'all', 'new', 'client', 'interpreter', 'resolved'
+  const [inquirySearchTerm, setInquirySearchTerm] = useState('');
+  const [replyModalInquiry, setReplyModalInquiry] = useState(null);
+  const [adminReplyText, setAdminReplyText] = useState('');
+  const [expandedInquiryId, setExpandedInquiryId] = useState(null);
+
   // Live Visitor Traffic & Funnel Analytics State
   const [analyticsData, setAnalyticsData] = useState({
     today: {
@@ -172,7 +182,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   const [editTotalPaid, setEditTotalPaid] = useState(0);
   const [editBillingType, setEditBillingType] = useState('prepaid');
 
-  // Fetch users & applications & analytics from backend
+  // Fetch users & applications & inquiries & analytics from backend
   const fetchUsers = () => {
     fetch('/api/admin/users')
       .then(res => res.json())
@@ -207,6 +217,17 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       .catch(() => {});
   };
 
+  const fetchInquiries = () => {
+    fetch('/api/inquiries')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setInquiriesList(data);
+        }
+      })
+      .catch(() => {});
+  };
+
   const fetchAnalytics = () => {
     fetch('/api/admin/analytics')
       .then(res => res.json())
@@ -221,11 +242,13 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   useEffect(() => {
     fetchUsers();
     fetchApplications();
+    fetchInquiries();
     fetchAnalytics();
     const timer = setInterval(() => {
       fetchApplications();
+      fetchInquiries();
       fetchAnalytics();
-    }, 10000);
+    }, 8000);
     return () => clearInterval(timer);
   }, []);
 
@@ -484,6 +507,91 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
     return matchesSearch && app.status === appFilter;
   });
 
+  // Inquiries Actions
+  const handleToggleInquiryStatus = (id, currentStatus) => {
+    const nextStatus = currentStatus === 'resolved' ? 'new' : 'resolved';
+    fetch(`/api/inquiries/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: nextStatus })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setInquiriesList(prev => prev.map(i => i.id === id ? { ...i, status: nextStatus } : i));
+        }
+      })
+      .catch(() => {
+        setInquiriesList(prev => prev.map(i => i.id === id ? { ...i, status: nextStatus } : i));
+      });
+  };
+
+  const handleSendAdminReply = (e) => {
+    e.preventDefault();
+    if (!replyModalInquiry || !adminReplyText.trim()) return;
+
+    const updatedMessages = [
+      ...(replyModalInquiry.messages || []),
+      {
+        sender: 'bot',
+        text: `**IK Enterprises Dispatch Reply:**\n${adminReplyText.trim()}`,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+    ];
+
+    fetch(`/api/inquiries/${replyModalInquiry.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        adminReply: adminReplyText.trim(),
+        status: 'resolved',
+        messages: updatedMessages
+      })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setInquiriesList(prev => prev.map(i => i.id === replyModalInquiry.id ? { ...i, adminReply: adminReplyText.trim(), status: 'resolved', messages: updatedMessages } : i));
+          setReplyModalInquiry(null);
+          setAdminReplyText('');
+        }
+      })
+      .catch(() => {
+        setInquiriesList(prev => prev.map(i => i.id === replyModalInquiry.id ? { ...i, adminReply: adminReplyText.trim(), status: 'resolved', messages: updatedMessages } : i));
+        setReplyModalInquiry(null);
+        setAdminReplyText('');
+      });
+  };
+
+  const handleDeleteInquiry = (id) => {
+    if (!confirm('Are you sure you want to delete this inquiry record?')) return;
+    fetch(`/api/inquiries/${id}`, { method: 'DELETE' })
+      .then(res => res.json())
+      .then(() => {
+        setInquiriesList(prev => prev.filter(i => i.id !== id));
+      })
+      .catch(() => {
+        setInquiriesList(prev => prev.filter(i => i.id !== id));
+      });
+  };
+
+  const newInquiriesCount = inquiriesList.filter(i => i.status === 'new').length;
+
+  const filteredInquiries = inquiriesList.filter(inq => {
+    const matchesSearch = 
+      (inq.userName && inq.userName.toLowerCase().includes(inquirySearchTerm.toLowerCase())) ||
+      (inq.userEmail && inq.userEmail.toLowerCase().includes(inquirySearchTerm.toLowerCase())) ||
+      (inq.subject && inq.subject.toLowerCase().includes(inquirySearchTerm.toLowerCase())) ||
+      (inq.message && inq.message.toLowerCase().includes(inquirySearchTerm.toLowerCase()));
+
+    if (inquiryFilter === 'all') return matchesSearch;
+    if (inquiryFilter === 'new') return matchesSearch && inq.status === 'new';
+    if (inquiryFilter === 'resolved') return matchesSearch && inq.status === 'resolved';
+    if (inquiryFilter === 'client') return matchesSearch && (inq.userRole === 'client' || inq.userRole === 'host');
+    if (inquiryFilter === 'interpreter') return matchesSearch && inq.userRole === 'interpreter';
+    return matchesSearch;
+  });
+
   // Helper to download applicant document / CV
   const handleDownloadApplicantDocument = (docModal) => {
     if (!docModal) return;
@@ -679,6 +787,20 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
           >
             <Users className="w-3.5 h-3.5" />
             <span>User & Account Manager</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('inquiries')}
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+              activeTab === 'inquiries' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <MessageSquare className="w-3.5 h-3.5 text-brand-400" />
+            <span>Inquiries & Messages</span>
+            {newInquiriesCount > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-brand-400 text-slate-950 text-[10px] font-extrabold animate-pulse">
+                {newInquiriesCount}
+              </span>
+            )}
           </button>
           <button
             onClick={() => setActiveTab('roster')}
@@ -1735,6 +1857,263 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
       )}
 
       {/* ========================================================== */}
+      {/* TAB: 💬 CLIENT & INTERPRETER INQUIRIES & AI SUPPORT BOX */}
+      {/* ========================================================== */}
+      {activeTab === 'inquiries' && (
+        <div className="space-y-6">
+          
+          {/* Action Toolbar */}
+          <div className="glass-panel p-6 rounded-3xl border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-brand-400" />
+                <span>Client & Interpreter Inquiries & AI Support Messages</span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Centralized message box capturing client questions, interpreter ticket requests, and AI concierge conversations
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={fetchInquiries}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold border border-slate-700 transition"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Refresh Messages</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Filter Bar & Search */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center bg-slate-900/80 p-1 rounded-xl border border-slate-800 text-xs font-bold gap-1">
+              <button
+                onClick={() => setInquiryFilter('all')}
+                className={`px-3 py-1.5 rounded-lg transition ${inquiryFilter === 'all' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                All Messages ({inquiriesList.length})
+              </button>
+              <button
+                onClick={() => setInquiryFilter('new')}
+                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${inquiryFilter === 'new' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                <span>New / Unresolved</span>
+                {newInquiriesCount > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black animate-pulse">
+                    {newInquiriesCount}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setInquiryFilter('client')}
+                className={`px-3 py-1.5 rounded-lg transition ${inquiryFilter === 'client' ? 'bg-brand-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                Clients ({inquiriesList.filter(i => i.userRole === 'client' || i.userRole === 'host').length})
+              </button>
+              <button
+                onClick={() => setInquiryFilter('interpreter')}
+                className={`px-3 py-1.5 rounded-lg transition ${inquiryFilter === 'interpreter' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                Interpreters ({inquiriesList.filter(i => i.userRole === 'interpreter').length})
+              </button>
+              <button
+                onClick={() => setInquiryFilter('resolved')}
+                className={`px-3 py-1.5 rounded-lg transition ${inquiryFilter === 'resolved' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                Resolved ({inquiriesList.filter(i => i.status === 'resolved').length})
+              </button>
+            </div>
+
+            <div className="relative flex-1 max-w-xs">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={inquirySearchTerm}
+                onChange={(e) => setInquirySearchTerm(e.target.value)}
+                placeholder="Search by sender, email, subject..."
+                className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+              />
+            </div>
+          </div>
+
+          {/* Inquiries Feed List */}
+          {filteredInquiries.length === 0 ? (
+            <div className="p-12 rounded-3xl bg-slate-900/40 border border-slate-800 text-center space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-400 flex items-center justify-center mx-auto">
+                <MessageSquare className="w-6 h-6" />
+              </div>
+              <p className="text-base font-bold text-white">No Inquiries Found</p>
+              <p className="text-xs text-slate-400 max-w-md mx-auto">
+                When clients or interpreters submit questions through the AI Concierge or leave support messages, they will appear here in real-time.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredInquiries.map((inq) => {
+                const isNew = inq.status === 'new' || inq.status === 'in_progress';
+                const isClient = inq.userRole === 'client' || inq.userRole === 'host';
+                const isInterpreter = inq.userRole === 'interpreter';
+                const isExpanded = expandedInquiryId === inq.id;
+
+                return (
+                  <div
+                    key={inq.id}
+                    className={`p-6 rounded-3xl border transition space-y-4 relative ${
+                      isNew 
+                        ? 'bg-slate-900/90 border-brand-500/40 ring-1 ring-brand-500/20 shadow-xl' 
+                        : 'bg-slate-900/50 border-slate-800 opacity-90'
+                    }`}
+                  >
+                    {/* Top Row: User identity & Category & Status */}
+                    <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                      <div className="flex items-start gap-3.5">
+                        <div className={`w-11 h-11 rounded-2xl font-black flex items-center justify-center text-white text-base shadow-lg shrink-0 ${
+                          isClient ? 'bg-gradient-to-tr from-brand-600 to-indigo-600' :
+                          isInterpreter ? 'bg-gradient-to-tr from-emerald-600 to-teal-600' :
+                          'bg-gradient-to-tr from-purple-600 to-pink-600'
+                        }`}>
+                          {inq.userName?.charAt(0) || 'U'}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2.5 flex-wrap">
+                            <h4 className="text-base font-extrabold text-white">{inq.userName}</h4>
+                            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider border ${
+                              isClient ? 'bg-brand-500/20 text-brand-300 border-brand-500/30' :
+                              isInterpreter ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' :
+                              'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                            }`}>
+                              {isClient ? '👤 Client / Host' : isInterpreter ? '🎧 Linguist / Interpreter' : '🌐 Visitor'}
+                            </span>
+                            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+                              isNew 
+                                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse' 
+                                : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                            }`}>
+                              {isNew ? '● New / Pending Review' : '✓ Resolved'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-2">
+                            <span className="font-mono text-purple-300">{inq.userEmail}</span>
+                            <span>• Category: <strong className="text-slate-200">{inq.category || 'General Support'}</strong></span>
+                            <span>• Received {new Date(inq.createdAt || Date.now()).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Top Action Buttons */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          onClick={() => {
+                            setReplyModalInquiry(inq);
+                            setAdminReplyText(inq.adminReply || '');
+                          }}
+                          className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-purple-600/30 transition"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                          <span>{inq.adminReply ? 'Edit Reply' : 'Send Admin Reply'}</span>
+                        </button>
+
+                        <button
+                          onClick={() => handleToggleInquiryStatus(inq.id, inq.status)}
+                          className={`px-3 py-2 rounded-xl text-xs font-bold border transition ${
+                            isNew 
+                              ? 'bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white border-emerald-500/30' 
+                              : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                          }`}
+                        >
+                          {isNew ? '✓ Mark as Resolved' : '↩ Reopen Ticket'}
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(inq.userEmail);
+                            alert(`Copied ${inq.userEmail} to clipboard!`);
+                          }}
+                          className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                          title="Copy User Email"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
+                          onClick={() => handleDeleteInquiry(inq.id)}
+                          className="p-2 rounded-xl bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 border border-slate-700 transition"
+                          title="Delete Record"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Subject & User Message Box */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h5 className="font-extrabold text-white text-sm flex items-center gap-2">
+                          <MessageSquare className="w-4 h-4 text-purple-400" />
+                          <span>{inq.subject || 'Platform Inquiry'}</span>
+                        </h5>
+                      </div>
+                      <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs text-slate-200 leading-relaxed">
+                        {inq.message}
+                      </div>
+                    </div>
+
+                    {/* Admin Response Box (if resolved/replied) */}
+                    {inq.adminReply && (
+                      <div className="p-4 rounded-2xl bg-purple-950/40 border border-purple-500/40 space-y-1.5 text-xs">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
+                          <ShieldCheck className="w-4 h-4 text-purple-400" />
+                          <span>Official Dispatch Reply from IK Enterprises:</span>
+                        </span>
+                        <p className="text-white font-medium leading-relaxed">
+                          {inq.adminReply}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Expandable Chat Transcript History (if AI chat or multi-message) */}
+                    {Array.isArray(inq.messages) && inq.messages.length > 1 && (
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => setExpandedInquiryId(isExpanded ? null : inq.id)}
+                          className="text-[11px] font-bold text-brand-400 hover:text-brand-300 flex items-center gap-1.5 transition"
+                        >
+                          <span>{isExpanded ? 'Hide Chat Transcript' : `View Full Conversation Transcript (${inq.messages.length} messages)`}</span>
+                          <ChevronRight className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                        </button>
+
+                        {isExpanded && (
+                          <div className="mt-3 p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2.5 text-xs">
+                            {inq.messages.map((msg, mIdx) => (
+                              <div key={mIdx} className={`p-2.5 rounded-xl ${msg.sender === 'user' ? 'bg-slate-900 border border-slate-800' : 'bg-purple-950/40 border border-purple-800/40'}`}>
+                                <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 mb-1">
+                                  <span className={msg.sender === 'user' ? 'text-brand-300' : 'text-purple-300'}>
+                                    {msg.sender === 'user' ? `👤 ${inq.userName}` : '🤖 LinguaBot / Admin Dispatch'}
+                                  </span>
+                                  <span>{msg.time || ''}</span>
+                                </div>
+                                <p className="text-slate-200 leading-relaxed whitespace-pre-line text-xs">
+                                  {msg.text}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+        </div>
+      )}
+
+      {/* ========================================================== */}
       {/* TAB 2: LIVE OPERATIONS & VISITOR CONVERSION MONITOR */}
       {/* ========================================================== */}
       {activeTab === 'overview' && (
@@ -2648,6 +3027,77 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
               )}
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Admin Inquiry Reply Modal */}
+      {replyModalInquiry && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-slate-900 border border-indigo-500/40 rounded-2xl p-6 max-w-xl w-full shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400">
+                  <Send className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Reply to Inquiry</h3>
+                  <p className="text-xs text-slate-400">IK Enterprises Dispatch Official Response</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setReplyModalInquiry(null); setAdminReplyText(''); }}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700/60 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white">{replyModalInquiry.userName}</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 capitalize">{replyModalInquiry.userRole}</span>
+              </div>
+              <p className="text-xs text-slate-400">{replyModalInquiry.userEmail}</p>
+              <p className="text-xs font-semibold text-indigo-300 pt-1">Subject: {replyModalInquiry.subject}</p>
+              <p className="text-xs text-slate-300 italic bg-slate-900/60 p-2.5 rounded-lg mt-1 border border-slate-800">
+                "{replyModalInquiry.message}"
+              </p>
+            </div>
+
+            <form onSubmit={handleSendAdminReply} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Official Response from Ikram-ul-haq Mian (Admin Dispatch):
+                </label>
+                <textarea
+                  rows={4}
+                  value={adminReplyText}
+                  onChange={(e) => setAdminReplyText(e.target.value)}
+                  placeholder="Type your official answer or resolution here... (Will be recorded on this inquiry and marked as Resolved)"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-indigo-500 transition resize-none"
+                  required
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setReplyModalInquiry(null); setAdminReplyText(''); }}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>Send & Mark Resolved</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

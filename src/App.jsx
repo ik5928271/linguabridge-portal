@@ -13,6 +13,7 @@ import GlossaryModal from './components/GlossaryModal';
 import AuthModal from './components/AuthModal';
 import InterpreterApplicationModal from './components/InterpreterApplicationModal';
 import AppointmentNotificationManager from './components/AppointmentNotificationManager';
+import AIAssistantWidget from './components/AIAssistantWidget';
 
 export default function App() {
   // Theme state ('dark' or 'light')
@@ -387,6 +388,12 @@ export default function App() {
         currentUser={currentUser}
         appointments={appointments}
         onStartCall={handleStartCall}
+      />
+
+      {/* Global AI Concierge Bot & Client/Interpreter Message Box */}
+      <AIAssistantWidget
+        currentUser={currentUser}
+        currentRole={currentRole}
       />
 
     </div>
