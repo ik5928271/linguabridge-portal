@@ -24,11 +24,33 @@ import {
 } from 'lucide-react';
 import { LANGUAGES, SPECIALTIES, EMPLOYMENT_MODELS } from '../data/mockData';
 
+const TIMEZONES = [
+  { value: 'PKT (UTC+5:00 - Pakistan / South Asia)', label: '🇵🇰 PKT (UTC+5:00 - Pakistan / South Asia)' },
+  { value: 'GST (UTC+4:00 - UAE / Dubai / Gulf)', label: '🇦🇪 GST (UTC+4:00 - UAE / Dubai / Gulf)' },
+  { value: 'EST (UTC-5:00 - US Eastern / New York)', label: '🇺🇸 EST (UTC-5:00 - US Eastern / New York)' },
+  { value: 'CST (UTC-6:00 - US Central / Chicago)', label: '🇺🇸 CST (UTC-6:00 - US Central / Chicago)' },
+  { value: 'MST (UTC-7:00 - US Mountain / Denver)', label: '🇺🇸 MST (UTC-7:00 - US Mountain / Denver)' },
+  { value: 'PST (UTC-8:00 - US Pacific / Los Angeles)', label: '🇺🇸 PST (UTC-8:00 - US Pacific / Los Angeles)' },
+  { value: 'GMT/UTC (UTC+0:00 - London / Western Europe)', label: '🇬🇧 GMT/UTC (UTC+0:00 - London / Western Europe)' },
+  { value: 'CET (UTC+1:00 - Paris / Berlin / Madrid)', label: '🇪🇺 CET (UTC+1:00 - Paris / Berlin / Madrid)' },
+  { value: 'EET (UTC+2:00 - Cairo / Athens / Istanbul)', label: '🇪🇬 EET (UTC+2:00 - Cairo / Athens / Istanbul)' },
+  { value: 'AST (UTC+3:00 - Saudi Arabia / Riyadh)', label: '🇸🇦 AST (UTC+3:00 - Saudi Arabia / Riyadh)' },
+  { value: 'IST (UTC+5:30 - India / New Delhi / Mumbai)', label: '🇮🇳 IST (UTC+5:30 - India / New Delhi / Mumbai)' },
+  { value: 'BST (UTC+6:00 - Bangladesh / Dhaka)', label: '🇧🇩 BST (UTC+6:00 - Bangladesh / Dhaka)' },
+  { value: 'ICT (UTC+7:00 - Thailand / Vietnam / Jakarta)', label: '🇹🇭 ICT (UTC+7:00 - Thailand / Vietnam / Jakarta)' },
+  { value: 'SGT (UTC+8:00 - Singapore / Philippines / China)', label: '🇸🇬 SGT (UTC+8:00 - Singapore / Philippines / China)' },
+  { value: 'JST (UTC+9:00 - Japan / Tokyo / Seoul)', label: '🇯🇵 JST (UTC+9:00 - Japan / Tokyo / Seoul)' },
+  { value: 'AEST (UTC+10:00 - Australia / Sydney / Melbourne)', label: '🇦🇺 AEST (UTC+10:00 - Australia / Sydney / Melbourne)' },
+  { value: 'NZST (UTC+12:00 - New Zealand / Auckland)', label: '🇳🇿 NZST (UTC+12:00 - New Zealand / Auckland)' }
+];
+
 export default function InterpreterApplicationModal({ isOpen, onClose }) {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [country, setCountry] = useState('United States');
+  const [timeZone, setTimeZone] = useState('PKT (UTC+5:00 - Pakistan / South Asia)');
+  const [preferredShiftType, setPreferredShiftType] = useState('fixed_9h'); // 'fixed_9h', 'fixed_6h', 'fixed_3h', 'open_unlimited'
 
   // Avatar / Profile Picture state (Optional)
   const [avatarType, setAvatarType] = useState('preset'); // 'preset' or 'custom'
@@ -177,11 +199,27 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
         ? `$${minuteRate.toFixed(2)}/min (Live Talk)`
         : `$${hourlyRate}/hr (Scheduled Shift)`;
 
+    const dailyHrs = preferredShiftType === 'open_unlimited' ? 'Unlimited' : preferredShiftType === 'fixed_3h' ? 3 : preferredShiftType === 'fixed_6h' ? 6 : 9;
+    const scheduleLabel = preferredShiftType === 'open_unlimited'
+      ? 'Open & Flexible (Unlimited On-Demand 24/7)'
+      : `${dailyHrs} Hours Daily (${timeZone.split(' ')[0]})`;
+
     const payload = {
       name: fullName.trim(),
       email: email.trim().toLowerCase(),
       phone: phone.trim(),
       country: country.trim(),
+      timeZone: timeZone,
+      preferredShiftType: preferredShiftType,
+      preferredDailyHours: dailyHrs,
+      shiftSchedule: {
+        shiftType: preferredShiftType,
+        dailyHours: dailyHrs,
+        timeZone: timeZone,
+        startTime: preferredShiftType === 'open_unlimited' ? null : '09:00',
+        endTime: preferredShiftType === 'open_unlimited' ? null : (preferredShiftType === 'fixed_3h' ? '12:00' : preferredShiftType === 'fixed_6h' ? '15:00' : '18:00'),
+        scheduleLabel
+      },
       avatarType: avatarType,
       avatarPreset: selectedAvatarPreset,
       photoUrl: avatarType === 'custom' ? customPhotoData : null,
@@ -256,8 +294,8 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="relative w-full max-w-3xl my-8 bg-slate-900/95 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl text-white font-sans">
+    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md overflow-y-auto p-3 sm:p-6 flex justify-center items-start">
+      <div className="relative w-full max-w-3xl my-6 sm:my-8 bg-slate-900/95 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl text-white font-sans">
         
         {/* Close button */}
         <button 
@@ -725,13 +763,14 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
                         key={spec.id}
                         type="button"
                         onClick={() => handleToggleSpecialty(spec.name)}
-                        className={`p-2.5 rounded-xl border text-left text-xs transition ${
+                        className={`p-2.5 rounded-xl border text-left text-xs font-bold transition flex items-center justify-between gap-1.5 ${
                           isSel 
-                            ? 'bg-brand-600/20 border-brand-500 text-white ring-1 ring-brand-500' 
-                            : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-white'
+                            ? 'bg-brand-600 border-brand-500 !text-white shadow-md shadow-brand-600/30 ring-2 ring-brand-400' 
+                            : 'bg-slate-900/90 border-slate-700/80 text-slate-200 hover:text-white hover:bg-slate-800'
                         }`}
                       >
-                        <p className="font-bold truncate">{spec.name}</p>
+                        <span className="truncate">{spec.name}</span>
+                        {isSel && <span className="text-white text-xs font-black shrink-0">✓</span>}
                       </button>
                     );
                   })}
@@ -776,11 +815,8 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
                       Scheduled Shifts
                     </span>
                     <p className="text-[10px] text-slate-400 leading-relaxed">
-                      For Interpreters with dedicated long shifts & confirmed assignment worklists, QA specialists, and consultants.
+                      For Interpreters with dedicated shifts, confirmed assignment queues, QA specialists, and consultants.
                     </p>
-                  </div>
-                  <div className="mt-3 pt-2 border-t border-slate-800/80 text-[11px] font-semibold text-brand-300">
-                    Typically $6 - $25 / hr
                   </div>
                 </div>
 
@@ -804,14 +840,11 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
                       )}
                     </div>
                     <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 block w-fit mb-1.5">
-                      On-Demand Flex (2x Rate)
+                      On-Demand Flex
                     </span>
                     <p className="text-[10px] text-slate-400 leading-relaxed">
-                      For On-Demand Interpreters with variable standby volume. Paid strictly per live call minute at a higher rate.
+                      For On-Demand Interpreters with flexible standby volume. Paid strictly per live call minute.
                     </p>
-                  </div>
-                  <div className="mt-3 pt-2 border-t border-slate-800/80 text-[11px] font-semibold text-emerald-300">
-                    Typically $0.20 - $0.75 / min
                   </div>
                 </div>
 
@@ -840,9 +873,6 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
                     <p className="text-[10px] text-slate-400 leading-relaxed">
                       For Full-Time In-House Interpreters, Admin staff, Accounts, and dedicated shift operations with fixed monthly pay.
                     </p>
-                  </div>
-                  <div className="mt-3 pt-2 border-t border-slate-800/80 text-[11px] font-semibold text-purple-300">
-                    Typically $1,200 - $3,500 / mo
                   </div>
                 </div>
               </div>
@@ -935,6 +965,88 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
                 </div>
               </div>
 
+              {/* Shift Duration & Time Zone Preference */}
+              <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Preferred Daily Shift Timing & Working Hours</span>
+                  </label>
+                  <span className="text-[10px] text-amber-300 font-bold bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+                    {preferredShiftType === 'open_unlimited' ? '⚡ Open 24/7 Unlimited' : preferredShiftType === 'fixed_3h' ? '⏱️ 3 Hours/Day' : preferredShiftType === 'fixed_6h' ? '💼 6 Hours/Day' : '🏢 9 Hours/Day'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPreferredShiftType('fixed_9h')}
+                    className={`p-2 rounded-xl border text-center transition ${
+                      preferredShiftType === 'fixed_9h'
+                        ? 'bg-amber-600/30 border-amber-500 text-white font-bold ring-1 ring-amber-500'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-[11px] font-bold">🏢 9 Hours</p>
+                    <p className="text-[9px] text-slate-400">Full Shift Daily</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPreferredShiftType('fixed_6h')}
+                    className={`p-2 rounded-xl border text-center transition ${
+                      preferredShiftType === 'fixed_6h'
+                        ? 'bg-amber-600/30 border-amber-500 text-white font-bold ring-1 ring-amber-500'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-[11px] font-bold">💼 6 Hours</p>
+                    <p className="text-[9px] text-slate-400">Standard Shift</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPreferredShiftType('fixed_3h')}
+                    className={`p-2 rounded-xl border text-center transition ${
+                      preferredShiftType === 'fixed_3h'
+                        ? 'bg-amber-600/30 border-amber-500 text-white font-bold ring-1 ring-amber-500'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-[11px] font-bold">⏱️ 3 Hours</p>
+                    <p className="text-[9px] text-slate-400">Part-Time Shift</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPreferredShiftType('open_unlimited')}
+                    className={`p-2 rounded-xl border text-center transition ${
+                      preferredShiftType === 'open_unlimited'
+                        ? 'bg-emerald-600/30 border-emerald-500 text-white font-bold ring-1 ring-emerald-500'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-[11px] font-bold">⚡ Open 24/7</p>
+                    <p className="text-[9px] text-slate-400">Unlimited / Flex</p>
+                  </button>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                    Your Local Time Zone (for Shift Scheduling)
+                  </label>
+                  <select
+                    value={timeZone}
+                    onChange={(e) => setTimeZone(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white focus:outline-none focus:border-brand-500"
+                  >
+                    {TIMEZONES.map((tz, idx) => (
+                      <option key={idx} value={tz.value}>{tz.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               <div>
                 <label className="text-[11px] font-semibold text-slate-300 block mb-1">Professional Bio / Summary</label>
                 <textarea
@@ -1006,6 +1118,14 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
               </div>
             </div>
 
+            {/* Bottom Error Notice if any */}
+            {errorMessage && (
+              <div className="p-3.5 rounded-2xl bg-red-950/60 border border-red-500/50 text-red-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                <span className="font-semibold">{errorMessage}</span>
+              </div>
+            )}
+
             {/* Footer Buttons */}
             <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
               <p className="text-[11px] text-slate-400">
@@ -1027,7 +1147,10 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
                   className="w-full sm:w-auto px-7 py-3 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-extrabold text-xs flex items-center justify-center gap-2 transition shadow-lg shadow-brand-500/30 disabled:opacity-50"
                 >
                   {isSubmitting ? (
-                    <span>Submitting Application...</span>
+                    <div className="flex items-center gap-2">
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Uploading & Submitting...</span>
+                    </div>
                   ) : (
                     <>
                       <Send className="w-3.5 h-3.5" />
