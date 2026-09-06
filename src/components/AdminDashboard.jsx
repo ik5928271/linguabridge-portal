@@ -198,8 +198,88 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   const [emailDispatchModal, setEmailDispatchModal] = useState(null);
   const [docPreviewModal, setDocPreviewModal] = useState(null);
 
-  // Inquiries & Support Messages Box State
-  const [inquiriesList, setInquiriesList] = useState([]);
+  // Inquiries & Support Messages Box State (5 Initial Platform Inquiries)
+  const DEFAULT_SEED_INQUIRIES = [
+    {
+      id: 'inq-seed-1',
+      userName: 'Dr. Sarah Jenkins, MD',
+      userEmail: 's.jenkins@mercyhealth.org',
+      userRole: 'client',
+      subject: 'Question on Net-30 Invoicing for Clinic Encounters',
+      message: 'Hello, we are onboarding our outpatient clinic and want to confirm if our Net-30 hospital invoice covers Russian and Arabic emergency dispatches without pre-funding wallet minutes.',
+      category: 'Billing & Invoicing',
+      status: 'resolved',
+      adminReply: 'Yes, Dr. Jenkins! Your Mercy Hospital Net-30 corporate account allows unlimited emergency 3-way dispatches across all 150+ languages with monthly itemized invoicing.',
+      createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
+      messages: [
+        { sender: 'user', text: 'Hello, we are onboarding our outpatient clinic and want to confirm if our Net-30 hospital invoice covers Russian and Arabic emergency dispatches without pre-funding wallet minutes.', time: '10:15 AM' },
+        { sender: 'bot', text: 'Hello Dr. Jenkins! Yes, Net 30 Hospital billing supports direct post-paid dispatches. I have also alerted platform administration.', time: '10:16 AM' }
+      ]
+    },
+    {
+      id: 'inq-seed-2',
+      userName: 'Elizaveta Khirevich',
+      userEmail: 'lkhirevich@gmail.com',
+      userRole: 'interpreter',
+      subject: 'Propio Training Certificate & Live Talk Availability',
+      message: 'Hello IK Enterprises admin, I submitted my Propio training certificate. I am available for Russian/English VRI/OPI live talk shifts. Please let me know when my profile will be live for dispatch.',
+      category: 'Interpreter Onboarding',
+      status: 'new',
+      adminReply: '',
+      createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
+      messages: [
+        { sender: 'user', text: 'Hello IK Enterprises admin, I submitted my Propio training certificate. I am available for Russian/English VRI/OPI live talk shifts. Please let me know when my profile will be live for dispatch.', time: '02:30 PM' }
+      ]
+    },
+    {
+      id: 'inq-seed-3',
+      userName: 'Muhammad Talha Khan',
+      userEmail: 'talhakhan.interpreter@gmail.com',
+      userRole: 'interpreter',
+      subject: 'Pashto / Urdu / Hindi Shift Availability Confirmation',
+      message: 'Greetings Administration, I submitted my application for Pashto, Urdu, and Hindi OPI/VRI interpretation. I can commit to 9 hours daily fixed shift in PKT timezone. Looking forward to verification.',
+      category: 'Shift Scheduling',
+      status: 'new',
+      adminReply: '',
+      createdAt: new Date(Date.now() - 3600000 * 8).toISOString(),
+      messages: [
+        { sender: 'user', text: 'Greetings Administration, I submitted my application for Pashto, Urdu, and Hindi OPI/VRI interpretation. I can commit to 9 hours daily fixed shift in PKT timezone. Looking forward to verification.', time: '11:45 AM' }
+      ]
+    },
+    {
+      id: 'inq-seed-4',
+      userName: 'Carlos Mendez',
+      userEmail: 'carlos.mendez@houstoncardio.com',
+      userRole: 'client',
+      subject: 'On-Demand Spanish Medical OPI Interpreter Dispatch',
+      message: 'We require certified Spanish medical interpreters for consecutive patient encounters starting next Monday. Can we schedule a recurrent daily interpreter or use on-demand dispatch?',
+      category: 'Medical Dispatch',
+      status: 'resolved',
+      adminReply: 'Both options are supported, Carlos! You can dispatch on-demand 24/7 or reserve certified Spanish medical specialists in advance from your Client Dashboard.',
+      createdAt: new Date(Date.now() - 3600000 * 36).toISOString(),
+      messages: [
+        { sender: 'user', text: 'We require certified Spanish medical interpreters for consecutive patient encounters starting next Monday. Can we schedule a recurrent daily interpreter or use on-demand dispatch?', time: '09:00 AM' },
+        { sender: 'bot', text: 'IK Enterprises dispatch supports both instant 30-second live matches and scheduled encounters.', time: '09:02 AM' }
+      ]
+    },
+    {
+      id: 'inq-seed-5',
+      userName: 'Elena Rostova',
+      userEmail: 'e.rostova@global-immigrations.com',
+      userRole: 'client',
+      subject: 'Emergency Russian Legal VRI Session Support',
+      message: 'Urgent inquiry regarding live video interpretation for an immigration hearing. We need a sworn Russian linguist with screen sharing enabled.',
+      category: 'Legal / Judiciary',
+      status: 'new',
+      adminReply: '',
+      createdAt: new Date(Date.now() - 3600000 * 12).toISOString(),
+      messages: [
+        { sender: 'user', text: 'Urgent inquiry regarding live video interpretation for an immigration hearing. We need a sworn Russian linguist with screen sharing enabled.', time: '04:15 PM' }
+      ]
+    }
+  ];
+
+  const [inquiriesList, setInquiriesList] = useState(DEFAULT_SEED_INQUIRIES);
   const [inquiryFilter, setInquiryFilter] = useState('all'); // 'all', 'new', 'client', 'interpreter', 'resolved'
   const [inquirySearchTerm, setInquirySearchTerm] = useState('');
   const [replyModalInquiry, setReplyModalInquiry] = useState(null);
@@ -302,7 +382,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
     fetch('/api/inquiries')
       .then(res => res.json())
       .then(data => {
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && data.length > 0) {
           setInquiriesList(data);
         }
       })
