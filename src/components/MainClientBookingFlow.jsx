@@ -507,7 +507,7 @@ END:VCALENDAR`;
                         setSelectedInterpreter(matched[0]);
                       }
                     }}
-                    className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between gap-2 cursor-pointer ${
+                    className={`language-card ${isSelected ? 'is-selected' : ''} p-3 rounded-2xl border text-left transition flex flex-col justify-between gap-2 cursor-pointer ${
                       isSelected 
                         ? 'bg-brand-600/20 border-brand-500 ring-1 ring-brand-500 shadow-lg shadow-brand-500/20' 
                         : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
@@ -551,7 +551,7 @@ END:VCALENDAR`;
                   <button
                     type="button"
                     onClick={() => setIs100LangModalOpen(true)}
-                    className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between gap-2 relative cursor-pointer ${
+                    className={`language-card ${isCustomLangSelected ? 'is-selected' : ''} p-3 rounded-2xl border text-left transition flex flex-col justify-between gap-2 relative cursor-pointer ${
                       isCustomLangSelected
                         ? 'bg-purple-900/30 border-purple-500 ring-2 ring-purple-400 shadow-lg shadow-purple-500/20'
                         : 'bg-slate-900/90 border-purple-500/40 hover:border-purple-400 hover:bg-slate-800/90'
@@ -613,7 +613,7 @@ END:VCALENDAR`;
           </div>
 
           <div className="space-y-3 pt-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-300">Industry / Domain Specialty:</label>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Industry / Domain Specialty:</label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {SPECIALTIES.map((spec) => {
                 const isSelected = selectedSpecialty === spec.name;
@@ -622,7 +622,7 @@ END:VCALENDAR`;
                     key={spec.id}
                     type="button"
                     onClick={() => setSelectedSpecialty(spec.name)}
-                    className={`p-3.5 rounded-2xl border text-left transition cursor-pointer ${
+                    className={`specialty-card ${isSelected ? 'is-selected' : ''} p-3.5 rounded-2xl border text-left transition cursor-pointer ${
                       isSelected
                         ? 'bg-brand-600/20 border-brand-500 ring-1 ring-brand-500 shadow-lg shadow-brand-500/20'
                         : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
@@ -1498,10 +1498,10 @@ END:VCALENDAR`;
                         setIs100LangModalOpen(false);
                         setLang100Search('');
                       }}
-                      className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between gap-1.5 cursor-pointer ${
+                      className={`language-card ${isSel ? 'is-selected' : ''} p-3 rounded-2xl border text-left transition flex flex-col justify-between gap-1.5 cursor-pointer ${
                         isSel
-                          ? 'bg-purple-600/30 border-purple-500 text-white ring-1 ring-purple-400 shadow-md'
-                          : 'bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white hover:border-slate-700'
+                          ? 'bg-purple-600/30 border-purple-500 ring-1 ring-purple-400 shadow-md'
+                          : 'bg-slate-950/80 border-slate-800 hover:bg-slate-800 hover:border-slate-700'
                       }`}
                     >
                       <div className="flex items-center gap-2.5 w-full">

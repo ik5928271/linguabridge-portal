@@ -206,26 +206,20 @@ body.light-theme .text-white {
   color: #0f172a !important;
 }
 
-/* Explicitly preserve crisp white text for solid primary action buttons, dark pills & badges */
+/* Explicitly preserve crisp white text for solid primary action buttons, dark pills & badges (without opacity modifiers) */
 .light button.bg-brand-600,
 .light button.bg-brand-500,
 .light button.bg-emerald-600,
 .light button.bg-emerald-500,
 .light button.bg-purple-600,
 .light button.bg-red-600,
-.light button[class*="bg-brand-600"],
-.light button[class*="bg-brand-500"],
-.light button[class*="bg-emerald-600"],
-.light button[class*="bg-emerald-500"],
-.light button[class*="bg-purple-600"],
-.light button[class*="bg-red-600"],
-.light button[class*="bg-gradient-"],
-.light .bg-brand-600,
-.light .bg-brand-500,
-.light .bg-emerald-600,
-.light .bg-emerald-500,
-.light .bg-purple-600,
-.light .bg-red-600,
+.light .btn-primary,
+.light .bg-brand-600:not([class*="/"]),
+.light .bg-brand-500:not([class*="/"]),
+.light .bg-emerald-600:not([class*="/"]),
+.light .bg-emerald-500:not([class*="/"]),
+.light .bg-purple-600:not([class*="/"]),
+.light .bg-red-600:not([class*="/"]),
 .light [class*="bg-gradient-to-"],
 body.light-theme button.bg-brand-600,
 body.light-theme button.bg-brand-500,
@@ -233,19 +227,13 @@ body.light-theme button.bg-emerald-600,
 body.light-theme button.bg-emerald-500,
 body.light-theme button.bg-purple-600,
 body.light-theme button.bg-red-600,
-body.light-theme button[class*="bg-brand-600"],
-body.light-theme button[class*="bg-brand-500"],
-body.light-theme button[class*="bg-emerald-600"],
-body.light-theme button[class*="bg-emerald-500"],
-body.light-theme button[class*="bg-purple-600"],
-body.light-theme button[class*="bg-red-600"],
-body.light-theme button[class*="bg-gradient-"],
-body.light-theme .bg-brand-600,
-body.light-theme .bg-brand-500,
-body.light-theme .bg-emerald-600,
-body.light-theme .bg-emerald-500,
-body.light-theme .bg-purple-600,
-body.light-theme .bg-red-600,
+body.light-theme .btn-primary,
+body.light-theme .bg-brand-600:not([class*="/"]),
+body.light-theme .bg-brand-500:not([class*="/"]),
+body.light-theme .bg-emerald-600:not([class*="/"]),
+body.light-theme .bg-emerald-500:not([class*="/"]),
+body.light-theme .bg-purple-600:not([class*="/"]),
+body.light-theme .bg-red-600:not([class*="/"]),
 body.light-theme [class*="bg-gradient-to-"] {
   color: #ffffff !important;
 }
@@ -256,41 +244,49 @@ body.light-theme [class*="bg-gradient-to-"] {
 .light button.bg-emerald-500 *,
 .light button.bg-purple-600 *,
 .light button.bg-red-600 *,
-.light button[class*="bg-brand-600"] *,
-.light button[class*="bg-brand-500"] *,
-.light button[class*="bg-emerald-600"] *,
-.light button[class*="bg-emerald-500"] *,
-.light button[class*="bg-purple-600"] *,
-.light button[class*="bg-red-600"] *,
-.light button[class*="bg-gradient-"] *,
-.light .bg-brand-600 *,
-.light .bg-brand-500 *,
-.light .bg-emerald-600 *,
-.light .bg-emerald-500 *,
-.light .bg-purple-600 *,
-.light .bg-red-600 *,
-.light [class*="bg-gradient-to-"] *,
+.light .btn-primary *,
 body.light-theme button.bg-brand-600 *,
 body.light-theme button.bg-brand-500 *,
 body.light-theme button.bg-emerald-600 *,
 body.light-theme button.bg-emerald-500 *,
 body.light-theme button.bg-purple-600 *,
 body.light-theme button.bg-red-600 *,
-body.light-theme button[class*="bg-brand-600"] *,
-body.light-theme button[class*="bg-brand-500"] *,
-body.light-theme button[class*="bg-emerald-600"] *,
-body.light-theme button[class*="bg-emerald-500"] *,
-body.light-theme button[class*="bg-purple-600"] *,
-body.light-theme button[class*="bg-red-600"] *,
-body.light-theme button[class*="bg-gradient-"] *,
-body.light-theme .bg-brand-600 *,
-body.light-theme .bg-brand-500 *,
-body.light-theme .bg-emerald-600 *,
-body.light-theme .bg-emerald-500 *,
-body.light-theme .bg-purple-600 *,
-body.light-theme .bg-red-600 *,
-body.light-theme [class*="bg-gradient-to-"] * {
+body.light-theme .btn-primary * {
   color: #ffffff !important;
+}
+
+/* Explicit Language & Specialty Cards in Light Mode */
+.light .language-card,
+body.light-theme .language-card,
+.light .specialty-card,
+body.light-theme .specialty-card {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.light .language-card p,
+body.light-theme .language-card p,
+.light .specialty-card p,
+body.light-theme .specialty-card p {
+  color: #0f172a !important;
+}
+
+.light .language-card.is-selected,
+body.light-theme .language-card.is-selected,
+.light .specialty-card.is-selected,
+body.light-theme .specialty-card.is-selected {
+  background-color: #eff6ff !important;
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 1px #3b82f6, 0 4px 12px rgba(59, 130, 246, 0.15) !important;
+}
+
+.light .language-card.is-selected p,
+body.light-theme .language-card.is-selected p,
+.light .specialty-card.is-selected p,
+body.light-theme .specialty-card.is-selected p {
+  color: #1d4ed8 !important;
 }
 
 /* Active / Selected Card states in Light Mode */
