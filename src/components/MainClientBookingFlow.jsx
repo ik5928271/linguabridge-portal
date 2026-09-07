@@ -131,6 +131,11 @@ export default function MainClientBookingFlow({
       setSelectedInterpreter(null);
     }
   }, [selectedLanguage, realInterpreters]);
+
+  // Auto-scroll to top smoothly whenever the step changes so user view is never stuck or cut off
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentStep]);
   
   // Date & Modality
   const [bookingType, setBookingType] = useState('scheduled'); // 'instant' or 'scheduled'
