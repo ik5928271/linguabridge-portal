@@ -318,6 +318,23 @@ body.light-theme [class*="bg-brand-600\/20"] .text-slate-500 {
   color: #3b82f6 !important;
 }
 
+/* LinguaBot AI Assistant Quick Reply Pills in Light Mode */
+.light .linguabot-quick-pill,
+body.light-theme .linguabot-quick-pill {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+}
+
+.light .linguabot-quick-pill:hover,
+body.light-theme .linguabot-quick-pill:hover {
+  background-color: #f3e8ff !important;
+  color: #6b21a8 !important;
+  border-color: #c084fc !important;
+}
+
+
 .light .text-slate-100,
 body.light-theme .text-slate-100,
 .light .text-slate-200,

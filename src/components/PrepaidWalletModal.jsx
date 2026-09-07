@@ -19,7 +19,8 @@ import {
   FileText,
   AlertCircle,
   Copy,
-  Info
+  Info,
+  Send
 } from 'lucide-react';
 
 export default function PrepaidWalletModal({ 
