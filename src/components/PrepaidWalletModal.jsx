@@ -180,8 +180,25 @@ export default function PrepaidWalletModal({
     reader.readAsDataURL(file);
   };
 
+  const [formError, setFormError] = useState('');
+
   const handleSubmitReceipt = (e) => {
     e.preventDefault();
+    setFormError('');
+
+    if (!senderName?.trim()) {
+      setFormError('Please enter your Sender / Client Name.');
+      return;
+    }
+    if (!senderEmail?.trim()) {
+      setFormError('Please enter your Email for confirmation.');
+      return;
+    }
+    if (!transactionRef?.trim()) {
+      setFormError('Please enter your Transaction Reference / UTR / Track ID.');
+      return;
+    }
+
     setIsProcessing(true);
 
     const resolvedMethodLabel = paymentMethod === 'remitly' 
@@ -398,12 +415,12 @@ export default function PrepaidWalletModal({
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmitReceipt} className="space-y-4">
+          <form onSubmit={handleSubmitReceipt} noValidate className="space-y-4">
             
             {/* Packages Selector */}
             <div className="space-y-2.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-200">
                   1. Select Minute Package or Custom Volume:
                 </label>
                 {isDiscountActive && (
@@ -427,22 +444,28 @@ export default function PrepaidWalletModal({
                       onClick={() => handleSelectFixedPack(pack.minutes)}
                       className={`p-3.5 rounded-2xl border text-left transition relative cursor-pointer ${
                         isSelected
-                          ? 'bg-emerald-600/25 border-emerald-500 text-white ring-2 ring-emerald-500/50 shadow-lg'
-                          : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
+                          ? 'bg-emerald-600/25 border-emerald-400 text-white ring-2 ring-emerald-500/60 shadow-lg shadow-emerald-950/40'
+                          : 'bg-slate-950/90 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-900/60'
                       }`}
                     >
-                      {pack.popular && (
-                        <span className="absolute -top-2 right-3 px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-black text-[9px] uppercase tracking-wider shadow">
+                      {isSelected && (
+                        <span className="absolute -top-2 left-3 px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-black text-[9px] uppercase tracking-wider shadow">
+                          ✓ Selected
+                        </span>
+                      )}
+
+                      {pack.popular && !isSelected && (
+                        <span className="absolute -top-2 right-3 px-2 py-0.5 rounded-full bg-slate-700 text-slate-200 font-bold text-[9px] uppercase tracking-wider">
                           Popular
                         </span>
                       )}
                       
-                      <div className="flex items-baseline justify-between">
-                        <p className="text-base font-black text-white">{pack.minutes} Mins</p>
+                      <div className="flex items-baseline justify-between mt-0.5">
+                        <p className={`text-base font-black ${isSelected ? 'text-emerald-300' : 'text-white'}`}>{pack.minutes} Mins</p>
                         <div className="text-right">
                           {isDiscountActive ? (
                             <div className="flex items-baseline gap-1.5">
-                              <span className="text-[11px] line-through text-slate-400 font-semibold">${pack.price.toFixed(2)}</span>
+                              <span className="text-[11px] line-through text-slate-500 font-semibold">${pack.price.toFixed(2)}</span>
                               <span className="text-sm font-black text-emerald-400">${pack.discountPrice.toFixed(2)}</span>
                             </div>
                           ) : (
@@ -472,11 +495,17 @@ export default function PrepaidWalletModal({
                 onClick={handleSelectCustomMode}
                 className={`p-4 rounded-2xl border transition relative cursor-pointer ${
                   isCustomMode
-                    ? 'bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-950 border-emerald-500 text-white ring-2 ring-emerald-500/50 shadow-xl'
-                    : 'bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-300'
+                    ? 'bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-950 border-emerald-400 text-white ring-2 ring-emerald-500/60 shadow-xl'
+                    : 'bg-slate-950/70 border-slate-800 hover:border-slate-700 text-slate-300 opacity-90'
                 }`}
               >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-800/80">
+                {isCustomMode && (
+                  <span className="absolute -top-2 left-3 px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-black text-[9px] uppercase tracking-wider shadow">
+                    ✓ Custom Volume Selected
+                  </span>
+                )}
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-800/80 mt-0.5">
                   <div className="flex items-center gap-2">
                     <span className="p-1.5 rounded-lg bg-amber-500/20 text-amber-300">
                       <Sparkles className="w-4 h-4" />
@@ -497,7 +526,7 @@ export default function PrepaidWalletModal({
                   <div className="text-right">
                     {isDiscountActive ? (
                       <div className="flex items-baseline justify-end gap-1.5">
-                        <span className="text-xs line-through text-slate-400 font-semibold">${customBasePrice.toFixed(2)}</span>
+                        <span className="text-xs line-through text-slate-500 font-semibold">${customBasePrice.toFixed(2)}</span>
                         <span className="text-base font-black text-emerald-400">${customDiscountPrice.toFixed(2)}</span>
                       </div>
                     ) : (
@@ -513,9 +542,9 @@ export default function PrepaidWalletModal({
                     <div className="relative flex-1">
                       <input
                         type="number"
-                        min="60"
+                        min="10"
                         max="100000"
-                        step="50"
+                        step="any"
                         value={customMinutes}
                         onChange={(e) => handleCustomMinutesChange(e.target.value)}
                         onFocus={() => setIsCustomMode(true)}
@@ -555,7 +584,7 @@ export default function PrepaidWalletModal({
                         }}
                         className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition cursor-pointer ${
                           isCustomMode && customMinutes === quickVal
-                            ? 'bg-emerald-500 text-slate-950 shadow'
+                            ? 'bg-emerald-500 text-slate-950 font-black shadow'
                             : 'bg-slate-900 text-slate-300 border border-slate-800 hover:border-slate-600'
                         }`}
                       >
@@ -575,6 +604,27 @@ export default function PrepaidWalletModal({
                       </strong>
                     </div>
                   )}
+                </div>
+              </div>
+
+              {/* 🌟 ACTIVE ORDER SUMMARY CALLOUT */}
+              <div className="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/40 flex items-center justify-between shadow-md">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-black text-xs shrink-0">
+                    ✓
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-emerald-400 block tracking-wider">
+                      Selected Top-Up Order:
+                    </span>
+                    <p className="text-xs font-black text-white">
+                      {activeMinutes} Minutes ({isCustomMode ? 'Custom High-Volume' : `${activeMinutes} Mins Package`})
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] text-slate-400 block">Total Amount to Pay</span>
+                  <span className="text-base font-black text-emerald-400">${activePrice.toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -874,6 +924,14 @@ export default function PrepaidWalletModal({
                 </div>
               </div>
             </div>
+
+            {/* Error Banner */}
+            {formError && (
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                <span className="font-semibold">{formError}</span>
+              </div>
+            )}
 
             {/* Submit Button */}
             <button
