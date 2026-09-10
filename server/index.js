@@ -379,25 +379,15 @@ function loadStore() {
         }
       });
 
-      // Ensure Seed Applications exist and are never lost
-      SEED_APPLICATIONS.forEach(seedApp => {
-        const existingAppIdx = store.interpreterApplications.findIndex(a => a.id === seedApp.id || (a.email && a.email.toLowerCase() === seedApp.email.toLowerCase()));
-        if (existingAppIdx >= 0) {
-          store.interpreterApplications[existingAppIdx] = { ...seedApp, ...store.interpreterApplications[existingAppIdx] };
-        } else {
-          store.interpreterApplications.unshift(seedApp);
-        }
-      });
+      // Initialize Seed Applications only if empty on first setup
+      if (store.interpreterApplications.length === 0) {
+        store.interpreterApplications = [...SEED_APPLICATIONS];
+      }
 
-      // Ensure Seed Inquiries exist and are never lost
-      SEED_INQUIRIES.forEach(seedInq => {
-        const existingInqIdx = store.inquiries.findIndex(i => i.id === seedInq.id || (i.subject && i.subject.toLowerCase() === seedInq.subject.toLowerCase()));
-        if (existingInqIdx >= 0) {
-          store.inquiries[existingInqIdx] = { ...seedInq, ...store.inquiries[existingInqIdx] };
-        } else {
-          store.inquiries.unshift(seedInq);
-        }
-      });
+      // Initialize Seed Inquiries only if empty on first setup
+      if (store.inquiries.length === 0) {
+        store.inquiries = [...SEED_INQUIRIES];
+      }
 
       // Ensure Interpreters collection is synchronized
       store.interpreters = store.users.filter(u => u.role === 'interpreter');
@@ -958,7 +948,7 @@ app.post('/api/admin/users/:id/wallet', (req, res) => {
 });
 
 // Delete user account
-app.delete('/api/admin/users/:id', (req, res) => {
+app.delete('/api/admin/users/:id', async (req, res) => {
   const { id } = req.params;
   const user = store.users.find(u => u.id === id);
   if (user && user.isOwner) {
@@ -968,6 +958,15 @@ app.delete('/api/admin/users/:id', (req, res) => {
   store.users = store.users.filter(u => u.id !== id);
   store.interpreters = store.interpreters.filter(i => i.userId !== id && i.id !== id);
   delete store.wallets[id];
+
+  if (db) {
+    try {
+      await db.collection('users').deleteOne({ id });
+      await db.collection('wallets').deleteOne({ userId: id });
+    } catch (e) {
+      console.error('Error deleting user from MongoDB:', e.message);
+    }
+  }
 
   saveStore();
   res.json({ success: true, message: 'Account removed successfully.' });
@@ -1257,9 +1256,16 @@ app.post('/api/admin/interpreter-applications/:id/reject', (req, res) => {
 });
 
 // 5. Admin: Delete Application
-app.delete('/api/admin/interpreter-applications/:id', (req, res) => {
+app.delete('/api/admin/interpreter-applications/:id', async (req, res) => {
   const { id } = req.params;
   store.interpreterApplications = store.interpreterApplications.filter(a => a.id !== id);
+  if (db) {
+    try {
+      await db.collection('interpreter_applications').deleteOne({ id });
+    } catch (e) {
+      console.error('Error deleting application from MongoDB:', e.message);
+    }
+  }
   saveStore();
   res.json({ success: true, message: 'Application deleted.' });
 });
@@ -1346,12 +1352,59 @@ app.put('/api/inquiries/:id', (req, res) => {
   res.json({ success: true, inquiry: inq });
 });
 
-// 4. Delete inquiry
-app.delete('/api/inquiries/:id', (req, res) => {
+// 4. Delete inquiry permanently
+app.delete('/api/inquiries/:id', async (req, res) => {
   const { id } = req.params;
   store.inquiries = (store.inquiries || []).filter(i => i.id !== id);
+  if (db) {
+    try {
+      await db.collection('inquiries').deleteOne({ id });
+    } catch (e) {
+      console.error('Error deleting inquiry from MongoDB:', e.message);
+    }
+  }
   saveStore();
-  res.json({ success: true, message: 'Inquiry record deleted.' });
+  io.emit('inquiry-deleted', { id });
+  res.json({ success: true, message: 'Inquiry record deleted permanently.' });
+});
+
+// 5. Bulk Clear / Purge Inquiries
+app.post('/api/inquiries/clear', async (req, res) => {
+  const { type = 'all', ids = [] } = req.body;
+  if (Array.isArray(ids) && ids.length > 0) {
+    store.inquiries = (store.inquiries || []).filter(i => !ids.includes(i.id));
+    if (db) {
+      try {
+        await db.collection('inquiries').deleteMany({ id: { $in: ids } });
+      } catch (e) {}
+    }
+  } else if (type === 'ai_chats') {
+    const idsToDelete = (store.inquiries || []).filter(i => i.category === 'AI Chat Assistant' || (i.subject && i.subject.startsWith('AI Chat:'))).map(i => i.id);
+    store.inquiries = (store.inquiries || []).filter(i => !idsToDelete.includes(i.id));
+    if (db) {
+      try {
+        await db.collection('inquiries').deleteMany({ id: { $in: idsToDelete } });
+      } catch (e) {}
+    }
+  } else if (type === 'resolved') {
+    const idsToDelete = (store.inquiries || []).filter(i => i.status === 'resolved').map(i => i.id);
+    store.inquiries = (store.inquiries || []).filter(i => !idsToDelete.includes(i.id));
+    if (db) {
+      try {
+        await db.collection('inquiries').deleteMany({ id: { $in: idsToDelete } });
+      } catch (e) {}
+    }
+  } else if (type === 'all') {
+    store.inquiries = [];
+    if (db) {
+      try {
+        await db.collection('inquiries').deleteMany({});
+      } catch (e) {}
+    }
+  }
+  saveStore();
+  io.emit('inquiries-cleared', { type });
+  res.json({ success: true, message: 'Inquiries cleared successfully.' });
 });
 
 // ==========================================

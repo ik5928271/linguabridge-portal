@@ -410,7 +410,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
     fetch('/api/inquiries')
       .then(res => res.json())
       .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           setInquiriesList(data);
         }
       })
@@ -888,14 +888,41 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   };
 
   const handleDeleteInquiry = (id) => {
-    if (!confirm('Are you sure you want to delete this inquiry record?')) return;
+    if (!confirm('Are you sure you want to delete this message permanently?')) return;
+    setInquiriesList(prev => prev.filter(i => i.id !== id));
     fetch(`/api/inquiries/${id}`, { method: 'DELETE' })
       .then(res => res.json())
       .then(() => {
-        setInquiriesList(prev => prev.filter(i => i.id !== id));
+        fetchInquiries();
       })
       .catch(() => {
-        setInquiriesList(prev => prev.filter(i => i.id !== id));
+        fetchInquiries();
+      });
+  };
+
+  const handleClearInquiries = (type) => {
+    const label = type === 'ai_chats' ? 'all AI Test Chats' : type === 'resolved' ? 'all Resolved Messages' : 'ALL Inquiries';
+    if (!confirm(`Are you sure you want to permanently delete ${label}? This cannot be undone.`)) return;
+    
+    if (type === 'ai_chats') {
+      setInquiriesList(prev => prev.filter(i => i.category !== 'AI Chat Assistant' && !(i.subject && i.subject.startsWith('AI Chat:'))));
+    } else if (type === 'resolved') {
+      setInquiriesList(prev => prev.filter(i => i.status !== 'resolved'));
+    } else if (type === 'all') {
+      setInquiriesList([]);
+    }
+
+    fetch('/api/inquiries/clear', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type })
+    })
+      .then(res => res.json())
+      .then(() => {
+        fetchInquiries();
+      })
+      .catch(() => {
+        fetchInquiries();
       });
   };
 
@@ -2358,13 +2385,27 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
-                <span className="text-xs text-slate-400 hidden md:inline">
-                  Showing <strong className="text-white">{filteredInquiries.length}</strong> of {inquiriesList.length}
-                </span>
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => handleClearInquiries('ai_chats')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-red-950/40 text-slate-300 hover:text-red-300 text-xs font-bold border border-slate-700/80 hover:border-red-700/60 transition active:scale-95"
+                  title="Purge all AI concierge test chats"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Clear AI Chats</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleClearInquiries('resolved')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-bold border border-slate-700/80 transition active:scale-95"
+                  title="Purge all resolved inquiries"
+                >
+                  <span>Clear Resolved</span>
+                </button>
                 <button
                   onClick={fetchInquiries}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold border border-slate-700 transition active:scale-95"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-md shadow-purple-600/30 transition active:scale-95"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                   <span>Refresh</span>

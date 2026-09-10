@@ -256,25 +256,6 @@ LinguaBridge enforces industry-standard protocols for high-stakes medical, legal
 
       setMessages(prev => [...prev, botMsg]);
       setIsTyping(false);
-
-      // Auto-log conversation snippet to backend inquiries database
-      try {
-        fetch('/api/inquiries', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userName: currentUser?.name || ticketName || 'Guest User',
-            userEmail: currentUser?.email || ticketEmail || (emailMatch ? emailMatch[0] : 'guest@linguabridge.com'),
-            userPhone: ticketPhone || (phoneMatch ? phoneMatch[0] : ''),
-            phone: ticketPhone || (phoneMatch ? phoneMatch[0] : ''),
-            userRole: currentUser?.role || currentRole || 'guest',
-            subject: `AI Chat: "${userText.substring(0, 45)}..."`,
-            message: userText,
-            category: 'AI Chat Assistant',
-            messages: [userMsg, botMsg]
-          })
-        }).catch(() => {});
-      } catch {}
     }, 600);
   };
 
