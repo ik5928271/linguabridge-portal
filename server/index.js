@@ -31,7 +31,7 @@ if (!fs.existsSync(DATA_DIR)) {
 const DEFAULT_OWNER = {
   id: 'usr-owner-ikram',
   name: 'Ikram-ul-haq Mian',
-  email: 'ik5928271@gmail.com',
+  email: 'iksale9817@gmail.com',
   password: 'admin123',
   role: 'admin',
   isOwner: true,
@@ -489,38 +489,35 @@ async function initMongo() {
   }
 }
 
-async function saveStore() {
-  try {
-    fs.writeFileSync(STORE_FILE, JSON.stringify(store, null, 2), 'utf8');
-    if (db) {
-      for (const u of store.users) {
-        await db.collection('users').updateOne({ id: u.id }, { $set: u }, { upsert: true }).catch(() => {});
+let saveTimeout = null;
+
+function saveStore() {
+  if (saveTimeout) clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(async () => {
+    try {
+      // Keep in-memory logs bounded to prevent memory leaks
+      if (Array.isArray(store.visitorLogs) && store.visitorLogs.length > 200) {
+        store.visitorLogs = store.visitorLogs.slice(0, 200);
       }
-      for (const app of store.interpreterApplications) {
-        await db.collection('interpreter_applications').updateOne({ id: app.id }, { $set: app }, { upsert: true }).catch(() => {});
+      
+      fs.writeFile(STORE_FILE, JSON.stringify(store), 'utf8', () => {});
+      
+      if (db) {
+        const batchPromises = [
+          ...store.users.slice(0, 50).map(u => db.collection('users').updateOne({ id: u.id }, { $set: u }, { upsert: true }).catch(() => {})),
+          ...store.interpreterApplications.slice(0, 50).map(app => db.collection('interpreter_applications').updateOne({ id: app.id }, { $set: app }, { upsert: true }).catch(() => {})),
+          ...(store.inquiries || []).slice(0, 50).map(inq => db.collection('inquiries').updateOne({ id: inq.id }, { $set: inq }, { upsert: true }).catch(() => {})),
+          ...(store.paymentReceipts || []).slice(0, 50).map(rcpt => db.collection('payment_receipts').updateOne({ id: rcpt.id }, { $set: rcpt }, { upsert: true }).catch(() => {})),
+          ...Object.keys(store.wallets).slice(0, 50).map(uId => db.collection('wallets').updateOne({ userId: uId }, { $set: store.wallets[uId] }, { upsert: true }).catch(() => {})),
+          ...store.appointments.slice(0, 50).map(a => db.collection('appointments').updateOne({ id: a.id }, { $set: a }, { upsert: true }).catch(() => {})),
+          ...store.callLogs.slice(0, 50).map(c => db.collection('call_logs').updateOne({ id: c.id }, { $set: c }, { upsert: true }).catch(() => {}))
+        ];
+        await Promise.allSettled(batchPromises);
       }
-      for (const inq of (store.inquiries || [])) {
-        await db.collection('inquiries').updateOne({ id: inq.id }, { $set: inq }, { upsert: true }).catch(() => {});
-      }
-      for (const rcpt of (store.paymentReceipts || [])) {
-        await db.collection('payment_receipts').updateOne({ id: rcpt.id }, { $set: rcpt }, { upsert: true }).catch(() => {});
-      }
-      for (const uId of Object.keys(store.wallets)) {
-        await db.collection('wallets').updateOne({ userId: uId }, { $set: store.wallets[uId] }, { upsert: true }).catch(() => {});
-      }
-      for (const a of store.appointments) {
-        await db.collection('appointments').updateOne({ id: a.id }, { $set: a }, { upsert: true }).catch(() => {});
-      }
-      for (const c of store.callLogs) {
-        await db.collection('call_logs').updateOne({ id: c.id }, { $set: c }, { upsert: true }).catch(() => {});
-      }
-      for (const v of store.visitorLogs.slice(-200)) {
-        await db.collection('visitor_logs').updateOne({ id: v.id }, { $set: v }, { upsert: true }).catch(() => {});
-      }
+    } catch (err) {
+      console.error('Error in debounced saveStore:', err.message);
     }
-  } catch (err) {
-    console.error('Error saving store:', err);
-  }
+  }, 1000);
 }
 
 loadStore();
@@ -1281,12 +1278,16 @@ app.post('/api/inquiries', (req, res) => {
   const { 
     userName = 'Guest Visitor', 
     userEmail = '', 
+    userPhone = '',
+    phone = '',
     userRole = 'guest', 
     subject = 'General Platform Inquiry', 
     message = '', 
     category = 'General Support',
     messages = [] 
   } = req.body;
+
+  const resolvedPhone = (userPhone || phone || '').trim();
 
   if (!message && (!messages || messages.length === 0)) {
     return res.status(400).json({ error: 'Message content is required.' });
@@ -1296,6 +1297,7 @@ app.post('/api/inquiries', (req, res) => {
     id: `inq-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 5)}`,
     userName: userName.trim(),
     userEmail: userEmail.trim(),
+    userPhone: resolvedPhone,
     userRole: userRole.toLowerCase(),
     subject: subject.trim(),
     message: message.trim() || (messages[messages.length - 1]?.text || 'Inquiry conversation'),

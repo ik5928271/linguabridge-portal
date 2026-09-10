@@ -377,6 +377,31 @@ END:VCALENDAR`;
           </div>
         )}
 
+        {/* ✅ VERIFIED & ACTIVE ACCOUNT CONFIRMATION BANNER */}
+        {wallet?.paymentStatus === 'verified' && (wallet?.minutesRemaining > 0) && (
+          <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-300 dark:border-emerald-500/30 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-emerald-900 dark:text-emerald-200">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-emerald-200 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div>
+                <span className="font-extrabold text-emerald-800 dark:text-emerald-300 text-xs uppercase tracking-wider block">
+                  ✓ Account Active & Funded ({wallet.minutesRemaining} Minutes Ready)
+                </span>
+                <p className="text-[11px] text-slate-700 dark:text-slate-200 mt-0.5">
+                  Your payment has been verified by administration. You can now choose any certified interpreter, schedule dates, or start instant calls.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-bold text-xs shadow-sm">
+                Status: Verified & Live
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* 4 Live Ledger Metrics */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
           

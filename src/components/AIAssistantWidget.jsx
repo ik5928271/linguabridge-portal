@@ -30,11 +30,22 @@ export default function AIAssistantWidget({ currentUser = null, currentRole = 'h
   
   // Chat Conversation State
   const [messages, setMessages] = useState(() => {
+    if (currentUser) {
+      return [
+        {
+          id: 'msg-welcome',
+          sender: 'bot',
+          text: `Hello **${currentUser.name || 'User'}**! 👋 I'm **LinguaBot**, your 24/7 AI Concierge for the **LinguaBridge 3-Way Interpretation Network** (powered by IK Enterprises).\n\nHow can I help you today? You can ask me about our **live 3-way calling protocols, client workflows, interpreter profile creation, 150+ supported languages**, or submit an inquiry directly to Admin Dispatch!`,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          category: 'welcome'
+        }
+      ];
+    }
     return [
       {
         id: 'msg-welcome',
         sender: 'bot',
-        text: `Hello! 👋 I'm **LinguaBot**, your 24/7 AI Concierge for the **LinguaBridge 3-Way Interpretation Network** (powered by IK Enterprises).\n\nHow can I help you today? You can ask me about our **live 3-way calling protocols, client workflows, interpreter profile creation, 150+ supported languages**, or submit an inquiry directly to Admin Dispatch!`,
+        text: `Hello! 👋 Welcome to **LinguaBridge 3-Way Interpretation Network** (powered by IK Enterprises).\n\nTo connect you with Admin Dispatch, prepare custom rate proposals, or assist with interpreter onboarding, **please enter your Name and Contact Details below to start our chat:**`,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         category: 'welcome'
       }
@@ -48,12 +59,14 @@ export default function AIAssistantWidget({ currentUser = null, currentRole = 'h
   // Inquiry / Message Form State
   const [ticketName, setTicketName] = useState(currentUser?.name || '');
   const [ticketEmail, setTicketEmail] = useState(currentUser?.email || '');
+  const [ticketPhone, setTicketPhone] = useState('');
   const [ticketRole, setTicketRole] = useState(currentUser?.role === 'interpreter' ? 'interpreter' : currentUser?.role === 'admin' ? 'admin' : 'client');
   const [ticketCategory, setTicketCategory] = useState('General Support');
   const [ticketSubject, setTicketSubject] = useState('');
   const [ticketMessage, setTicketMessage] = useState('');
   const [ticketSubmitting, setTicketSubmitting] = useState(false);
   const [ticketSuccess, setTicketSuccess] = useState(false);
+  const [contactCaptured, setContactCaptured] = useState(() => Boolean(currentUser));
 
   // Sync user info if user logs in
   useEffect(() => {
@@ -61,6 +74,7 @@ export default function AIAssistantWidget({ currentUser = null, currentRole = 'h
       if (!ticketName) setTicketName(currentUser.name || '');
       if (!ticketEmail) setTicketEmail(currentUser.email || '');
       if (currentUser.role) setTicketRole(currentUser.role === 'host' ? 'client' : currentUser.role);
+      setContactCaptured(true);
     }
   }, [currentUser]);
 
@@ -71,7 +85,7 @@ export default function AIAssistantWidget({ currentUser = null, currentRole = 'h
     }
   }, [messages, isOpen, isTyping, activeTab]);
 
-  // Quick prompt suggestions (strictly focused on workflows, protocols, profile setup, and inquiries)
+  // Quick prompt suggestions
   const QUICK_PROMPTS = [
     { label: '📞 How does 3-Way Calling work?', query: 'How does the 3-way conference calling work for doctor, patient, and interpreter?' },
     { label: '📋 Clinical & Court Protocols', query: 'What are the live interpretation protocols for medical and legal sessions?' },
@@ -81,12 +95,11 @@ export default function AIAssistantWidget({ currentUser = null, currentRole = 'h
     { label: '✉️ Inquiries & Rate Quotes', query: 'How do I request rates, billing, or custom organization proposals?' }
   ];
 
-  // Comprehensive Knowledge Base Engine (No pricing disclosed - redirects to separate Admin quote)
+  // Comprehensive Knowledge Base Engine
   const generateBotResponse = (query) => {
     const q = query.toLowerCase().trim();
 
-    // 1. 3-Way Conference Calling & WebRTC Workflow
-    if (q.includes('3-way') || q.includes('3 way') || q.includes('three way') || q.includes('call room') || q.includes('how it works') || q.includes('how does') || q.includes('connect patient')) {
+    if (q.includes('3-way') || q.includes('3 way') || q.includes('three way') || q.includes('call room') || q.includes('how it works') || q.includes('how does') || q.includes('connect patient') || q.includes('guest link') || q.includes('invite')) {
       return `### 📞 How LinguaBridge 3-Way Calling Works:
 1. **Host Initiates**: The Host (e.g. Doctor, Attorney, or Customer Rep) selects their target language (e.g. Spanish, Russian, Arabic) and specialty.
 2. **Instant Match**: The system connects a verified, certified live interpreter into the encrypted WebRTC room in **under 15 seconds**.
@@ -94,18 +107,39 @@ export default function AIAssistantWidget({ currentUser = null, currentRole = 'h
 4. **Live Audio/Video**: Everyone communicates with crystal-clear 3-way simultaneous audio, video toggle, and live terminology glossary aids.`;
     }
 
-    // 2. Pricing, Rates, Compensation, or Billing Queries -> STRICTLY REDIRECT SEPARATELY
-    if (q.includes('rate') || q.includes('price') || q.includes('pricing') || q.includes('pay') || q.includes('salary') || q.includes('hourly') || q.includes('per minute') || q.includes('earning') || q.includes('compensation') || q.includes('cost') || q.includes('package') || q.includes('wallet') || q.includes('invoice') || q.includes('net 30') || q.includes('net-30') || q.includes('fee')) {
-      return `### 📋 Pricing & Compensation Policy:
+    const isPricingOrRateQuery = 
+      q.includes('rate') || q.includes('rates') || 
+      q.includes('charge') || q.includes('charges') || 
+      q.includes('price') || q.includes('pricing') || 
+      q.includes('cost') || q.includes('costs') || 
+      q.includes('fee') || q.includes('fees') || 
+      q.includes('how much') || q.includes('pay') || 
+      q.includes('salary') || q.includes('hourly') || 
+      q.includes('per minute') || q.includes('minute') || 
+      q.includes('earning') || q.includes('compensation') || 
+      q.includes('quote') || q.includes('quotation') || 
+      q.includes('proposal') || q.includes('package') || 
+      q.includes('packages') || q.includes('wallet') || 
+      q.includes('invoice') || q.includes('invoicing') || 
+      q.includes('net 30') || q.includes('net-30') || 
+      q.includes('bill') || q.includes('billing') ||
+      q.includes('discount') || q.includes('deposit');
+
+    if (isPricingOrRateQuery) {
+      return `### 📋 Official Pricing, Rates & Custom Quotes:
 All client rates, minute package pricing, and interpreter compensation agreements are **customized and provided separately** by **IK Enterprises Administration & Dispatch**.
 
-* **For Clients & Organizations (Hospitals, Clinics, Law Firms)**: Custom rate sheets, prepaid bulk minute packages, and Net-30 enterprise invoicing terms are provided directly based on your monthly volume and language requirements.
-* **For Interpreters & Linguists**: Compensation models (Live Talk, Scheduled Shifts, or Salary Base) are finalized privately during the credentialing and onboarding review.
+* **For Clients & Organizations (Hospitals, Clinics, Law Firms)**:
+  Custom rate sheets, prepaid bulk minute packages, and Net-30 enterprise invoicing terms are provided directly based on your monthly volume and language requirements.
+  📧 **Client Billing & Proposals**: \`iksale9817@gmail.com\`
 
-👉 **To receive an official rate proposal or compensation details**, please switch to the **"✉️ Inquire / Message Box"** tab above to submit an inquiry, or contact Admin Dispatch (**Ikram-ul-haq Mian**) directly at \`ik5928271@gmail.com\`.`;
+* **For Interpreters & Linguists**:
+  Compensation models (Live Talk, Scheduled Shifts, or Salary Base) are finalized privately during the credentialing and onboarding review.
+  📧 **Interpreter Relations & Rates**: \`iksale9815@gmail.com\`
+
+👇 **Please enter your details in the form below so Admin Dispatch can immediately send you the customized rate quote!**`;
     }
 
-    // 3. Clinical & Legal Interpretation Protocols
     if (q.includes('protocol') || q.includes('conduct') || q.includes('rule') || q.includes('standard') || q.includes('ethics') || q.includes('guideline') || q.includes('best practice')) {
       return `### 📋 Interpretation Protocols & Professional Conduct:
 LinguaBridge enforces industry-standard protocols for high-stakes medical, legal, and enterprise sessions:
@@ -116,7 +150,6 @@ LinguaBridge enforces industry-standard protocols for high-stakes medical, legal
 5. **HIPAA & Confidentiality**: All dialogue is confidential; no medical recordings are retained without written patient authorization.`;
     }
 
-    // 4. Interpreter Profile Creation, CV & Credentials Setup
     if (q.includes('apply') || q.includes('profile') || q.includes('propio') || q.includes('credential') || q.includes('resume') || q.includes('cv') || q.includes('certif') || q.includes('join as interpreter') || q.includes('onboard') || q.includes('document')) {
       return `### 👤 Interpreter Profile Setup & Onboarding:
 1. Click **"Apply as Interpreter"** on the top navigation bar.
@@ -126,77 +159,65 @@ LinguaBridge enforces industry-standard protocols for high-stakes medical, legal
 5. **Attach Verification Files**:
    * **CV / Resume** (PDF/DOCX)
    * **Training / Credential Certificate** (such as **Propio Healthcare Training**, CCHI/NBCMI, Court Certification, or Diploma).
-6. **Review & Approval**: Our **IK Enterprises Verification Board** reviews your application and documents. Once approved, your certified portal account is activated with your separate compensation schedule!`;
+6. **Review & Approval**: Our **IK Enterprises Verification Board** reviews your application and documents. Once approved, your certified portal account is activated with your separate compensation schedule!
+📧 **Interpreter Onboarding Support**: \`iksale9815@gmail.com\``;
     }
 
-    // 5. Client Workflow & Inviting Patients/Guests / Scheduling
-    if (q.includes('client workflow') || q.includes('invite') || q.includes('patient') || q.includes('guest') || q.includes('schedule') || q.includes('appointment') || q.includes('calendar') || q.includes('book')) {
-      return `### 🔄 Client Workflow & Guest Invites:
-* **Instant 3-Way Calls**:
-  1. Choose your desired language and specialty.
-  2. Get paired with an active certified interpreter.
-  3. Click **"Invite Patient"** to send an SMS or copy a direct Web link. Guests join instantly without installing any app.
-* **Scheduled Appointments**:
-  1. Click **"Schedule Appointment"** to book an upcoming session.
-  2. Both you and the assigned interpreter receive automated notifications **10 minutes before the call**.
-  3. Click **"Start Call"** when ready to launch the room.`;
-    }
-
-    // 6. Languages Supported
-    if (q.includes('language') || q.includes('spanish') || q.includes('russian') || q.includes('arabic') || q.includes('urdu') || q.includes('hindi') || q.includes('mandarin') || q.includes('punjabi') || q.includes('french')) {
-      return `### 🌐 150+ Global Languages Supported:
-LinguaBridge covers over **150+ spoken languages and dialects**, including:
-* **Spanish** (Medical CCHI & Legal)
-* **Russian & Ukrainian** (Certified Propio & Technical)
-* **Arabic** (Levantine, Gulf, Egyptian, Standard)
-* **Urdu, Punjabi & Hindi** (Healthcare & Judiciary)
-* **Mandarin & Cantonese Chinese**
-* **Vietnamese, Korean, Tagalog, Portuguese, French, Haitian Creole, Somali, and 140+ more!**`;
-    }
-
-    // 7. Medical & Legal Glossaries
-    if (q.includes('glossary') || q.includes('medical') || q.includes('legal') || q.includes('term') || q.includes('dictionary') || q.includes('definition')) {
-      return `### 📖 Live Interactive Glossaries:
-During active 3-way conference calls, both the host and interpreter have access to our **Multi-Domain Terminology Bank**:
-* **Medical / Clinical**: Anatomical terms, diagnostic procedures, pharmacology, and triage protocols.
-* **Legal / Judiciary**: Courtroom procedures, sworn depositions, immigration hearings, and statutory terminology.
-* **Emergency & Customer Care**: Standardized translations in Spanish, Russian, Arabic, Mandarin, and Urdu.`;
-    }
-
-    // 8. Inquiries & Receiving Help via Message Box
-    if (q.includes('inquiry') || q.includes('ticket') || q.includes('message') || q.includes('ask') || q.includes('help') || q.includes('support') || q.includes('contact')) {
-      return `### ✉️ Inquiries & Admin Dispatch Support:
-Have a specific question, custom language request, profile issue, or need a rate proposal?
-* Switch to the **"✉️ Inquire / Message Box"** tab in this widget.
-* Fill in your name, email, category, and message.
-* Your inquiry is transmitted directly to the **IK Enterprises Admin Dispatch Box** (monitored by Ikram-ul-haq Mian) for prompt review and resolution!`;
-    }
-
-    // 9. Ownership & Company Info
-    if (q.includes('ikram') || q.includes('owner') || q.includes('ik enterprise') || q.includes('company') || q.includes('who are you')) {
-      return `### 👑 About LinguaBridge & IK Enterprises:
-* **Platform Owner & Administrator**: **Ikram-ul-haq Mian** (Master Operations Dispatch).
-* **Enterprise Entity**: IK Enterprises.
-* **Headquarters / Operations**: Lahore, Pakistan & Global Cloud Dispatch.
-* **Direct Email**: \`ik5928271@gmail.com\` / \`operations@linguabridge.com\`
-* You can also switch to the **"✉️ Inquire / Message Box"** tab to send a direct message to the admin dashboard!`;
-    }
-
-    // 10. Security, HIPAA, & Privacy
-    if (q.includes('security') || q.includes('hipaa') || q.includes('privacy') || q.includes('safe') || q.includes('encrypt')) {
-      return `### 🛡️ Enterprise Security & Compliance:
-* **End-to-End Encrypted**: Live 3-way WebRTC media streams are encrypted using DTLS/SRTP protocols.
-* **HIPAA & GDPR Ready**: No medical audio recordings are permanently stored without patient authorization.
-* **Cloud Database**: Powered by 24/7 dedicated MongoDB Atlas with high-grade security clearance.`;
-    }
-
-    // 11. Default Intelligent Fallback
     return `Thank you for your question! LinguaBridge is an enterprise on-demand 3-way interpretation portal bridging Doctors, Patients, and Certified Interpreters in 150+ languages.
 
 * **Workflows & 3-Way Calling**: Learn how instant calls, guest invites, and scheduled appointments operate.
 * **Protocols & Ethics**: Learn about clinical and court interpretation standards.
 * **Profile Setup**: Step-by-step guidance for interpreter applications and document uploads.
-* **Rates & Inquiries**: Pricing and compensation are provided separately by Admin Dispatch. Switch to the **"✉️ Inquire / Message Box"** tab to submit an inquiry!`;
+* **Rates & Inquiries**: Pricing and compensation are provided separately by Admin Dispatch:
+  - 🏥 **For Clients**: \`iksale9817@gmail.com\`
+  - 🗣️ **For Interpreters**: \`iksale9815@gmail.com\`
+
+👇 **Please share your contact details below if you would like Admin Dispatch to reach out directly!**`;
+  };
+
+  // Quick Inline Lead Capture in Chat
+  const handleQuickLeadSubmit = async (e) => {
+    e?.preventDefault();
+    if (!ticketName.trim() || !ticketEmail.trim()) {
+      alert('Please enter your name and email address.');
+      return;
+    }
+
+    setTicketSubmitting(true);
+    const lastUserQuery = messages.filter(m => m.sender === 'user').slice(-1)[0]?.text || 'Pricing / General Inquiry';
+
+    try {
+      await fetch('/api/inquiries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userName: ticketName.trim(),
+          userEmail: ticketEmail.trim(),
+          userPhone: ticketPhone.trim(),
+          phone: ticketPhone.trim(),
+          userRole: currentUser?.role || currentRole || 'client',
+          subject: `⚡ Direct Lead / Rate Request from ${ticketName.trim()}`,
+          message: `Visitor submitted contact details via LinguaBot AI widget.\nName: ${ticketName.trim()}\nEmail: ${ticketEmail.trim()}\nPhone/WhatsApp: ${ticketPhone.trim() || 'Not provided'}\nRecent Question: "${lastUserQuery}"`,
+          category: 'Rates & Custom Proposals',
+          messages: messages
+        })
+      });
+
+      setContactCaptured(true);
+      setTicketSubmitting(false);
+
+      // Append confirmation bot message
+      const confirmBotMsg = {
+        id: `msg-confirm-${Date.now()}`,
+        sender: 'bot',
+        text: `✅ **Thank you, ${ticketName.trim()}!**\n\nYour contact details have been successfully transmitted to the **IK Enterprises Admin Dispatch** team. We will review your inquiry regarding *"${lastUserQuery}"* and reach out to you directly at **${ticketEmail.trim()}**${ticketPhone.trim() ? ` / **${ticketPhone.trim()}**` : ''} with your customized rate proposal!`,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setMessages(prev => [...prev, confirmBotMsg]);
+    } catch {
+      setContactCaptured(true);
+      setTicketSubmitting(false);
+    }
   };
 
   // Handle Sending a Message in Chat
@@ -205,6 +226,13 @@ Have a specific question, custom language request, profile issue, or need a rate
     if (!inputQuery.trim()) return;
 
     const userText = inputQuery.trim();
+
+    // Auto-detect email and phone if user typed them in chat
+    const emailMatch = userText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+    const phoneMatch = userText.match(/(?:\+?\d{1,4}[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)?\d{3}[-.\s]?\d{4}/);
+    if (emailMatch && !ticketEmail) setTicketEmail(emailMatch[0]);
+    if (phoneMatch && !ticketPhone && phoneMatch[0].length >= 7) setTicketPhone(phoneMatch[0]);
+
     const userMsg = {
       id: `msg-usr-${Date.now()}`,
       sender: 'user',
@@ -236,7 +264,9 @@ Have a specific question, custom language request, profile issue, or need a rate
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userName: currentUser?.name || ticketName || 'Guest User',
-            userEmail: currentUser?.email || ticketEmail || 'guest@linguabridge.com',
+            userEmail: currentUser?.email || ticketEmail || (emailMatch ? emailMatch[0] : 'guest@linguabridge.com'),
+            userPhone: ticketPhone || (phoneMatch ? phoneMatch[0] : ''),
+            phone: ticketPhone || (phoneMatch ? phoneMatch[0] : ''),
             userRole: currentUser?.role || currentRole || 'guest',
             subject: `AI Chat: "${userText.substring(0, 45)}..."`,
             message: userText,
@@ -260,9 +290,11 @@ Have a specific question, custom language request, profile issue, or need a rate
     const payload = {
       userName: ticketName.trim(),
       userEmail: ticketEmail.trim(),
+      userPhone: ticketPhone.trim(),
+      phone: ticketPhone.trim(),
       userRole: ticketRole,
       subject: ticketSubject.trim() || `Inquiry from ${ticketName.trim()}`,
-      message: ticketMessage.trim(),
+      message: `${ticketMessage.trim()}${ticketPhone ? `\n\nContact Phone/WhatsApp: ${ticketPhone}` : ''}`,
       category: ticketCategory,
       messages: [
         { sender: 'user', text: ticketMessage.trim(), time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
@@ -270,21 +302,15 @@ Have a specific question, custom language request, profile issue, or need a rate
     };
 
     try {
-      const res = await fetch('/api/inquiries', {
+      await fetch('/api/inquiries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      const data = await res.json();
-      if (data.success) {
-        setTicketSuccess(true);
-        setTicketSubmitting(false);
-        setTicketSubject('');
-        setTicketMessage('');
-      } else {
-        setTicketSuccess(true);
-        setTicketSubmitting(false);
-      }
+      setTicketSuccess(true);
+      setTicketSubmitting(false);
+      setTicketSubject('');
+      setTicketMessage('');
     } catch {
       setTicketSuccess(true);
       setTicketSubmitting(false);
@@ -423,6 +449,89 @@ Have a specific question, custom language request, profile issue, or need a rate
                     </div>
                   );
                 })}
+
+                {/* Interactive Lead Capture Form Card inside Chat Feed - Prompts Immediately for Guests */}
+                {!contactCaptured && (
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-950/90 via-slate-900 to-indigo-950/90 border border-purple-500/50 shadow-2xl space-y-3 my-2 animate-fadeIn">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-purple-600/30 text-amber-300 flex items-center justify-center ring-1 ring-purple-500/40">
+                          <User className="w-3.5 h-3.5" />
+                        </div>
+                        <h4 className="font-extrabold text-white text-xs">
+                          Please Enter Your Contact Details to Start
+                        </h4>
+                      </div>
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[9px] font-bold border border-emerald-500/30">
+                        IK Dispatch Direct
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-slate-300 leading-relaxed">
+                      To provide you with customized rate proposals, language availability, and direct support from Admin Dispatch, please tell us your name and contact details:
+                    </p>
+
+                    <form onSubmit={handleQuickLeadSubmit} className="space-y-2.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Your Full Name *</label>
+                          <input
+                            type="text"
+                            required
+                            value={ticketName}
+                            onChange={(e) => setTicketName(e.target.value)}
+                            placeholder="e.g. Dr. Sarah / John"
+                            className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Email Address *</label>
+                          <input
+                            type="email"
+                            required
+                            value={ticketEmail}
+                            onChange={(e) => setTicketEmail(e.target.value)}
+                            placeholder="e.g. you@hospital.com"
+                            className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">WhatsApp / Phone Number</label>
+                        <input
+                          type="tel"
+                          value={ticketPhone}
+                          onChange={(e) => setTicketPhone(e.target.value)}
+                          placeholder="e.g. +1 555-0199 or +92 300 1234567"
+                          className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={ticketSubmitting || !ticketName.trim() || !ticketEmail.trim()}
+                        className="w-full py-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-brand-600 hover:from-purple-500 hover:to-brand-500 disabled:opacity-50 text-white font-extrabold text-xs shadow-lg shadow-purple-600/30 transition transform hover:scale-[1.01] active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        {ticketSubmitting ? (
+                          <span>Connecting to Admin Dispatch...</span>
+                        ) : (
+                          <>
+                            <Send className="w-3.5 h-3.5 text-amber-300" />
+                            <span>Start Chat & Connect with Dispatch 🚀</span>
+                          </>
+                        )}
+                      </button>
+                    </form>
+                  </div>
+                )}
+
+                {contactCaptured && (
+                  <div className="p-3 rounded-2xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2 my-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>Contact details registered ({ticketName || 'Visitor'} • {ticketEmail || ticketPhone})! Admin Dispatch has been alerted.</span>
+                  </div>
+                )}
 
                 {isTyping && (
                   <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs italic pl-9">

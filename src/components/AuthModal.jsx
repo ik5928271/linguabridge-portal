@@ -132,11 +132,11 @@ export default function AuthModal({
     }
 
     // 2. Known system defaults
-    if (query === 'ik5928271@gmail.com' || query.includes('admin') || query.includes('ikram')) {
+    if (query === 'iksale9817@gmail.com' || query === 'iksale9815@gmail.com' || query.includes('admin') || query.includes('ikram')) {
       const ownerUser = {
         id: 'usr-owner-ikram',
         name: 'Ikram-ul-haq Mian',
-        email: 'ik5928271@gmail.com',
+        email: 'iksale9817@gmail.com',
         role: 'admin',
         isOwner: true,
         org: 'IK Enterprises'
@@ -254,7 +254,7 @@ export default function AuthModal({
       onSuccessLogin({
         id: 'usr-owner-ikram',
         name: 'Ikram-ul-haq Mian',
-        email: 'ik5928271@gmail.com',
+        email: 'iksale9817@gmail.com',
         role: 'admin',
         isOwner: true,
         org: 'IK Enterprises'

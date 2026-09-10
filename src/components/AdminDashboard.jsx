@@ -73,7 +73,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
     {
       id: 'usr-owner-ikram',
       name: 'Ikram-ul-haq Mian',
-      email: 'ik5928271@gmail.com',
+      email: 'iksale9817@gmail.com',
       role: 'admin',
       isOwner: true,
       org: 'IK Enterprises',
@@ -1048,7 +1048,7 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
             <span>IK Enterprises Control Center</span>
           </h1>
           <p className="text-sm text-slate-400 mt-1">
-            Logged in as: <strong className="text-white">Ikram-ul-haq Mian</strong> (<span className="text-purple-300">ik5928271@gmail.com</span>) • Full Root Privileges
+            Logged in as: <strong className="text-white">Ikram-ul-haq Mian</strong> (<span className="text-purple-300">iksale9817@gmail.com</span>) • Full Root Privileges
           </p>
         </div>
 
@@ -1707,7 +1707,7 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
                   {filteredUsers.map((u) => {
-                    const isMasterOwner = u.isOwner || u.email === 'ik5928271@gmail.com';
+                    const isMasterOwner = u.isOwner || u.email === 'iksale9817@gmail.com' || u.email === 'iksale9815@gmail.com';
                     const activeRate = u.hourlyRate !== undefined ? u.hourlyRate : (u.interpreterProfile?.hourlyRate !== undefined ? u.interpreterProfile.hourlyRate : 5);
 
                     return (
