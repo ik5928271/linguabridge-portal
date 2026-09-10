@@ -37,7 +37,11 @@ import {
   Printer,
   Copy,
   MessageSquare,
+  MessageCircle,
   HelpCircle,
+  User,
+  Paperclip,
+  ExternalLink,
   ChevronRight,
   ChevronDown,
   ChevronUp
@@ -282,6 +286,8 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   const [inquiriesList, setInquiriesList] = useState(DEFAULT_SEED_INQUIRIES);
   const [inquiryFilter, setInquiryFilter] = useState('all'); // 'all', 'new', 'client', 'interpreter', 'resolved'
   const [inquirySearchTerm, setInquirySearchTerm] = useState('');
+  const [selectedInquiryId, setSelectedInquiryId] = useState(null);
+  const [directReplyText, setDirectReplyText] = useState('');
   const [replyModalInquiry, setReplyModalInquiry] = useState(null);
   const [adminReplyText, setAdminReplyText] = useState('');
   const [expandedInquiryId, setExpandedInquiryId] = useState(null);
@@ -842,6 +848,42 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
         setInquiriesList(prev => prev.map(i => i.id === replyModalInquiry.id ? { ...i, adminReply: adminReplyText.trim(), status: 'resolved', messages: updatedMessages } : i));
         setReplyModalInquiry(null);
         setAdminReplyText('');
+      });
+  };
+
+  const handleSendDirectReply = (inquiryId, replyText) => {
+    if (!inquiryId || !replyText || !replyText.trim()) return;
+    const inq = inquiriesList.find(i => i.id === inquiryId);
+    if (!inq) return;
+
+    const updatedMessages = [
+      ...(inq.messages || []),
+      {
+        sender: 'bot',
+        text: `**IK Enterprises Dispatch Reply:**\n${replyText.trim()}`,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+    ];
+
+    fetch(`/api/inquiries/${inquiryId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        adminReply: replyText.trim(),
+        status: 'resolved',
+        messages: updatedMessages
+      })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setInquiriesList(prev => prev.map(i => i.id === inquiryId ? { ...i, adminReply: replyText.trim(), status: 'resolved', messages: updatedMessages } : i));
+          setDirectReplyText('');
+        }
+      })
+      .catch(() => {
+        setInquiriesList(prev => prev.map(i => i.id === inquiryId ? { ...i, adminReply: replyText.trim(), status: 'resolved', messages: updatedMessages } : i));
+        setDirectReplyText('');
       });
   };
 
@@ -2289,261 +2331,516 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
       )}
 
       {/* ========================================================== */}
-      {/* TAB: 💬 CLIENT & INTERPRETER INQUIRIES & AI SUPPORT BOX */}
+      {/* TAB: 💬 CLIENT & INTERPRETER INQUIRIES & AI SUPPORT BOX (WHATSAPP & GMAIL STYLE) */}
       {/* ========================================================== */}
-      {activeTab === 'inquiries' && (
-        <div className="space-y-6">
-          
-          {/* Action Toolbar */}
-          <div className="glass-panel p-6 rounded-3xl border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div>
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-brand-400" />
-                <span>Client & Interpreter Inquiries & AI Support Messages</span>
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Centralized message box capturing client questions, interpreter ticket requests, and AI concierge conversations
-              </p>
-            </div>
+      {activeTab === 'inquiries' && (() => {
+        const activeInquiry = filteredInquiries.find(i => i.id === selectedInquiryId) || filteredInquiries[0] || null;
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={fetchInquiries}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold border border-slate-700 transition"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>Refresh Messages</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Filter Bar & Search */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center bg-slate-900/80 p-1 rounded-xl border border-slate-800 text-xs font-bold gap-1">
-              <button
-                onClick={() => setInquiryFilter('all')}
-                className={`px-3 py-1.5 rounded-lg transition ${inquiryFilter === 'all' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
-              >
-                All Messages ({inquiriesList.length})
-              </button>
-              <button
-                onClick={() => setInquiryFilter('new')}
-                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${inquiryFilter === 'new' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'}`}
-              >
-                <span>New / Unresolved</span>
-                {newInquiriesCount > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black animate-pulse">
-                    {newInquiriesCount}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => setInquiryFilter('client')}
-                className={`px-3 py-1.5 rounded-lg transition ${inquiryFilter === 'client' ? 'bg-brand-600 text-white' : 'text-slate-400 hover:text-white'}`}
-              >
-                Clients ({inquiriesList.filter(i => i.userRole === 'client' || i.userRole === 'host').length})
-              </button>
-              <button
-                onClick={() => setInquiryFilter('interpreter')}
-                className={`px-3 py-1.5 rounded-lg transition ${inquiryFilter === 'interpreter' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
-              >
-                Interpreters ({inquiriesList.filter(i => i.userRole === 'interpreter').length})
-              </button>
-              <button
-                onClick={() => setInquiryFilter('resolved')}
-                className={`px-3 py-1.5 rounded-lg transition ${inquiryFilter === 'resolved' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
-              >
-                Resolved ({inquiriesList.filter(i => i.status === 'resolved').length})
-              </button>
-            </div>
-
-            <div className="relative flex-1 max-w-xs">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={inquirySearchTerm}
-                onChange={(e) => setInquirySearchTerm(e.target.value)}
-                placeholder="Search by sender, email, subject..."
-                className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
-              />
-            </div>
-          </div>
-
-          {/* Inquiries Feed List */}
-          {filteredInquiries.length === 0 ? (
-            <div className="p-12 rounded-3xl bg-slate-900/40 border border-slate-800 text-center space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-400 flex items-center justify-center mx-auto">
-                <MessageSquare className="w-6 h-6" />
+        return (
+          <div className="space-y-4">
+            
+            {/* Action Toolbar Header */}
+            <div className="glass-panel p-4 sm:p-5 rounded-2xl border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center shrink-0">
+                  <MessageSquare className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                    <span>Inquiries & Live Support Hub</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-purple-300 border border-slate-700">
+                      WhatsApp & Gmail Mode
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Live client requests, interpreter onboarding inquiries, and AI concierge chats
+                  </p>
+                </div>
               </div>
-              <p className="text-base font-bold text-white">No Inquiries Found</p>
-              <p className="text-xs text-slate-400 max-w-md mx-auto">
-                When clients or interpreters submit questions through the AI Concierge or leave support messages, they will appear here in real-time.
-              </p>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                <span className="text-xs text-slate-400 hidden md:inline">
+                  Showing <strong className="text-white">{filteredInquiries.length}</strong> of {inquiriesList.length}
+                </span>
+                <button
+                  onClick={fetchInquiries}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold border border-slate-700 transition active:scale-95"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Refresh</span>
+                </button>
+              </div>
             </div>
-          ) : (
-            <div className="space-y-4">
-              {filteredInquiries.map((inq) => {
-                const isNew = inq.status === 'new' || inq.status === 'in_progress';
-                const isClient = inq.userRole === 'client' || inq.userRole === 'host';
-                const isInterpreter = inq.userRole === 'interpreter';
-                const isExpanded = expandedInquiryId === inq.id;
 
-                return (
-                  <div
-                    key={inq.id}
-                    className={`p-6 rounded-3xl border transition space-y-4 relative shadow-xl ${
-                      isNew 
-                        ? 'bg-slate-900 border-purple-500/50 ring-1 ring-purple-500/30' 
-                        : 'bg-slate-900 border-slate-700'
-                    }`}
-                  >
-                    {/* Top Row: User identity & Category & Status */}
-                    <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-slate-700 pb-4">
-                      <div className="flex items-start gap-3.5">
-                        <div className={`w-11 h-11 rounded-2xl font-black flex items-center justify-center text-white text-base shadow-lg shrink-0 ${
-                          isClient ? 'bg-gradient-to-tr from-blue-600 to-indigo-600' :
-                          isInterpreter ? 'bg-gradient-to-tr from-emerald-600 to-teal-600' :
-                          'bg-gradient-to-tr from-purple-600 to-pink-600'
-                        }`}>
-                          {inq.userName?.charAt(0) || 'U'}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2.5 flex-wrap">
-                            <h4 className="text-base font-extrabold text-white">{inq.userName}</h4>
-                            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider border ${
-                              isClient ? 'bg-blue-500/20 text-blue-300 border-blue-500/40 font-bold' :
-                              isInterpreter ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-bold' :
-                              'bg-purple-500/20 text-purple-300 border border-purple-500/40 font-bold'
-                            }`}>
-                              {isClient ? '👤 Client / Host' : isInterpreter ? '🎧 Linguist / Interpreter' : '🌐 Visitor'}
-                            </span>
-                            <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border ${
-                              isNew 
-                                ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 animate-pulse' 
-                                : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
-                            }`}>
-                              {isNew ? '● New / Pending Review' : '✓ Resolved'}
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-300 mt-1 flex flex-wrap items-center gap-2">
-                            <span className="font-mono text-cyan-300 font-semibold">{inq.userEmail}</span>
-                            <span>• Category: <strong className="text-amber-300">{inq.category || 'General Support'}</strong></span>
-                            <span className="text-slate-400">• Received {new Date(inq.createdAt || Date.now()).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>
-                          </p>
-                        </div>
+            {/* Main Split Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+              
+              {/* LEFT COLUMN: WhatsApp & Gmail Style Inbox List (5 Cols) */}
+              <div className="lg:col-span-5 glass-panel rounded-2xl border border-slate-800 overflow-hidden flex flex-col h-[780px] shadow-xl">
+                
+                {/* Search & Filter Header */}
+                <div className="p-3.5 bg-slate-900/90 border-b border-slate-800 space-y-2.5">
+                  <div className="relative">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={inquirySearchTerm}
+                      onChange={(e) => setInquirySearchTerm(e.target.value)}
+                      placeholder="Search inquiries, email, phone..."
+                      className="w-full pl-9 pr-8 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition"
+                    />
+                    {inquirySearchTerm && (
+                      <button 
+                        onClick={() => setInquirySearchTerm('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Filter Pills */}
+                  <div className="flex items-center gap-1 overflow-x-auto pb-1 text-[11px] font-bold no-scrollbar">
+                    <button
+                      onClick={() => setInquiryFilter('all')}
+                      className={`px-2.5 py-1 rounded-lg shrink-0 transition ${inquiryFilter === 'all' ? 'bg-purple-600 text-white' : 'bg-slate-800/60 text-slate-400 hover:text-white'}`}
+                    >
+                      All ({inquiriesList.length})
+                    </button>
+                    <button
+                      onClick={() => setInquiryFilter('new')}
+                      className={`px-2.5 py-1 rounded-lg shrink-0 transition flex items-center gap-1 ${inquiryFilter === 'new' ? 'bg-amber-600 text-white' : 'bg-slate-800/60 text-slate-400 hover:text-white'}`}
+                    >
+                      <span>New</span>
+                      {newInquiriesCount > 0 && (
+                        <span className="px-1.5 py-0.2 rounded-full bg-amber-300 text-slate-950 text-[9px] font-black">
+                          {newInquiriesCount}
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => setInquiryFilter('client')}
+                      className={`px-2.5 py-1 rounded-lg shrink-0 transition ${inquiryFilter === 'client' ? 'bg-blue-600 text-white' : 'bg-slate-800/60 text-slate-400 hover:text-white'}`}
+                    >
+                      Clients ({inquiriesList.filter(i => i.userRole === 'client' || i.userRole === 'host').length})
+                    </button>
+                    <button
+                      onClick={() => setInquiryFilter('interpreter')}
+                      className={`px-2.5 py-1 rounded-lg shrink-0 transition ${inquiryFilter === 'interpreter' ? 'bg-emerald-600 text-white' : 'bg-slate-800/60 text-slate-400 hover:text-white'}`}
+                    >
+                      Interpreters ({inquiriesList.filter(i => i.userRole === 'interpreter').length})
+                    </button>
+                    <button
+                      onClick={() => setInquiryFilter('resolved')}
+                      className={`px-2.5 py-1 rounded-lg shrink-0 transition ${inquiryFilter === 'resolved' ? 'bg-emerald-600 text-white' : 'bg-slate-800/60 text-slate-400 hover:text-white'}`}
+                    >
+                      Resolved
+                    </button>
+                  </div>
+                </div>
+
+                {/* Messages Feed List (Scrollable) */}
+                <div className="flex-1 overflow-y-auto divide-y divide-slate-800/60">
+                  {filteredInquiries.length === 0 ? (
+                    <div className="p-8 text-center space-y-2">
+                      <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center mx-auto">
+                        <MessageSquare className="w-5 h-5" />
                       </div>
+                      <p className="text-sm font-bold text-white">No messages found</p>
+                      <p className="text-xs text-slate-500">
+                        {inquirySearchTerm ? 'Try adjusting your search terms' : 'No messages match the current filter.'}
+                      </p>
+                    </div>
+                  ) : (
+                    filteredInquiries.map((inq) => {
+                      const isSelected = activeInquiry && activeInquiry.id === inq.id;
+                      const isNew = inq.status === 'new' || inq.status === 'in_progress';
+                      const isClient = inq.userRole === 'client' || inq.userRole === 'host';
+                      const isInterpreter = inq.userRole === 'interpreter';
+                      const phone = inq.userPhone || inq.phone || inq.contactPhone || '';
 
-                      {/* Top Action Buttons */}
-                      <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          onClick={() => {
-                            setReplyModalInquiry(inq);
-                            setAdminReplyText(inq.adminReply || '');
-                          }}
-                          className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-md shadow-purple-600/40 transition"
-                        >
-                          <Send className="w-3.5 h-3.5" />
-                          <span>{inq.adminReply ? 'Edit Reply' : 'Send Admin Reply'}</span>
-                        </button>
-
-                        <button
-                          onClick={() => handleToggleInquiryStatus(inq.id, inq.status)}
-                          className={`px-4 py-2.5 rounded-xl text-xs font-extrabold border transition ${
-                            isNew 
-                              ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-600/30' 
-                              : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-600'
+                      return (
+                        <div
+                          key={inq.id}
+                          onClick={() => setSelectedInquiryId(inq.id)}
+                          className={`p-3.5 cursor-pointer transition flex items-start gap-3 relative ${
+                            isSelected
+                              ? 'bg-purple-950/40 border-l-4 border-l-purple-500 text-white shadow-inner'
+                              : 'hover:bg-slate-800/40 text-slate-300'
                           }`}
                         >
-                          {isNew ? '✓ Mark as Resolved' : '↩ Reopen Ticket'}
-                        </button>
+                          {/* Sender Avatar */}
+                          <div className={`w-10 h-10 rounded-xl font-black flex items-center justify-center text-white text-sm shadow-md shrink-0 ${
+                            isClient ? 'bg-gradient-to-tr from-blue-600 to-indigo-600' :
+                            isInterpreter ? 'bg-gradient-to-tr from-emerald-600 to-teal-600' :
+                            'bg-gradient-to-tr from-purple-600 to-pink-600'
+                          }`}>
+                            {inq.userName?.charAt(0)?.toUpperCase() || 'U'}
+                          </div>
 
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(inq.userEmail);
-                            alert(`Copied ${inq.userEmail} to clipboard!`);
-                          }}
-                          className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
-                          title="Copy User Email"
-                        >
-                          <Copy className="w-3.5 h-3.5" />
-                        </button>
+                          {/* Preview Details */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-1 mb-0.5">
+                              <h4 className={`text-xs font-bold truncate ${isSelected ? 'text-white' : 'text-slate-200'}`}>
+                                {inq.userName || inq.userEmail || 'Anonymous Guest'}
+                              </h4>
+                              <span className="text-[10px] text-slate-400 shrink-0 font-medium">
+                                {new Date(inq.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
 
-                        <button
-                          onClick={() => handleDeleteInquiry(inq.id)}
-                          className="p-2.5 rounded-xl bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 border border-slate-700 transition"
-                          title="Delete Record"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                            <p className="text-[11px] font-semibold text-purple-300 truncate mb-1">
+                              {inq.subject || inq.category || 'General Support Inquiry'}
+                            </p>
+
+                            <p className="text-[11px] text-slate-400 line-clamp-1 leading-snug">
+                              {inq.message || (inq.messages && inq.messages[0]?.text) || 'No message preview'}
+                            </p>
+
+                            {/* Badges Row */}
+                            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                              <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded uppercase ${
+                                isClient ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' :
+                                isInterpreter ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                                'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                              }`}>
+                                {isClient ? 'Client' : isInterpreter ? 'Interpreter' : 'Guest'}
+                              </span>
+
+                              {isNew ? (
+                                <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                                  <span>New</span>
+                                </span>
+                              ) : (
+                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                  ✓ Resolved
+                                </span>
+                              )}
+
+                              {phone && (
+                                <span className="text-[9px] font-mono text-emerald-400 flex items-center gap-0.5">
+                                  <MessageCircle className="w-2.5 h-2.5" />
+                                  <span>WhatsApp</span>
+                                </span>
+                              )}
+
+                              {inq.adminReply && (
+                                <span className="text-[9px] text-indigo-300 font-medium">
+                                  • Replied
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* RIGHT COLUMN: WhatsApp & Gmail Style Active Conversation (7 Cols) */}
+              <div className="lg:col-span-7 glass-panel rounded-2xl border border-slate-800 overflow-hidden flex flex-col h-[780px] shadow-2xl bg-slate-950/60">
+                {!activeInquiry ? (
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-3">
+                    <div className="w-14 h-14 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center">
+                      <MessageSquare className="w-7 h-7" />
                     </div>
+                    <h4 className="text-base font-bold text-white">No Conversation Selected</h4>
+                    <p className="text-xs text-slate-400 max-w-sm">
+                      Select an inquiry from the inbox on the left to view the complete conversation thread, open WhatsApp, or send direct replies.
+                    </p>
+                  </div>
+                ) : (() => {
+                  const isNew = activeInquiry.status === 'new' || activeInquiry.status === 'in_progress';
+                  const isClient = activeInquiry.userRole === 'client' || activeInquiry.userRole === 'host';
+                  const isInterpreter = activeInquiry.userRole === 'interpreter';
+                  const phone = activeInquiry.userPhone || activeInquiry.phone || activeInquiry.contactPhone || '';
+                  const cleanPhone = phone.replace(/[^0-9]/g, '');
 
-                    {/* Subject & User Message Box */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <h5 className="font-extrabold text-white text-sm flex items-center gap-2">
-                          <MessageSquare className="w-4 h-4 text-purple-400" />
-                          <span>{inq.subject || 'Platform Inquiry'}</span>
-                        </h5>
+                  return (
+                    <>
+                      {/* Thread Top Header (WhatsApp / Gmail Header Style) */}
+                      <div className="p-4 bg-slate-900 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-11 h-11 rounded-xl font-black flex items-center justify-center text-white text-base shadow-md shrink-0 ${
+                            isClient ? 'bg-gradient-to-tr from-blue-600 to-indigo-600' :
+                            isInterpreter ? 'bg-gradient-to-tr from-emerald-600 to-teal-600' :
+                            'bg-gradient-to-tr from-purple-600 to-pink-600'
+                          }`}>
+                            {activeInquiry.userName?.charAt(0)?.toUpperCase() || 'U'}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="text-sm font-extrabold text-white">
+                                {activeInquiry.userName || 'Anonymous Visitor'}
+                              </h4>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                                isClient ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' :
+                                isInterpreter ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                                'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                              }`}>
+                                {isClient ? '👤 Client / Organization' : isInterpreter ? '🎧 Linguist / Interpreter' : '🌐 Visitor'}
+                              </span>
+                              <span className={`text-[10px] font-black px-2 py-0.5 rounded ${
+                                isNew ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                              }`}>
+                                {isNew ? '● New' : '✓ Resolved'}
+                              </span>
+                            </div>
+                            
+                            <div className="flex items-center gap-2 text-xs text-slate-400 mt-1 flex-wrap">
+                              <a 
+                                href={`mailto:${activeInquiry.userEmail}`} 
+                                className="font-mono text-cyan-400 hover:underline flex items-center gap-1"
+                              >
+                                <Mail className="w-3 h-3" />
+                                <span>{activeInquiry.userEmail}</span>
+                              </a>
+                              {phone && (
+                                <span className="font-mono text-emerald-400 font-semibold flex items-center gap-1">
+                                  <span>•</span>
+                                  <PhoneCall className="w-3 h-3" />
+                                  <span>{phone}</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Top Direct Action Buttons */}
+                        <div className="flex items-center gap-2 self-end sm:self-center flex-wrap">
+                          {phone && (
+                            <a
+                              href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(`Hello ${activeInquiry.userName || ''}, this is IK Enterprises Dispatch regarding your inquiry on our interpretation platform.`)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold flex items-center gap-1.5 shadow-md shadow-emerald-600/30 transition active:scale-95"
+                              title="Open WhatsApp Chat Directly"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" />
+                              <span>WhatsApp</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          )}
+
+                          <button
+                            onClick={() => handleToggleInquiryStatus(activeInquiry.id, activeInquiry.status)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
+                              isNew 
+                                ? 'bg-emerald-600/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-600/30' 
+                                : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                            }`}
+                          >
+                            {isNew ? '✓ Resolve' : '↩ Reopen'}
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(activeInquiry.userEmail);
+                              alert(`Copied ${activeInquiry.userEmail} to clipboard!`);
+                            }}
+                            className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                            title="Copy Email"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
+                            onClick={() => handleDeleteInquiry(activeInquiry.id)}
+                            className="p-1.5 rounded-xl bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 border border-slate-700 transition"
+                            title="Delete Inquiry"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
-                      <div className="p-4 rounded-2xl bg-slate-950 border border-slate-700 text-xs text-slate-100 leading-relaxed font-medium">
-                        {inq.message}
+
+                      {/* Subject & Category Banner */}
+                      <div className="px-5 py-2.5 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                        <div className="flex items-center gap-2 truncate">
+                          <span className="text-purple-400 font-bold">Subject:</span>
+                          <span className="text-white font-semibold truncate">{activeInquiry.subject || 'General Platform Inquiry'}</span>
+                        </div>
+                        <div className="shrink-0 flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-medium text-[10px]">
+                            {activeInquiry.category || 'General Support'}
+                          </span>
+                          <span className="text-[10px] text-slate-500">
+                            {new Date(activeInquiry.createdAt || Date.now()).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                          </span>
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Admin Response Box (if resolved/replied) */}
-                    {inq.adminReply && (
-                      <div className="p-4 rounded-2xl bg-indigo-950/80 border border-indigo-500/60 space-y-1.5 text-xs shadow-inner">
-                        <span className="text-[11px] font-extrabold uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
-                          <ShieldCheck className="w-4 h-4 text-purple-400" />
-                          <span>Official Dispatch Reply from IK Enterprises:</span>
-                        </span>
-                        <p className="text-white font-semibold text-xs leading-relaxed">
-                          {inq.adminReply}
-                        </p>
-                      </div>
-                    )}
+                      {/* Conversation Stream (WhatsApp Chat Bubbles UI) */}
+                      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px]">
+                        
+                        {/* Initial User Inquiry Message Bubble */}
+                        <div className="flex items-start gap-2.5 max-w-[85%]">
+                          <div className="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-slate-300 shrink-0 mt-0.5">
+                            {activeInquiry.userName?.charAt(0)?.toUpperCase() || 'U'}
+                          </div>
+                          <div className="p-3.5 rounded-2xl rounded-tl-sm bg-slate-900 border border-slate-700/80 text-xs text-slate-100 shadow-md space-y-1">
+                            <div className="flex items-center justify-between gap-3 text-[10px] font-bold text-cyan-300">
+                              <span>{activeInquiry.userName || 'Client'}</span>
+                              <span className="text-slate-500 font-normal">
+                                {new Date(activeInquiry.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <p className="whitespace-pre-line leading-relaxed text-xs">
+                              {activeInquiry.message}
+                            </p>
+                          </div>
+                        </div>
 
-                    {/* Expandable Chat Transcript History (if AI chat or multi-message) */}
-                    {Array.isArray(inq.messages) && inq.messages.length > 1 && (
-                      <div>
-                        <button
-                          type="button"
-                          onClick={() => setExpandedInquiryId(isExpanded ? null : inq.id)}
-                          className="text-xs font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1.5 transition"
-                        >
-                          <span>{isExpanded ? 'Hide Chat Transcript' : `View Full Conversation Transcript (${inq.messages.length} messages)`}</span>
-                          <ChevronRight className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-                        </button>
-
-                        {isExpanded && (
-                          <div className="mt-3 p-4 rounded-2xl bg-slate-950 border border-slate-700 space-y-2.5 text-xs">
-                            {inq.messages.map((msg, mIdx) => (
-                              <div key={mIdx} className={`p-3 rounded-xl ${msg.sender === 'user' ? 'bg-slate-900 border border-slate-700' : 'bg-purple-950/60 border border-purple-700/60'}`}>
-                                <div className="flex items-center justify-between text-[11px] font-bold text-slate-300 mb-1">
-                                  <span className={msg.sender === 'user' ? 'text-cyan-300' : 'text-purple-300'}>
-                                    {msg.sender === 'user' ? `👤 ${inq.userName}` : '🤖 LinguaBot / Admin Dispatch'}
-                                  </span>
-                                  <span className="text-slate-400">{msg.time || ''}</span>
+                        {/* Multi-message Transcript if present */}
+                        {Array.isArray(activeInquiry.messages) && activeInquiry.messages.length > 1 && (
+                          activeInquiry.messages.slice(1).map((msg, mIdx) => {
+                            const isUser = msg.sender === 'user';
+                            return (
+                              <div
+                                key={mIdx}
+                                className={`flex items-start gap-2.5 max-w-[85%] ${
+                                  isUser ? '' : 'ml-auto flex-row-reverse'
+                                }`}
+                              >
+                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 ${
+                                  isUser 
+                                    ? 'bg-slate-800 border border-slate-700 text-slate-300' 
+                                    : 'bg-purple-600 text-white shadow-md'
+                                }`}>
+                                  {isUser ? (activeInquiry.userName?.charAt(0) || 'U') : 'IK'}
                                 </div>
-                                <p className="text-white leading-relaxed whitespace-pre-line text-xs font-medium">
-                                  {msg.text}
-                                </p>
+                                <div className={`p-3.5 rounded-2xl text-xs shadow-md space-y-1 ${
+                                  isUser 
+                                    ? 'rounded-tl-sm bg-slate-900 border border-slate-700/80 text-slate-100' 
+                                    : 'rounded-tr-sm bg-purple-950 border border-purple-700/70 text-purple-100'
+                                }`}>
+                                  <div className="flex items-center justify-between gap-3 text-[10px] font-bold">
+                                    <span className={isUser ? 'text-cyan-300' : 'text-purple-300'}>
+                                      {isUser ? activeInquiry.userName : 'IK Enterprises Dispatch'}
+                                    </span>
+                                    <span className="text-slate-400 font-normal">{msg.time || ''}</span>
+                                  </div>
+                                  <p className="whitespace-pre-line leading-relaxed text-xs">
+                                    {msg.text}
+                                  </p>
+                                </div>
                               </div>
-                            ))}
+                            );
+                          })
+                        )}
+
+                        {/* Standalone Admin Dispatch Reply if resolved without messages array */}
+                        {activeInquiry.adminReply && (!Array.isArray(activeInquiry.messages) || activeInquiry.messages.length <= 1) && (
+                          <div className="flex items-start gap-2.5 max-w-[85%] ml-auto flex-row-reverse">
+                            <div className="w-7 h-7 rounded-lg bg-purple-600 text-white shadow-md flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                              IK
+                            </div>
+                            <div className="p-3.5 rounded-2xl rounded-tr-sm bg-purple-950 border border-purple-700/70 text-purple-100 text-xs shadow-md space-y-1">
+                              <div className="flex items-center justify-between gap-3 text-[10px] font-bold text-purple-300">
+                                <span className="flex items-center gap-1">
+                                  <ShieldCheck className="w-3 h-3 text-purple-400" />
+                                  <span>Official Dispatch Reply</span>
+                                </span>
+                                <span className="text-slate-400 font-normal">Resolved</span>
+                              </div>
+                              <p className="whitespace-pre-line leading-relaxed text-xs">
+                                {activeInquiry.adminReply}
+                              </p>
+                            </div>
                           </div>
                         )}
+
                       </div>
-                    )}
 
-                  </div>
-                );
-              })}
+                      {/* Quick Presets & Reply Footer (WhatsApp / Gmail Input Bar) */}
+                      <div className="p-3 bg-slate-900 border-t border-slate-800 space-y-2.5 shrink-0">
+                        
+                        {/* 1-Click Quick Response Chips */}
+                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] font-medium no-scrollbar">
+                          <span className="text-[10px] text-slate-500 font-bold uppercase shrink-0">Quick:</span>
+                          <button
+                            type="button"
+                            onClick={() => setDirectReplyText('Thank you for contacting IK Enterprises! Your request has been verified and processed by dispatch.')}
+                            className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 shrink-0 transition"
+                          >
+                            ⚡ Verified & Processed
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDirectReplyText('Your account is active. You can now log in to your Client Dashboard and dispatch live interpreters 24/7.')}
+                            className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 shrink-0 transition"
+                          >
+                            👤 Account Active
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDirectReplyText('Your interpreter application and credentials have been verified. Welcome to IK Enterprises!')}
+                            className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 shrink-0 transition"
+                          >
+                            🎧 Profile Approved
+                          </button>
+                          {phone && (
+                            <button
+                              type="button"
+                              onClick={() => setDirectReplyText(`We have received your request and our operations team will message you on WhatsApp at ${phone} shortly.`)}
+                              className="px-2 py-1 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-700/60 shrink-0 transition"
+                            >
+                              💬 WhatsApp Follow-up
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Text input and send button */}
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            if (directReplyText.trim()) {
+                              handleSendDirectReply(activeInquiry.id, directReplyText.trim());
+                            }
+                          }}
+                          className="flex items-center gap-2"
+                        >
+                          <input
+                            type="text"
+                            value={directReplyText}
+                            onChange={(e) => setDirectReplyText(e.target.value)}
+                            placeholder={`Type a direct reply to ${activeInquiry.userName || 'client'}...`}
+                            className="flex-1 px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition"
+                          />
+                          <button
+                            type="submit"
+                            disabled={!directReplyText.trim()}
+                            className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:hover:bg-purple-600 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-md shadow-purple-600/30 transition shrink-0"
+                          >
+                            <Send className="w-3.5 h-3.5" />
+                            <span>Send</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReplyModalInquiry(activeInquiry);
+                              setAdminReplyText(activeInquiry.adminReply || directReplyText || '');
+                            }}
+                            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition shrink-0"
+                            title="Open Advanced Dispatch Modal"
+                          >
+                            <Mail className="w-4 h-4" />
+                          </button>
+                        </form>
+
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+
             </div>
-          )}
 
-        </div>
-      )}
+          </div>
+        );
+      })()}
 
       {/* ========================================================== */}
       {/* TAB: PAYMENT RECEIPTS & BANK DEPOSIT VERIFICATION */}

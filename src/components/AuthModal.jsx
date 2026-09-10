@@ -37,6 +37,7 @@ export default function AuthModal({
   // Sign up state
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [orgName, setOrgName] = useState('');
   const [specialty, setSpecialty] = useState('Medical / Healthcare');
@@ -181,6 +182,7 @@ export default function AuthModal({
       id: `usr-${Date.now().toString(36)}`,
       name: cleanName,
       email: cleanEmail,
+      phone: phone.trim(),
       role: role,
       avatarType: avatarType,
       avatarPreset: selectedAvatarPreset,
@@ -588,10 +590,31 @@ export default function AuthModal({
                   </div>
                 </div>
 
+                {/* Interpreter switch alert */}
+                <div className="p-3 rounded-2xl bg-gradient-to-r from-purple-950/80 to-indigo-950/80 border border-purple-500/40 flex items-center justify-between gap-2 shadow-inner">
+                  <div className="flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-purple-300 shrink-0" />
+                    <div>
+                      <p className="text-[11px] font-bold text-white">Are you a Linguist / Interpreter?</p>
+                      <p className="text-[10px] text-purple-300">Apply to join our paid interpretation roster.</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      if (onOpenInterpreterApplication) onOpenInterpreterApplication();
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-[10px] shrink-0 shadow-md shadow-purple-600/30 transition cursor-pointer"
+                  >
+                    Apply as Interpreter ✍️
+                  </button>
+                </div>
+
                 {/* Client / Host Registration Form */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div className="space-y-1">
-                    <label className="font-semibold text-slate-300">Full Name</label>
+                    <label className="font-semibold text-slate-300 text-xs">Full Name</label>
                     <input
                       type="text"
                       value={name}
@@ -603,7 +626,7 @@ export default function AuthModal({
                   </div>
 
                   <div className="space-y-1">
-                    <label className="font-semibold text-slate-300">Work Email</label>
+                    <label className="font-semibold text-slate-300 text-xs">Work Email</label>
                     <input
                       type="email"
                       value={email}
@@ -617,7 +640,19 @@ export default function AuthModal({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div className="space-y-1">
-                    <label className="font-semibold text-slate-300">Organization / Company (Optional)</label>
+                    <label className="font-semibold text-slate-300 text-xs">WhatsApp / Mobile Number</label>
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="e.g. +1 555-0199 or +92 300 1234567"
+                      className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-300 text-xs">Organization / Company (Optional)</label>
                     <input
                       type="text"
                       value={orgName}
@@ -626,16 +661,17 @@ export default function AuthModal({
                       className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="font-semibold text-slate-300">Primary Domain</label>
-                    <select
-                      value={specialty}
-                      onChange={(e) => setSpecialty(e.target.value)}
-                      className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none bg-slate-900"
-                    >
-                      {SPECIALTIES.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-                    </select>
-                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-300 text-xs">Primary Domain</label>
+                  <select
+                    value={specialty}
+                    onChange={(e) => setSpecialty(e.target.value)}
+                    className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none bg-slate-900"
+                  >
+                    {SPECIALTIES.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                  </select>
                 </div>
 
                 <div className="space-y-1">
