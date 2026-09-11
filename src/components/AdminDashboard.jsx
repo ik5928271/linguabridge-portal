@@ -72,7 +72,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   const [userRoleFilter, setUserRoleFilter] = useState('all');
   const [employmentFilter, setEmploymentFilter] = useState('all'); // 'all', 'salary_base', 'hourly', 'per_minute'
 
-  // Dynamic user list
+  // Dynamic user list with instant pre-loaded roster
   const [usersList, setUsersList] = useState([
     {
       id: 'usr-owner-ikram',
@@ -87,6 +87,82 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       monthlySalary: 5000,
       hourlyRate: 0,
       wallet: { totalPaid: 1000, totalMinutesPurchased: 9999, minutesRemaining: 9999, billingType: 'unlimited_owner' },
+      createdAt: '2026-08-30'
+    },
+    {
+      id: 'usr-interp-alex',
+      name: 'Alex S.',
+      email: 'alex@linguabridge.com',
+      role: 'interpreter',
+      primaryLang: 'Russian',
+      specialty: 'General / Customer Support',
+      hourlyRate: 5,
+      minuteRate: 0.30,
+      monthlySalary: 1200,
+      employmentType: 'hourly',
+      rateLabel: '$5/hr (Scheduled Shift)',
+      createdAt: '2026-08-30'
+    },
+    {
+      id: 'usr-interp-wali',
+      name: 'Wali',
+      email: 'wali@linguabridge.com',
+      role: 'interpreter',
+      primaryLang: 'Arabic',
+      specialty: 'Medical / Healthcare',
+      hourlyRate: 5,
+      minuteRate: 0.30,
+      monthlySalary: 1200,
+      employmentType: 'hourly',
+      rateLabel: '$5/hr (Scheduled Shift)',
+      createdAt: '2026-08-30'
+    },
+    {
+      id: 'usr-interp-tariq',
+      name: 'Tariq Khan',
+      email: 'tariq@linguabridge.com',
+      role: 'interpreter',
+      primaryLang: 'Urdu',
+      specialty: 'General / Customer Support',
+      hourlyRate: 5,
+      minuteRate: 0.30,
+      monthlySalary: 1200,
+      employmentType: 'hourly',
+      rateLabel: '$5/hr (Scheduled Shift)',
+      createdAt: '2026-08-30'
+    },
+    {
+      id: 'usr-interp-sofia',
+      name: 'Sofia Martinez',
+      email: 'sofia@linguabridge.com',
+      role: 'interpreter',
+      primaryLang: 'Spanish',
+      specialty: 'Medical / Healthcare',
+      hourlyRate: 5,
+      minuteRate: 0.30,
+      monthlySalary: 1200,
+      employmentType: 'hourly',
+      rateLabel: '$5/hr (Scheduled Shift)',
+      createdAt: '2026-08-30'
+    },
+    {
+      id: 'usr-client-demo',
+      name: 'IK Client (Prepaid 120 Mins)',
+      email: 'client@linguabridge.com',
+      role: 'host',
+      org: 'IK Enterprises Client Corp',
+      billingType: 'prepaid',
+      wallet: { totalPaid: 100, totalMinutesPurchased: 120, minutesRemaining: 120, billingType: 'prepaid' },
+      createdAt: '2026-08-30'
+    },
+    {
+      id: 'usr-client-hospital',
+      name: 'Mercy Hospital Client (Net 30)',
+      email: 'hospital@linguabridge.com',
+      role: 'host',
+      org: 'Mercy Healthcare Network',
+      billingType: 'postpaid_hospital',
+      wallet: { totalPaid: 0, totalMinutesPurchased: 0, minutesRemaining: 0, billingType: 'postpaid_hospital' },
       createdAt: '2026-08-30'
     }
   ]);
@@ -2525,9 +2601,22 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                               <h4 className={`text-xs font-bold truncate ${isSelected ? 'text-white' : 'text-slate-200'}`}>
                                 {inq.userName || inq.userEmail || 'Anonymous Guest'}
                               </h4>
-                              <span className="text-[10px] text-slate-400 shrink-0 font-medium">
-                                {new Date(inq.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </span>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span className="text-[10px] text-slate-400 font-medium">
+                                  {new Date(inq.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteInquiry(inq.id);
+                                  }}
+                                  className="p-1 rounded-md text-slate-500 hover:text-red-400 hover:bg-red-500/20 transition"
+                                  title="Delete this message"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
                             </div>
 
                             <p className="text-[11px] font-semibold text-purple-300 truncate mb-1">
