@@ -1282,6 +1282,7 @@ app.get('/api/inquiries', (req, res) => {
 // 2. Submit new inquiry or save AI bot conversation
 app.post('/api/inquiries', (req, res) => {
   const { 
+    id,
     userName = 'Guest Visitor', 
     userEmail = '', 
     userPhone = '',
@@ -1299,35 +1300,44 @@ app.post('/api/inquiries', (req, res) => {
     return res.status(400).json({ error: 'Message content is required.' });
   }
 
-  const newInq = {
-    id: `inq-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 5)}`,
-    userName: userName.trim(),
-    userEmail: userEmail.trim(),
-    userPhone: resolvedPhone,
+  if (!Array.isArray(store.inquiries)) {
+    store.inquiries = [];
+  }
+
+  const targetId = id || `inq-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 5)}`;
+  const existingIdx = store.inquiries.findIndex(i => i.id === targetId);
+
+  const inqData = {
+    id: targetId,
+    userName: userName.trim() || (existingIdx >= 0 ? store.inquiries[existingIdx].userName : 'Guest Visitor'),
+    userEmail: userEmail.trim() || (existingIdx >= 0 ? store.inquiries[existingIdx].userEmail : ''),
+    userPhone: resolvedPhone || (existingIdx >= 0 ? store.inquiries[existingIdx].userPhone : ''),
     userRole: userRole.toLowerCase(),
-    subject: subject.trim(),
+    subject: subject.trim() || (existingIdx >= 0 ? store.inquiries[existingIdx].subject : 'General Platform Inquiry'),
     message: message.trim() || (messages[messages.length - 1]?.text || 'Inquiry conversation'),
     category: category,
-    status: 'new', // 'new', 'in_progress', 'resolved'
-    adminReply: '',
-    createdAt: new Date().toISOString(),
+    status: existingIdx >= 0 ? store.inquiries[existingIdx].status : 'new',
+    adminReply: existingIdx >= 0 ? store.inquiries[existingIdx].adminReply : '',
+    createdAt: existingIdx >= 0 ? store.inquiries[existingIdx].createdAt : new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     messages: Array.isArray(messages) && messages.length > 0 ? messages : [
       { sender: 'user', text: message.trim(), time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
     ]
   };
 
-  if (!Array.isArray(store.inquiries)) {
-    store.inquiries = [];
+  if (existingIdx >= 0) {
+    store.inquiries[existingIdx] = inqData;
+  } else {
+    store.inquiries.unshift(inqData);
   }
 
-  store.inquiries.unshift(newInq);
   saveStore();
-  io.emit('new-inquiry', newInq);
+  io.emit(existingIdx >= 0 ? 'inquiry-updated' : 'new-inquiry', inqData);
 
   res.json({
     success: true,
-    message: 'Inquiry submitted successfully. Dispatch team has been alerted.',
-    inquiry: newInq
+    message: 'Inquiry saved successfully.',
+    inquiry: inqData
   });
 });
 

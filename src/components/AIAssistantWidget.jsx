@@ -55,6 +55,7 @@ export default function AIAssistantWidget({ currentUser = null, currentRole = 'h
   const [inputQuery, setInputQuery] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const chatBottomRef = useRef(null);
+  const sessionIdRef = useRef('inq-chat-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6));
 
   // Inquiry / Message Form State
   const [ticketName, setTicketName] = useState(currentUser?.name || '');
@@ -191,6 +192,7 @@ LinguaBridge enforces industry-standard protocols for high-stakes medical, legal
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          id: sessionIdRef.current,
           userName: ticketName.trim(),
           userEmail: ticketEmail.trim(),
           userPhone: ticketPhone.trim(),
@@ -240,7 +242,8 @@ LinguaBridge enforces industry-standard protocols for high-stakes medical, legal
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
-    setMessages(prev => [...prev, userMsg]);
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
     setInputQuery('');
     setIsTyping(true);
 
@@ -254,8 +257,29 @@ LinguaBridge enforces industry-standard protocols for high-stakes medical, legal
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
 
-      setMessages(prev => [...prev, botMsg]);
+      const finalMessages = [...updatedMessages, botMsg];
+      setMessages(finalMessages);
       setIsTyping(false);
+
+      // Automatically sync live chat to Admin Support Hub & MongoDB Atlas
+      try {
+        await fetch('/api/inquiries', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: sessionIdRef.current,
+            userName: ticketName.trim() || (currentUser?.name || 'Guest Visitor'),
+            userEmail: ticketEmail.trim() || (currentUser?.email || ''),
+            userPhone: ticketPhone.trim() || '',
+            phone: ticketPhone.trim() || '',
+            userRole: currentUser?.role || currentRole || 'guest',
+            subject: `💬 Live Guest Chat: "${userText.slice(0, 40)}${userText.length > 40 ? '...' : ''}"`,
+            message: userText,
+            category: 'AI Concierge & Live Chat',
+            messages: finalMessages
+          })
+        });
+      } catch {}
     }, 600);
   };
 

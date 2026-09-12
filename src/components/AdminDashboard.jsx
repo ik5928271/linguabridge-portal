@@ -46,6 +46,8 @@ import {
   ChevronDown,
   ChevronUp
 } from 'lucide-react';
+import { getSocket } from '../services/socket';
+
 const TIMEZONES = [
   { value: 'PKT (UTC+5:00 - Pakistan / South Asia)', label: '🇵🇰 PKT (UTC+5:00 - Pakistan / South Asia)' },
   { value: 'GST (UTC+4:00 - UAE / Dubai / Gulf)', label: '🇦🇪 GST (UTC+4:00 - UAE / Dubai / Gulf)' },
@@ -510,13 +512,53 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
     fetchInquiries();
     fetchReceipts();
     fetchAnalytics();
+
+    const socket = getSocket();
+    let handleNewInquiry, handleUpdatedInquiry, handleDeletedInquiry, handleNewApp;
+    if (socket) {
+      handleNewInquiry = (inq) => {
+        if (inq && inq.id) {
+          setInquiriesList(prev => [inq, ...prev.filter(i => i.id !== inq.id)]);
+        }
+      };
+      handleUpdatedInquiry = (inq) => {
+        if (inq && inq.id) {
+          setInquiriesList(prev => prev.map(i => i.id === inq.id ? { ...i, ...inq } : i));
+        }
+      };
+      handleDeletedInquiry = ({ id }) => {
+        if (id) {
+          setInquiriesList(prev => prev.filter(i => i.id !== id));
+        }
+      };
+      handleNewApp = (app) => {
+        if (app && app.id) {
+          setApplications(prev => [app, ...prev.filter(a => a.id !== app.id)]);
+        }
+      };
+
+      socket.on('new-inquiry', handleNewInquiry);
+      socket.on('inquiry-updated', handleUpdatedInquiry);
+      socket.on('inquiry-deleted', handleDeletedInquiry);
+      socket.on('new-interpreter-application', handleNewApp);
+    }
+
     const timer = setInterval(() => {
       fetchApplications();
       fetchInquiries();
       fetchReceipts();
       fetchAnalytics();
-    }, 8000);
-    return () => clearInterval(timer);
+    }, 6000);
+
+    return () => {
+      clearInterval(timer);
+      if (socket) {
+        if (handleNewInquiry) socket.off('new-inquiry', handleNewInquiry);
+        if (handleUpdatedInquiry) socket.off('inquiry-updated', handleUpdatedInquiry);
+        if (handleDeletedInquiry) socket.off('inquiry-deleted', handleDeletedInquiry);
+        if (handleNewApp) socket.off('new-interpreter-application', handleNewApp);
+      }
+    };
   }, []);
 
   const handleApproveReceipt = (receiptId) => {
