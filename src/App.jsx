@@ -78,6 +78,7 @@ export default function App() {
 
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState('signin'); // 'signin' or 'signup'
+  const [authTargetRole, setAuthTargetRole] = useState('host'); // 'host' or 'interpreter'
   const [isInterpreterAppOpen, setIsInterpreterAppOpen] = useState(false);
 
   // Global Prepaid Minute Wallet State (Persisted in localStorage & synced with backend)
@@ -266,8 +267,9 @@ export default function App() {
     setAppointments(prev => [newApt, ...prev]);
   };
 
-  const handleOpenAuth = (mode = 'signin') => {
+  const handleOpenAuth = (mode = 'signin', role = 'host') => {
     setAuthMode(mode);
+    setAuthTargetRole(role || 'host');
     setIsAuthOpen(true);
   };
 
@@ -279,6 +281,7 @@ export default function App() {
 
     const normalizedRole = (user.role === 'client' || user.role === 'host') ? 'host' : user.role;
     setCurrentRole(normalizedRole);
+    setCurrentView(user.role === 'admin' ? 'admin' : user.role === 'interpreter' ? 'interpreter' : 'host');
     
     if (walletData) {
       setClientWallet(walletData);
@@ -410,6 +413,7 @@ export default function App() {
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
         initialMode={authMode}
+        initialRole={authTargetRole}
         onSuccessLogin={handleSuccessLogin}
         onOpenInterpreterApplication={() => {
           setIsAuthOpen(false);

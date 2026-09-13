@@ -22,13 +22,20 @@ export default function AuthModal({
   isOpen, 
   onClose, 
   initialMode = 'signin', // 'signin' or 'signup'
+  initialRole = 'host', // 'host' or 'interpreter'
   onSuccessLogin,
   onOpenInterpreterApplication
 }) {
   if (!isOpen) return null;
 
   const [mode, setMode] = useState(initialMode); // 'signin' or 'signup'
-  const [role, setRole] = useState('host'); // 'host', 'interpreter', 'guest'
+  const [role, setRole] = useState(initialRole || 'host'); // 'host', 'interpreter', 'guest'
+  
+  // Update mode/role when modal opens with new initial props
+  React.useEffect(() => {
+    setMode(initialMode);
+    setRole(initialRole || 'host');
+  }, [initialMode, initialRole, isOpen]);
   
   // Sign in state
   const [signInEmail, setSignInEmail] = useState('');
@@ -296,13 +303,44 @@ export default function AuthModal({
           </button>
         </div>
 
+        {/* Portal Identifier Switcher Bar */}
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Select Portal Type:</label>
+          <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-slate-900 border border-slate-800 text-xs font-extrabold">
+            <button
+              type="button"
+              onClick={() => setRole('host')}
+              className={`py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 transition ${
+                role === 'host'
+                  ? 'bg-brand-600 text-white shadow-md shadow-brand-600/30 ring-1 ring-brand-400/50'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              <span>🏢 Client / Hospital</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setRole('interpreter')}
+              className={`py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 transition ${
+                role === 'interpreter'
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-1 ring-emerald-400/50'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <Headphones className="w-3.5 h-3.5" />
+              <span>🎧 Interpreter Portal</span>
+            </button>
+          </div>
+        </div>
+
         {/* Mode Switcher Tabs */}
         <div className="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-800 text-xs font-bold">
           <button
             type="button"
             onClick={() => setMode('signin')}
             className={`flex-1 py-2 rounded-lg transition ${
-              mode === 'signin' ? 'bg-brand-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+              mode === 'signin' ? (role === 'interpreter' ? 'bg-emerald-600 text-white shadow' : 'bg-brand-600 text-white shadow') : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             Sign In
@@ -311,10 +349,10 @@ export default function AuthModal({
             type="button"
             onClick={() => setMode('signup')}
             className={`flex-1 py-2 rounded-lg transition ${
-              mode === 'signup' ? 'bg-brand-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+              mode === 'signup' ? (role === 'interpreter' ? 'bg-emerald-600 text-white shadow' : 'bg-brand-600 text-white shadow') : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            Create Account
+            {role === 'interpreter' ? 'Apply / Register' : 'Create Client Account'}
           </button>
         </div>
 
@@ -322,14 +360,16 @@ export default function AuthModal({
         {mode === 'signin' && (
           <form onSubmit={handleSignInSubmit} className="space-y-4 text-xs">
             <div className="space-y-1">
-              <label className="font-semibold text-slate-300">Email Address or Username</label>
+              <label className="font-semibold text-slate-300">
+                {role === 'interpreter' ? 'Interpreter Email or Username' : 'Client / Hospital Email'}
+              </label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5" />
                 <input
                   type="email"
                   value={signInEmail}
                   onChange={(e) => setSignInEmail(e.target.value)}
-                  placeholder="doctor@hospital.org or interpreter@network.com"
+                  placeholder={role === 'interpreter' ? 'interpreter@network.com' : 'doctor@hospital.org'}
                   className="w-full glass-input pl-10 pr-3 py-2.5 rounded-xl text-xs text-white focus:outline-none"
                   required
                 />
@@ -358,9 +398,13 @@ export default function AuthModal({
 
             <button
               type="submit"
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-brand-500 to-indigo-600 hover:from-brand-600 hover:to-indigo-700 text-white font-extrabold text-xs shadow-lg shadow-brand-500/25 flex items-center justify-center gap-2 transition"
+              className={`w-full py-3 rounded-xl text-white font-extrabold text-xs shadow-lg flex items-center justify-center gap-2 transition ${
+                role === 'interpreter'
+                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-emerald-600/30'
+                  : 'bg-gradient-to-r from-brand-500 to-indigo-600 hover:from-brand-600 hover:to-indigo-700 shadow-brand-500/25'
+              }`}
             >
-              <span>Sign In to Dashboard</span>
+              <span>{role === 'interpreter' ? 'Sign In to Interpreter Workbench' : 'Sign In to Client Dashboard'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
 

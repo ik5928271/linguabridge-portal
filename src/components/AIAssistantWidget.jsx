@@ -223,11 +223,10 @@ LinguaBridge enforces industry-standard protocols for high-stakes medical, legal
   };
 
   // Handle Sending a Message in Chat
-  const handleSendMessage = async (e) => {
+  const handleSendMessage = async (e, directQuery = null) => {
     e?.preventDefault();
-    if (!inputQuery.trim()) return;
-
-    const userText = inputQuery.trim();
+    const userText = (typeof directQuery === 'string' ? directQuery : inputQuery).trim();
+    if (!userText) return;
 
     // Auto-detect email and phone if user typed them in chat
     const emailMatch = userText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
@@ -553,12 +552,7 @@ LinguaBridge enforces industry-standard protocols for high-stakes medical, legal
                   <button
                     key={idx}
                     type="button"
-                    onClick={() => {
-                      setInputQuery(qp.query);
-                      setTimeout(() => {
-                        handleSendMessage();
-                      }, 50);
-                    }}
+                    onClick={() => handleSendMessage(null, qp.query)}
                     className="linguabot-quick-pill px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-purple-100 dark:hover:bg-purple-900/40 text-slate-900 dark:text-slate-200 hover:text-purple-700 dark:hover:text-purple-300 border border-slate-300 dark:border-slate-700 hover:border-purple-400 dark:hover:border-purple-500/50 text-[11px] font-bold whitespace-nowrap transition-all shadow-sm shrink-0 cursor-pointer"
                   >
                     {qp.label}

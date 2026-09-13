@@ -676,6 +676,69 @@ app.post('/api/auth/login', (req, res) => {
   res.json({ success: true, user, wallet: userWallet });
 });
 
+// 3b. Switch user role (Self-service role fix: Client <-> Interpreter)
+app.post('/api/auth/switch-role', (req, res) => {
+  const { userId, targetRole } = req.body;
+  if (!userId || !targetRole) {
+    return res.status(400).json({ error: 'User ID and target role are required.' });
+  }
+
+  const user = store.users.find(u => u.id === userId || u.email?.toLowerCase() === userId?.toLowerCase());
+  if (!user) {
+    return res.status(404).json({ error: 'User not found.' });
+  }
+
+  user.role = targetRole === 'interpreter' ? 'interpreter' : 'host';
+  user.org = user.role === 'interpreter' ? 'Certified Linguist Pool' : (user.org && user.org !== 'Certified Linguist Pool' ? user.org : 'Client / Organization Account');
+
+  if (user.role === 'interpreter') {
+    let interp = store.interpreters.find(i => i.userId === user.id || i.email === user.email);
+    if (!interp) {
+      interp = {
+        id: `int-${Date.now().toString(36)}`,
+        userId: user.id,
+        name: user.name,
+        email: user.email,
+        avatar: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 900000000)}?w=150&auto=format&fit=crop&q=80`,
+        languages: [user.primaryLang || 'Spanish', 'English'],
+        primaryLang: user.primaryLang || 'Spanish',
+        specialties: [user.specialty || 'General / Customer Support'],
+        status: 'online',
+        rating: 5.0,
+        totalCalls: 0,
+        employmentType: 'hourly',
+        hourlyRate: user.hourlyRate || 8,
+        minuteRate: user.minuteRate || 0.30,
+        monthlySalary: user.monthlySalary || 1200,
+        rateLabel: user.rateLabel || '$8/hr (Scheduled Shift)',
+        certifications: ['Certified Professional Linguist'],
+        bio: `Certified ${user.primaryLang || 'Spanish'} professional linguist.`
+      };
+      store.interpreters.push(interp);
+      io.emit('interpreter-registered', interp);
+    }
+  }
+
+  if (user.role === 'host' && !store.wallets[user.id]) {
+    store.wallets[user.id] = {
+      userId: user.id,
+      totalPaid: 0.00,
+      totalMinutesPurchased: 0,
+      minutesUsed: 0,
+      minutesRemaining: 0,
+      billingType: 'prepaid'
+    };
+  }
+
+  saveStore();
+  res.json({
+    success: true,
+    message: `Account role switched to ${user.role === 'interpreter' ? 'Certified Interpreter' : 'Client / Payer'}.`,
+    user,
+    wallet: store.wallets[user.id] || null
+  });
+});
+
 // 4. Admin Account Management: Get all users & provision new accounts
 app.get('/api/admin/users', (req, res) => {
   const userList = store.users.map(u => ({
@@ -823,21 +886,46 @@ app.put('/api/admin/users/:id', (req, res) => {
 
   if (billingType) user.billingType = billingType;
 
-  // Update corresponding interpreter profile if applicable
-  const interp = store.interpreters.find(i => i.userId === id || i.id === id || i.email === user.email);
-  if (interp) {
-    if (name) interp.name = name;
-    if (primaryLang) {
-      interp.primaryLang = primaryLang;
-      interp.languages = [primaryLang, 'English'];
+  // Update or create corresponding interpreter profile if role is interpreter
+  let interp = store.interpreters.find(i => i.userId === id || i.id === id || i.email === user.email);
+  if (user.role === 'interpreter') {
+    if (interp) {
+      if (name) interp.name = name;
+      if (primaryLang) {
+        interp.primaryLang = primaryLang;
+        interp.languages = [primaryLang, 'English'];
+      }
+      if (specialty) interp.specialties = [specialty, 'General / Customer Support'];
+      if (employmentType) interp.employmentType = employmentType;
+      if (hourlyRate !== undefined) interp.hourlyRate = parseInt(hourlyRate);
+      if (minuteRate !== undefined) interp.minuteRate = parseFloat(minuteRate);
+      if (monthlySalary !== undefined) interp.monthlySalary = parseInt(monthlySalary);
+      if (shiftSchedule) interp.shiftSchedule = shiftSchedule;
+      interp.rateLabel = user.rateLabel;
+    } else {
+      interp = {
+        id: `int-${Date.now().toString(36)}`,
+        userId: user.id,
+        name: user.name,
+        email: user.email,
+        avatar: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 900000000)}?w=150&auto=format&fit=crop&q=80`,
+        languages: [user.primaryLang || 'Spanish', 'English'],
+        primaryLang: user.primaryLang || 'Spanish',
+        specialties: [user.specialty || 'General / Customer Support'],
+        status: 'online',
+        rating: 5.0,
+        totalCalls: 0,
+        employmentType: resolvedType,
+        hourlyRate: user.hourlyRate || 8,
+        minuteRate: user.minuteRate || 0.30,
+        monthlySalary: user.monthlySalary || 1200,
+        rateLabel: user.rateLabel,
+        certifications: ['Certified Professional Linguist'],
+        bio: `Certified ${user.primaryLang || 'Spanish'} professional linguist.`
+      };
+      store.interpreters.push(interp);
+      io.emit('interpreter-registered', interp);
     }
-    if (specialty) interp.specialties = [specialty, 'General / Customer Support'];
-    if (employmentType) interp.employmentType = employmentType;
-    if (hourlyRate !== undefined) interp.hourlyRate = parseInt(hourlyRate);
-    if (minuteRate !== undefined) interp.minuteRate = parseFloat(minuteRate);
-    if (monthlySalary !== undefined) interp.monthlySalary = parseInt(monthlySalary);
-    if (shiftSchedule) interp.shiftSchedule = shiftSchedule;
-    interp.rateLabel = user.rateLabel;
   }
 
   // Update corresponding wallet if applicable

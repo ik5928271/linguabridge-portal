@@ -94,34 +94,77 @@ export default function LandingPage({
           The next-generation on-demand and scheduled interpretation platform. Connect doctors, attorneys, and businesses with certified linguists and diverse non-English clients in under 15 seconds across 150+ languages.
         </p>
 
-        {/* Primary Action Buttons */}
-        <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
-          <button
-            onClick={() => onSelectRole('host')}
-            className="flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-brand-500 via-brand-600 to-indigo-600 hover:from-brand-600 hover:to-indigo-700 text-white font-extrabold text-base shadow-xl shadow-brand-500/30 transition transform hover:-translate-y-0.5"
-          >
-            <PhoneCall className="w-5 h-5" />
-            <span>Book Certified Interpreter Now</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
+        {/* DUAL GATEWAYS: CLIENT & HOSPITAL PORTAL vs INTERPRETER & LINGUIST PORTAL */}
+        <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto text-left">
+          
+          {/* GATEWAY 1: FOR CLIENTS & HOSPITALS */}
+          <div className="glass-panel p-6 sm:p-7 rounded-3xl border border-brand-500/30 bg-gradient-to-br from-brand-950/40 via-slate-900/80 to-slate-950 flex flex-col justify-between shadow-2xl hover:border-brand-500/60 transition-all group">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="w-12 h-12 rounded-2xl bg-brand-500/20 text-brand-400 flex items-center justify-center ring-1 ring-brand-500/40 group-hover:scale-105 transition">
+                  <Building2 className="w-6 h-6" />
+                </div>
+                <span className="px-3 py-1 rounded-full bg-brand-500/20 text-brand-300 text-[10px] font-extrabold uppercase tracking-wider border border-brand-500/30">
+                  Clients & Hospitals
+                </span>
+              </div>
+              <h3 className="text-xl font-black text-white">Client / Doctor Portal</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                For Hospitals, Clinics, Law Firms, and Individuals needing on-demand & scheduled 3-way live interpretation in 150+ languages.
+              </p>
+            </div>
 
-          <button
-            onClick={() => onOpenAuth('signin')}
-            className="flex items-center gap-2 px-7 py-4 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 font-bold text-base border border-slate-700 transition"
-          >
-            <LogIn className="w-5 h-5 text-brand-400" />
-            <span>Client Sign In</span>
-          </button>
+            <div className="mt-6 flex flex-col sm:flex-row items-center gap-2.5">
+              <button
+                onClick={() => onSelectRole('host')}
+                className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-brand-500 via-brand-600 to-indigo-600 hover:from-brand-600 hover:to-indigo-700 text-white font-extrabold text-xs shadow-lg shadow-brand-500/30 flex items-center justify-center gap-1.5 transition transform active:scale-95 cursor-pointer"
+              >
+                <PhoneCall className="w-4 h-4" />
+                <span>Book / Start Call</span>
+              </button>
+              <button
+                onClick={() => onOpenAuth('signin', 'host')}
+                className="w-full sm:w-auto py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition cursor-pointer"
+              >
+                <span>Client Sign In</span>
+              </button>
+            </div>
+          </div>
 
-          <button
-            onClick={() => {
-              const el = document.getElementById('how-it-works');
-              if (el) el.scrollIntoView({ behavior: 'smooth' });
-            }}
-            className="flex items-center gap-2 px-6 py-4 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 font-semibold text-base border border-slate-700 transition"
-          >
-            <span>How It Works</span>
-          </button>
+          {/* GATEWAY 2: FOR CERTIFIED INTERPRETERS */}
+          <div className="glass-panel p-6 sm:p-7 rounded-3xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/40 via-slate-900/80 to-slate-950 flex flex-col justify-between shadow-2xl hover:border-emerald-500/60 transition-all group">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center ring-1 ring-emerald-500/40 group-hover:scale-105 transition">
+                  <Headphones className="w-6 h-6" />
+                </div>
+                <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-extrabold uppercase tracking-wider border border-emerald-500/30">
+                  Interpreters & Linguists
+                </span>
+              </div>
+              <h3 className="text-xl font-black text-white">Interpreter Portal</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                For certified and professional linguists seeking live talk calls, fixed shifts, salary packages, and Propio verification.
+              </p>
+            </div>
+
+            <div className="mt-6 flex flex-col sm:flex-row items-center gap-2.5">
+              <button
+                onClick={() => onOpenInterpreterApplication ? onOpenInterpreterApplication() : onOpenAuth('signup', 'interpreter')}
+                className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-1.5 transition transform active:scale-95 cursor-pointer"
+              >
+                <Award className="w-4 h-4" />
+                <span>Apply as Interpreter</span>
+              </button>
+              <button
+                onClick={() => onOpenAuth('signin', 'interpreter')}
+                className="w-full sm:w-auto py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition cursor-pointer"
+              >
+                <span>Interpreter Sign In</span>
+              </button>
+            </div>
+          </div>
+
         </div>
 
         {/* Trust Badges Bar */}
