@@ -47,6 +47,8 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { getSocket } from '../services/socket';
+import ALL_SEED_APPLICATIONS from '../data/all_seed_applications.json';
+
 
 const TIMEZONES = [
   { value: 'PKT (UTC+5:00 - Pakistan / South Asia)', label: '🇵🇰 PKT (UTC+5:00 - Pakistan / South Asia)' },
@@ -169,96 +171,22 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
     }
   ]);
 
-  // Interpreter Applications & Verification Queue state
+  // Interpreter Applications & Verification Queue state (All 41 live applications loaded instantly with 0ms delay)
   const [applications, setApplications] = useState(() => {
-    const defaultApps = [
-      {
-        id: 'app-talha-khan',
-        name: 'Muhammad Talha Khan',
-        email: 'talhakhan.interpreter@gmail.com',
-        phone: '+923358544432',
-        country: 'Pakistan',
-        primaryLang: 'Pashto',
-        languages: ['Pashto', 'Urdu', 'Hindi', 'English'],
-        specialties: ['General / Customer Support', 'Medical / Healthcare'],
-        certifications: ['Certified Interpreter (OPI/VRI)', 'Bilingual Pashto-Urdu-Hindi Specialist'],
-        experienceYears: 4,
-        employmentType: 'hourly',
-        minuteRate: 0.30,
-        hourlyRate: 8,
-        monthlySalary: 1200,
-        rateLabel: '$8/hr (Scheduled Shift)',
-        bio: 'Professional certified OPI/VRI interpreter fluent in Pashto, Urdu, Hindi, and English. Available Mon-Fri for live hospital and customer support encounters.',
-        cvFileName: 'Muhammad_Talha_Khan_CV.pdf',
-        docFileName: 'OPI_VRI_Certification.pdf',
-        avatarPreset: 'male-1',
-        avatarEmoji: '👨‍💼',
-        status: 'pending',
-        adminNotes: 'Application received via LinkedIn dispatch (+92 3358544432) - ready for verification review.',
-        submittedAt: '2026-09-06T14:37:00.000Z'
-      },
-      {
-        id: 'app-ahmed-ali',
-        name: 'Dr. Ahmed Atef Ahmed Ali',
-        email: 'ahmed.atef.ali@gmail.com',
-        phone: '+201000000000',
-        country: 'Egypt / Global',
-        primaryLang: 'Arabic',
-        languages: ['Arabic', 'English'],
-        specialties: ['Medical / Healthcare', 'General / Customer Support'],
-        certifications: ['Certified Medical Doctor & Healthcare Interpreter', 'Propio Healthcare Training Certified'],
-        experienceYears: 5,
-        employmentType: 'hourly',
-        minuteRate: 0.35,
-        hourlyRate: 8,
-        monthlySalary: 1200,
-        rateLabel: '$8/hr (Scheduled Shift)',
-        bio: 'Certified Medical Doctor and bilingual Arabic/English medical interpreter with extensive clinical encounter and telehealth translation experience.',
-        cvFileName: 'Dr_Ahmed_Ali_Medical_CV.pdf',
-        docFileName: 'Medical_Degree_Propio_Certificate.pdf',
-        avatarPreset: 'male-2',
-        avatarEmoji: '👨‍⚕️',
-        status: 'pending',
-        adminNotes: 'Application received via email dispatch - ready for verification review.',
-        submittedAt: '2026-09-06T01:35:00.000Z'
-      },
-      {
-        id: 'app-elizaveta-khirevich',
-        name: 'Elizaveta Khirevich',
-        email: 'lkhirevich@gmail.com',
-        phone: '+971585829592',
-        country: 'United Arab Emirates',
-        primaryLang: 'Russian',
-        languages: ['Russian', 'English'],
-        specialties: ['General / Customer Support', 'Medical / Healthcare'],
-        certifications: ['Certified Professional Russian Linguist', 'Propio Training Certified'],
-        experienceYears: 1,
-        employmentType: 'per_minute',
-        minuteRate: 0.45,
-        hourlyRate: 8,
-        monthlySalary: 1200,
-        rateLabel: '$0.45/min (Live Talk)',
-        bio: 'Professional Russian and English interpreter based in United Arab Emirates with specialized Propio medical/client encounter training.',
-        cvFileName: 'Resume_CV_Submitted.pdf',
-        docFileName: 'Propio training.pdf',
-        avatarPreset: 'female-1',
-        avatarEmoji: '👩‍💼',
-        status: 'pending',
-        adminNotes: '',
-        submittedAt: '2026-09-05T08:26:00.000Z'
-      }
-    ];
+    let list = Array.isArray(ALL_SEED_APPLICATIONS) && ALL_SEED_APPLICATIONS.length > 0 
+      ? [...ALL_SEED_APPLICATIONS] 
+      : [];
     try {
       const localSaved = JSON.parse(localStorage.getItem('linguabridge_submitted_applications') || '[]');
       if (Array.isArray(localSaved) && localSaved.length > 0) {
         localSaved.forEach(localApp => {
-          if (!defaultApps.some(d => d.email && d.email.toLowerCase() === localApp.email?.toLowerCase())) {
-            defaultApps.unshift(localApp);
+          if (!list.some(d => d.email && d.email.toLowerCase() === localApp.email?.toLowerCase())) {
+            list.unshift(localApp);
           }
         });
       }
     } catch {}
-    return defaultApps;
+    return list;
   });
 
   const [appFilter, setAppFilter] = useState('all'); // 'all', 'pending', 'approved', 'rejected'

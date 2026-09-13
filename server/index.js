@@ -156,83 +156,16 @@ const SEED_WALLETS = {
 };
 
 // Permanent Seed Applications (Preserved across all deployments & container restarts)
-const SEED_APPLICATIONS = [
-  {
-    id: 'app-talha-khan',
-    name: 'Muhammad Talha Khan',
-    email: 'talhakhan.interpreter@gmail.com',
-    phone: '+923358544432',
-    country: 'Pakistan',
-    primaryLang: 'Pashto',
-    languages: ['Pashto', 'Urdu', 'Hindi', 'English'],
-    specialties: ['General / Customer Support', 'Medical / Healthcare'],
-    certifications: ['Certified Interpreter (OPI/VRI)', 'Bilingual Pashto-Urdu-Hindi Specialist'],
-    experienceYears: 4,
-    employmentType: 'hourly',
-    minuteRate: 0.30,
-    hourlyRate: 8,
-    monthlySalary: 1200,
-    rateLabel: '$8/hr (Scheduled Shift)',
-    bio: 'Professional certified OPI/VRI interpreter fluent in Pashto, Urdu, Hindi, and English. Available Mon-Fri for live hospital and customer support encounters.',
-    cvFileName: 'Muhammad_Talha_Khan_CV.pdf',
-    docFileName: 'OPI_VRI_Certification.pdf',
-    avatarPreset: 'male-1',
-    avatarEmoji: '👨‍💼',
-    status: 'pending',
-    adminNotes: 'Application received via LinkedIn dispatch (+92 3358544432) - ready for verification review.',
-    submittedAt: '2026-09-06T14:37:00.000Z'
-  },
-  {
-    id: 'app-ahmed-ali',
-    name: 'Dr. Ahmed Atef Ahmed Ali',
-    email: 'ahmed.atef.ali@gmail.com',
-    phone: '+201000000000',
-    country: 'Egypt / Global',
-    primaryLang: 'Arabic',
-    languages: ['Arabic', 'English'],
-    specialties: ['Medical / Healthcare', 'General / Customer Support'],
-    certifications: ['Certified Medical Doctor & Healthcare Interpreter', 'Propio Healthcare Training Certified'],
-    experienceYears: 5,
-    employmentType: 'hourly',
-    minuteRate: 0.35,
-    hourlyRate: 8,
-    monthlySalary: 1200,
-    rateLabel: '$8/hr (Scheduled Shift)',
-    bio: 'Certified Medical Doctor and bilingual Arabic/English medical interpreter with extensive clinical encounter and telehealth translation experience.',
-    cvFileName: 'Dr_Ahmed_Ali_Medical_CV.pdf',
-    docFileName: 'Medical_Degree_Propio_Certificate.pdf',
-    avatarPreset: 'male-2',
-    avatarEmoji: '👨‍⚕️',
-    status: 'pending', // 'pending', 'approved', 'rejected'
-    adminNotes: 'Application received via email dispatch - ready for verification review.',
-    submittedAt: '2026-09-06T01:35:00.000Z'
-  },
-  {
-    id: 'app-elizaveta-khirevich',
-    name: 'Elizaveta Khirevich',
-    email: 'lkhirevich@gmail.com',
-    phone: '+971585829592',
-    country: 'United Arab Emirates',
-    primaryLang: 'Russian',
-    languages: ['Russian', 'English'],
-    specialties: ['General / Customer Support', 'Medical / Healthcare'],
-    certifications: ['Certified Professional Russian Linguist', 'Propio Training Certified'],
-    experienceYears: 1,
-    employmentType: 'per_minute',
-    minuteRate: 0.45,
-    hourlyRate: 8,
-    monthlySalary: 1200,
-    rateLabel: '$0.45/min (Live Talk)',
-    bio: 'Professional Russian and English interpreter based in United Arab Emirates with specialized Propio medical/client encounter training.',
-    cvFileName: 'Resume_CV_Submitted.pdf',
-    docFileName: 'Propio training.pdf',
-    avatarPreset: 'female-1',
-    avatarEmoji: '👩‍💼',
-    status: 'pending', // 'pending', 'approved', 'rejected'
-    adminNotes: '',
-    submittedAt: '2026-09-05T08:26:00.000Z'
+let SEED_APPLICATIONS = [];
+try {
+  const seedAppsPath = path.join(__dirname, 'seed_applications.json');
+  if (fs.existsSync(seedAppsPath)) {
+    SEED_APPLICATIONS = JSON.parse(fs.readFileSync(seedAppsPath, 'utf8'));
   }
-];
+} catch (e) {
+  console.warn('Could not read seed_applications.json:', e.message);
+}
+
 
 // Permanent Seed Inquiries & Conversations Box
 const SEED_INQUIRIES = [
@@ -1083,9 +1016,30 @@ app.post('/api/interpreter-applications', (req, res) => {
   });
 });
 
-// 2. Admin: Get all applications
+// 2. Admin: Get all applications (Ultra-fast lightweight payload)
 app.get('/api/admin/interpreter-applications', (req, res) => {
-  res.json(store.interpreterApplications || []);
+  const cleanList = (store.interpreterApplications || []).map(app => {
+    const { cvFileData, docFileData, supportingDocs, ...rest } = app;
+    return {
+      ...rest,
+      hasCv: Boolean(cvFileData || app.cvFileName),
+      hasDoc: Boolean(docFileData || app.docFileName)
+    };
+  });
+  res.json(cleanList);
+});
+
+// Admin: Download/Preview specific applicant document on demand
+app.get('/api/admin/interpreter-applications/:id/file/:fileType', (req, res) => {
+  const { id, fileType } = req.params;
+  const app = (store.interpreterApplications || []).find(a => a.id === id);
+  if (!app) return res.status(404).json({ error: 'Application not found' });
+
+  if (fileType === 'cv') {
+    res.json({ fileName: app.cvFileName || 'Resume.pdf', fileData: app.cvFileData || null });
+  } else {
+    res.json({ fileName: app.docFileName || 'Certificate.pdf', fileData: app.docFileData || null });
+  }
 });
 
 // 3. Admin: Approve Application & Provision Active Account
