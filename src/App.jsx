@@ -364,6 +364,7 @@ export default function App() {
             currentUser={currentUser}
             wallet={clientWallet}
             onUpdateWallet={handleUpdateWallet}
+            onOpenAuth={handleOpenAuth}
           />
         )}
 

@@ -29,7 +29,8 @@ export default function PrepaidWalletModal({
   onTopUpSuccess,
   currentBalance = 0,
   initialClaimDiscount = true,
-  currentUser = null
+  currentUser = null,
+  onOpenAuth = null
 }) {
   if (!isOpen) return null;
 
@@ -257,8 +258,8 @@ export default function PrepaidWalletModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="max-w-lg w-full bg-slate-900 border border-slate-700 shadow-2xl rounded-3xl p-6 sm:p-8 space-y-6 relative text-white my-8">
+    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md overflow-y-auto p-3 sm:p-6 flex justify-center items-start">
+      <div className="max-w-lg w-full bg-slate-900 border border-slate-700 shadow-2xl rounded-3xl p-6 sm:p-8 space-y-6 relative text-white my-6 sm:my-8">
         
         {/* Background glow */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -353,9 +354,43 @@ export default function PrepaidWalletModal({
             </div>
           </div>
           <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-            Prepaid Account
+            {currentUser ? 'Client Account' : 'Guest Checkout'}
           </span>
         </div>
+
+        {/* Guest Authentication Banner */}
+        {!currentUser && (
+          <div className="p-3.5 rounded-2xl bg-brand-950/60 border border-brand-500/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs shadow-md">
+            <div className="flex items-center gap-2.5">
+              <Lock className="w-4 h-4 text-brand-400 shrink-0" />
+              <p className="text-[11px] text-slate-200">
+                <strong className="text-white">Not signed in?</strong> Sign in or register so minutes and receipts attach directly to your client profile.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  if (onOpenAuth) onOpenAuth('signin', 'host');
+                }}
+                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-[10px] border border-slate-700 cursor-pointer transition"
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  if (onOpenAuth) onOpenAuth('signup', 'host');
+                }}
+                className="px-2.5 py-1 rounded-lg bg-brand-600 hover:bg-brand-500 text-white font-bold text-[10px] shadow cursor-pointer transition"
+              >
+                Sign Up
+              </button>
+            </div>
+          </div>
+        )}
 
         {isSuccess ? (
           <div className="p-6 sm:p-8 rounded-3xl bg-slate-950 border-2 border-emerald-500/50 text-center space-y-4 shadow-2xl">

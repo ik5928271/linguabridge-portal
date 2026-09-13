@@ -102,7 +102,7 @@ export default function GuestJoinView({
               >
                 {LANGUAGES.map((lang) => (
                   <option key={lang.code} value={lang.code} className="bg-slate-900 text-slate-200">
-                    {lang.flag} {lang.nativeName}
+                    {lang.name} — {lang.nativeName}
                   </option>
                 ))}
               </select>

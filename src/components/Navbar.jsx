@@ -78,30 +78,32 @@ export default function Navbar({
         {/* Center Navigation - Intelligently adapts based on user role! */}
         {!currentUser ? (
           /* 1. PUBLIC VISITOR NAVIGATION (No internal dashboards exposed) */
-          <nav className="flex items-center gap-1 sm:gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
+          <nav className="flex items-center gap-1 sm:gap-2 text-xs font-bold">
             <button
               onClick={() => setCurrentView('landing')}
-              className={`px-3 py-1.5 rounded-lg transition ${
-                currentView === 'landing' ? 'text-brand-600 dark:text-brand-400 bg-brand-500/10 font-bold' : 'hover:text-brand-600 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/50'
+              className={`px-3.5 py-1.5 rounded-xl transition ${
+                currentView === 'landing' 
+                  ? 'text-white bg-slate-800/90 border border-slate-700 font-extrabold shadow-sm' 
+                  : 'text-slate-200 hover:text-white hover:bg-slate-800/70'
               }`}
             >
               Home
             </button>
             <button
               onClick={() => scrollToSection('services')}
-              className="px-3 py-1.5 rounded-lg hover:text-brand-600 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/50 transition"
+              className="px-3.5 py-1.5 rounded-xl text-slate-200 hover:text-white hover:bg-slate-800/70 transition"
             >
               Services
             </button>
             <button
               onClick={() => scrollToSection('how-it-works')}
-              className="px-3 py-1.5 rounded-lg hover:text-brand-600 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/50 transition"
+              className="px-3.5 py-1.5 rounded-xl text-slate-200 hover:text-white hover:bg-slate-800/70 transition"
             >
               How It Works
             </button>
             <button
               onClick={() => scrollToSection('pricing')}
-              className="px-3 py-1.5 rounded-lg hover:text-brand-600 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/50 transition"
+              className="px-3.5 py-1.5 rounded-xl text-slate-200 hover:text-white hover:bg-slate-800/70 transition"
             >
               Pricing & Minutes
             </button>
@@ -239,34 +241,34 @@ export default function Navbar({
             <div className="relative">
               <button
                 onClick={() => setShowUserMenu(!showUserMenu)}
-                className="flex items-center gap-2 p-1.5 pl-2.5 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 transition shadow-sm"
+                className="flex items-center gap-2.5 p-1.5 pl-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white border border-slate-700 transition shadow-md cursor-pointer"
               >
                 {currentUser.photoUrl ? (
                   <img src={currentUser.photoUrl} alt="Avatar" className="w-6 h-6 rounded-full object-cover ring-1 ring-brand-400" />
                 ) : currentUser.avatarEmoji ? (
-                  <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs">
+                  <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-xs">
                     {currentUser.avatarEmoji}
                   </div>
                 ) : (
-                  <div className="w-6 h-6 rounded-full bg-brand-500 text-white font-bold text-xs flex items-center justify-center">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-600 text-white font-bold text-xs flex items-center justify-center shadow">
                     {currentUser.name?.charAt(0) || 'U'}
                   </div>
                 )}
                 <div className="text-left hidden sm:block">
-                  <p className="text-[11px] font-bold text-slate-900 dark:text-white leading-tight truncate max-w-[110px]">{currentUser.name || 'User'}</p>
-                  <p className="text-[9px] text-slate-500 dark:text-slate-400 capitalize">
-                    {currentUser?.role === 'admin' ? 'Administrator' : currentUser?.role === 'interpreter' ? 'Interpreter' : 'Client / Payer'}
+                  <p className="text-[11px] font-black text-white leading-tight truncate max-w-[120px]">{currentUser.name || 'User'}</p>
+                  <p className="text-[9.5px] text-slate-300 font-semibold capitalize">
+                    {currentUser?.role === 'admin' ? 'Administrator' : currentUser?.role === 'interpreter' ? 'Certified Linguist' : 'Client / Payer'}
                   </p>
                 </div>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                <ChevronDown className="w-3.5 h-3.5 text-slate-300" />
               </button>
 
               {showUserMenu && (
-                <div className="absolute right-0 mt-2 w-52 glass-panel p-2 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl space-y-1 text-xs z-50">
-                  <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-800">
-                    <p className="font-bold text-slate-900 dark:text-white truncate">{currentUser.name || 'User'}</p>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{currentUser.email || ''}</p>
-                    <span className="inline-block mt-1 text-[9px] font-bold px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-600 dark:text-brand-300">
+                <div className="absolute right-0 mt-2 w-60 bg-slate-900 border-2 border-slate-700 shadow-2xl shadow-black rounded-2xl p-2.5 space-y-1.5 text-xs z-50">
+                  <div className="px-3 py-2.5 border-b border-slate-800 bg-slate-950/60 rounded-xl space-y-1">
+                    <p className="font-extrabold text-white text-xs truncate">{currentUser.name || 'User'}</p>
+                    <p className="text-[11px] text-slate-300 truncate font-mono">{currentUser.email || ''}</p>
+                    <span className="inline-block mt-1 text-[9.5px] font-bold px-2 py-0.5 rounded-md bg-brand-500/20 text-brand-300 border border-brand-500/30">
                       {currentUser?.role === 'admin' ? '👑 Admin Account' : currentUser?.role === 'interpreter' ? '🎧 Certified Linguist' : '💳 Client / Payer Account'}
                     </span>
                   </div>
@@ -276,9 +278,9 @@ export default function Navbar({
                       setCurrentView(currentUser?.role === 'admin' ? 'admin' : currentUser?.role === 'interpreter' ? 'interpreter' : 'host');
                       setShowUserMenu(false);
                     }}
-                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center gap-2 transition"
+                    className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-800 text-white font-bold flex items-center gap-2 transition cursor-pointer"
                   >
-                    <Users className="w-3.5 h-3.5 text-brand-500" />
+                    <Users className="w-4 h-4 text-brand-400" />
                     <span>My Dashboard</span>
                   </button>
 
@@ -303,9 +305,9 @@ export default function Navbar({
                           console.error(e);
                         }
                       }}
-                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/30 text-purple-600 dark:text-purple-300 flex items-center gap-2 transition font-bold"
+                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-purple-900/40 text-purple-300 font-bold flex items-center gap-2 transition cursor-pointer border border-purple-500/20"
                     >
-                      <Zap className="w-3.5 h-3.5 text-amber-400" />
+                      <Zap className="w-4 h-4 text-amber-400" />
                       <span>Switch to {currentUser?.role === 'interpreter' ? 'Client Account' : 'Interpreter Account'}</span>
                     </button>
                   )}
@@ -316,9 +318,9 @@ export default function Navbar({
                       setShowUserMenu(false);
                       setCurrentView('landing');
                     }}
-                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400 flex items-center gap-2 transition"
+                    className="w-full text-left px-3 py-2 rounded-xl hover:bg-red-500/20 text-red-400 font-bold flex items-center gap-2 transition cursor-pointer"
                   >
-                    <LogOut className="w-3.5 h-3.5" />
+                    <LogOut className="w-4 h-4 text-red-400" />
                     <span>Sign Out</span>
                   </button>
                 </div>
