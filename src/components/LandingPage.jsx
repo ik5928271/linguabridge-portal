@@ -116,17 +116,17 @@ export default function LandingPage({
 
             <div className="mt-6 flex flex-col sm:flex-row items-center gap-2.5">
               <button
-                onClick={() => onSelectRole('host')}
+                onClick={() => onOpenAuth ? onOpenAuth('signin', 'host') : onSelectRole('host')}
                 className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-brand-500 via-brand-600 to-indigo-600 hover:from-brand-600 hover:to-indigo-700 text-white font-extrabold text-xs shadow-lg shadow-brand-500/30 flex items-center justify-center gap-1.5 transition transform active:scale-95 cursor-pointer"
               >
                 <PhoneCall className="w-4 h-4" />
-                <span>Book / Start Call</span>
+                <span>Book / Client Sign In</span>
               </button>
               <button
-                onClick={() => onOpenAuth('signin', 'host')}
+                onClick={() => onOpenAuth ? onOpenAuth('signup', 'host') : onSelectRole('host')}
                 className="w-full sm:w-auto py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition cursor-pointer"
               >
-                <span>Client Sign In</span>
+                <span>Register Client</span>
               </button>
             </div>
           </div>

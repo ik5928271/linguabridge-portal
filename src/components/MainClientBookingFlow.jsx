@@ -497,6 +497,47 @@ END:VCALENDAR`;
             <p className="text-xs text-slate-400 mt-1">Choose the target language assistance needed for your session</p>
           </div>
 
+          {/* 🔒 INITIAL CLIENT SIGN-IN / SIGN-UP GATE */}
+          {!currentUser && (
+            <div className="p-5 rounded-2xl bg-gradient-to-r from-brand-950/90 via-slate-900 to-indigo-950/90 border-2 border-brand-500/50 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-brand-500/20 text-brand-400 flex items-center justify-center shrink-0 ring-2 ring-brand-500/30">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-brand-400 bg-brand-500/15 px-2 py-0.5 rounded border border-brand-500/30">
+                      Client Sign In Required
+                    </span>
+                  </div>
+                  <p className="text-xs text-white font-bold mt-0.5">
+                    Please Sign In or Create a Client Account before booking your session
+                  </p>
+                  <p className="text-[11px] text-slate-300">
+                    Signing in connects your selected interpreter, room link, and prepaid balance directly to your client profile.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => onOpenAuth && onOpenAuth('signin', 'host')}
+                  className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs shadow-md shadow-brand-500/30 transition cursor-pointer"
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onOpenAuth && onOpenAuth('signup', 'host')}
+                  className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition cursor-pointer"
+                >
+                  Create Account
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-3">
             <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-300">Target Language:</label>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
@@ -654,15 +695,19 @@ END:VCALENDAR`;
             <button
               type="button"
               onClick={() => {
+                if (!currentUser && onOpenAuth) {
+                  onOpenAuth('signin', 'host');
+                  return;
+                }
                 const matched = getInterpretersForLanguage(selectedLanguage);
                 if (matched && matched.length > 0) {
                   setSelectedInterpreter(matched[0]);
                 }
                 setCurrentStep(2);
               }}
-              className="px-6 py-3 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs flex items-center gap-2 transition shadow-lg shadow-brand-500/30"
+              className="px-6 py-3 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs flex items-center gap-2 transition shadow-lg shadow-brand-500/30 cursor-pointer"
             >
-              <span>Continue: Choose {selectedLanguage} Interpreter</span>
+              <span>{currentUser ? `Continue: Choose ${selectedLanguage} Interpreter` : 'Sign In to Choose Interpreter'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>

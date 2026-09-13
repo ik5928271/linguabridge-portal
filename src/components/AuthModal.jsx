@@ -274,64 +274,54 @@ export default function AuthModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md overflow-y-auto p-4 flex justify-center items-start">
-      <div className="max-w-md w-full glass-panel p-6 sm:p-8 rounded-3xl border border-slate-700 shadow-2xl space-y-6 relative overflow-hidden my-6 sm:my-8">
+      <div className={`max-w-md w-full glass-panel p-6 sm:p-8 rounded-3xl border shadow-2xl space-y-6 relative overflow-hidden my-6 sm:my-8 transition-all ${
+        role === 'interpreter' ? 'border-emerald-500/50 ring-1 ring-emerald-500/30' : 'border-brand-500/50 ring-1 ring-brand-500/30'
+      }`}>
         
         {/* Background glow */}
-        <div className="absolute top-0 right-0 w-64 h-64 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className={`absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl pointer-events-none ${
+          role === 'interpreter' ? 'bg-emerald-500/15' : 'bg-brand-500/15'
+        }`} />
 
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-brand-600 to-cyan-400 flex items-center justify-center text-white font-bold shadow">
-              <Globe className="w-4 h-4" />
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-white font-bold shadow-lg ${
+              role === 'interpreter' 
+                ? 'bg-gradient-to-tr from-emerald-600 to-teal-500 ring-2 ring-emerald-400/40' 
+                : 'bg-gradient-to-tr from-brand-600 via-indigo-600 to-cyan-500 ring-2 ring-brand-400/40'
+            }`}>
+              {role === 'interpreter' ? <Headphones className="w-5 h-5 text-white" /> : <Building2 className="w-5 h-5 text-white" />}
             </div>
             <div>
-              <h3 className="text-lg font-bold text-white">
-                {mode === 'signin' ? 'Sign In to LinguaBridge' : 'Create Your Account'}
+              <div className="flex items-center gap-2">
+                <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                  role === 'interpreter' 
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' 
+                    : 'bg-brand-500/20 text-brand-300 border-brand-500/30'
+                }`}>
+                  {role === 'interpreter' ? '🎧 Interpreter & Linguist Portal' : '🏢 Client & Hospital Portal'}
+                </span>
+              </div>
+              <h3 className="text-lg font-black text-white mt-1">
+                {role === 'interpreter' 
+                  ? (mode === 'signin' ? 'Interpreter Sign In' : 'Interpreter Application')
+                  : (mode === 'signin' ? 'Client / Doctor Sign In' : 'Create Client Account')}
               </h3>
-              <p className="text-xs text-slate-400">
-                {mode === 'signin' ? 'Access your 3-party interpretation dashboard' : 'Join our global enterprise interpretation network'}
+              <p className="text-xs text-slate-400 mt-0.5">
+                {role === 'interpreter'
+                  ? 'Access your live encounters, schedule, and earnings'
+                  : 'Access on-demand & scheduled 3-way interpretation'}
               </p>
             </div>
           </div>
 
           <button 
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
-        </div>
-
-        {/* Portal Identifier Switcher Bar */}
-        <div className="space-y-1.5">
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Select Portal Type:</label>
-          <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-slate-900 border border-slate-800 text-xs font-extrabold">
-            <button
-              type="button"
-              onClick={() => setRole('host')}
-              className={`py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 transition ${
-                role === 'host'
-                  ? 'bg-brand-600 text-white shadow-md shadow-brand-600/30 ring-1 ring-brand-400/50'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-              }`}
-            >
-              <Building2 className="w-3.5 h-3.5" />
-              <span>🏢 Client / Hospital</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setRole('interpreter')}
-              className={`py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 transition ${
-                role === 'interpreter'
-                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-1 ring-emerald-400/50'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-              }`}
-            >
-              <Headphones className="w-3.5 h-3.5" />
-              <span>🎧 Interpreter Portal</span>
-            </button>
-          </div>
         </div>
 
         {/* Mode Switcher Tabs */}
@@ -339,20 +329,31 @@ export default function AuthModal({
           <button
             type="button"
             onClick={() => setMode('signin')}
-            className={`flex-1 py-2 rounded-lg transition ${
-              mode === 'signin' ? (role === 'interpreter' ? 'bg-emerald-600 text-white shadow' : 'bg-brand-600 text-white shadow') : 'text-slate-400 hover:text-slate-200'
+            className={`flex-1 py-2 rounded-lg transition cursor-pointer ${
+              mode === 'signin' 
+                ? (role === 'interpreter' ? 'bg-emerald-600 text-white shadow-md' : 'bg-brand-600 text-white shadow-md') 
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             Sign In
           </button>
           <button
             type="button"
-            onClick={() => setMode('signup')}
-            className={`flex-1 py-2 rounded-lg transition ${
-              mode === 'signup' ? (role === 'interpreter' ? 'bg-emerald-600 text-white shadow' : 'bg-brand-600 text-white shadow') : 'text-slate-400 hover:text-slate-200'
+            onClick={() => {
+              if (role === 'interpreter') {
+                onClose();
+                if (onOpenInterpreterApplication) onOpenInterpreterApplication();
+              } else {
+                setMode('signup');
+              }
+            }}
+            className={`flex-1 py-2 rounded-lg transition cursor-pointer ${
+              mode === 'signup' 
+                ? (role === 'interpreter' ? 'bg-emerald-600 text-white shadow-md' : 'bg-brand-600 text-white shadow-md') 
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            {role === 'interpreter' ? 'Apply / Register' : 'Create Client Account'}
+            {role === 'interpreter' ? 'Apply as Interpreter ✍️' : 'Create Client Account'}
           </button>
         </div>
 
@@ -361,7 +362,7 @@ export default function AuthModal({
           <form onSubmit={handleSignInSubmit} className="space-y-4 text-xs">
             <div className="space-y-1">
               <label className="font-semibold text-slate-300">
-                {role === 'interpreter' ? 'Interpreter Email or Username' : 'Client / Hospital Email'}
+                {role === 'interpreter' ? 'Interpreter Registered Email or Username' : 'Client / Hospital Email'}
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5" />
@@ -369,8 +370,8 @@ export default function AuthModal({
                   type="email"
                   value={signInEmail}
                   onChange={(e) => setSignInEmail(e.target.value)}
-                  placeholder={role === 'interpreter' ? 'interpreter@network.com' : 'doctor@hospital.org'}
-                  className="w-full glass-input pl-10 pr-3 py-2.5 rounded-xl text-xs text-white focus:outline-none"
+                  placeholder={role === 'interpreter' ? 'e.g. rohim6360ba.en@gmail.com' : 'e.g. doctor@hospital.org'}
+                  className="w-full glass-input pl-10 pr-3 py-2.5 rounded-xl text-xs text-white focus:outline-none bg-slate-950 border border-slate-700"
                   required
                 />
               </div>
@@ -390,7 +391,7 @@ export default function AuthModal({
                   value={signInPassword}
                   onChange={(e) => setSignInPassword(e.target.value)}
                   placeholder="••••••••••••"
-                  className="w-full glass-input pl-10 pr-3 py-2.5 rounded-xl text-xs text-white focus:outline-none"
+                  className="w-full glass-input pl-10 pr-3 py-2.5 rounded-xl text-xs text-white focus:outline-none bg-slate-950 border border-slate-700"
                   required
                 />
               </div>
@@ -398,10 +399,10 @@ export default function AuthModal({
 
             <button
               type="submit"
-              className={`w-full py-3 rounded-xl text-white font-extrabold text-xs shadow-lg flex items-center justify-center gap-2 transition ${
+              className={`w-full py-3.5 rounded-xl text-white font-extrabold text-xs shadow-lg flex items-center justify-center gap-2 transition cursor-pointer transform hover:-translate-y-0.5 ${
                 role === 'interpreter'
-                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-emerald-600/30'
-                  : 'bg-gradient-to-r from-brand-500 to-indigo-600 hover:from-brand-600 hover:to-indigo-700 shadow-brand-500/25'
+                  ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 shadow-emerald-600/30'
+                  : 'bg-gradient-to-r from-brand-500 via-brand-600 to-indigo-600 hover:from-brand-600 hover:to-indigo-700 shadow-brand-500/25'
               }`}
             >
               <span>{role === 'interpreter' ? 'Sign In to Interpreter Workbench' : 'Sign In to Client Dashboard'}</span>
@@ -411,31 +412,76 @@ export default function AuthModal({
             {/* Quick Demo Logins Helper */}
             <div className="pt-3 border-t border-slate-800 space-y-2">
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 text-center">
-                Or 1-Click Instant Demo Login:
+                1-Click Instant Demo Login:
               </p>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => quickDemoLogin('host')}
-                  className="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-brand-300 font-semibold text-[11px] border border-slate-700 transition"
-                >
-                  Doctor / Host
-                </button>
-                <button
-                  type="button"
-                  onClick={() => quickDemoLogin('interpreter')}
-                  className="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-300 font-semibold text-[11px] border border-slate-700 transition"
-                >
-                  Interpreter
-                </button>
-                <button
-                  type="button"
-                  onClick={() => quickDemoLogin('admin')}
-                  className="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-purple-300 font-semibold text-[11px] border border-slate-700 transition"
-                >
-                  Admin
-                </button>
+              <div className="grid grid-cols-2 gap-2">
+                {role === 'interpreter' ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => quickDemoLogin('interpreter')}
+                      className="py-2 px-2 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-300 font-bold text-[11px] border border-emerald-500/40 transition cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <Headphones className="w-3.5 h-3.5" />
+                      <span>Demo Interpreter</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => quickDemoLogin('admin')}
+                      className="py-2 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-purple-300 font-bold text-[11px] border border-purple-500/30 transition cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>Demo Admin</span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => quickDemoLogin('host')}
+                      className="py-2 px-2 rounded-xl bg-brand-950/60 hover:bg-brand-900/60 text-brand-300 font-bold text-[11px] border border-brand-500/40 transition cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <Building2 className="w-3.5 h-3.5" />
+                      <span>Demo Client / Doctor</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => quickDemoLogin('admin')}
+                      className="py-2 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-purple-300 font-bold text-[11px] border border-purple-500/30 transition cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>Demo Admin</span>
+                    </button>
+                  </>
+                )}
               </div>
+            </div>
+
+            {/* Discrete Portal Switcher Link at Bottom */}
+            <div className="pt-2 text-center text-[11px]">
+              {role === 'interpreter' ? (
+                <p className="text-slate-400">
+                  Are you a Client or Doctor?{' '}
+                  <button
+                    type="button"
+                    onClick={() => setRole('host')}
+                    className="text-brand-400 hover:text-brand-300 font-bold underline cursor-pointer"
+                  >
+                    Go to Client Portal →
+                  </button>
+                </p>
+              ) : (
+                <p className="text-slate-400">
+                  Are you a Certified Interpreter?{' '}
+                  <button
+                    type="button"
+                    onClick={() => setRole('interpreter')}
+                    className="text-emerald-400 hover:text-emerald-300 font-bold underline cursor-pointer"
+                  >
+                    Go to Interpreter Portal →
+                  </button>
+                </p>
+              )}
             </div>
           </form>
         )}
