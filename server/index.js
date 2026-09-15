@@ -48,6 +48,8 @@ const SEED_USERS = [
     email: 'kamila@linguabridge.com',
     password: 'interpreter123',
     role: 'interpreter',
+    badgeNumber: '84921',
+    interpreterBadgeId: '84921',
     primaryLang: 'Russian',
     languages: ['Russian', 'English', 'Ukrainian'],
     specialty: 'General / Customer Support',
@@ -64,6 +66,8 @@ const SEED_USERS = [
     email: 'wali@linguabridge.com',
     password: 'interpreter123',
     role: 'interpreter',
+    badgeNumber: '84922',
+    interpreterBadgeId: '84922',
     primaryLang: 'Arabic',
     languages: ['Arabic', 'English'],
     specialty: 'Medical / Healthcare',
@@ -80,6 +84,8 @@ const SEED_USERS = [
     email: 'tariq@linguabridge.com',
     password: 'interpreter123',
     role: 'interpreter',
+    badgeNumber: '84923',
+    interpreterBadgeId: '84923',
     primaryLang: 'Urdu',
     languages: ['Urdu', 'Punjabi', 'English'],
     specialty: 'General / Customer Support',
@@ -96,6 +102,8 @@ const SEED_USERS = [
     email: 'sofia@linguabridge.com',
     password: 'interpreter123',
     role: 'interpreter',
+    badgeNumber: '84924',
+    interpreterBadgeId: '84924',
     primaryLang: 'Spanish',
     languages: ['Spanish', 'English'],
     specialty: 'Medical / Healthcare',
@@ -127,6 +135,34 @@ const SEED_USERS = [
     createdAt: new Date().toISOString()
   }
 ];
+
+// Helper to generate unique pure numeric ID for interpreters (e.g. 5 digits)
+function generateNumericBadgeId() {
+  let candidate;
+  let exists = true;
+  let attempts = 0;
+  while (exists && attempts < 1000) {
+    attempts++;
+    candidate = Math.floor(10000 + Math.random() * 90000).toString();
+    exists = (store?.users || []).some(u => u.badgeNumber === candidate || u.interpreterBadgeId === candidate) ||
+             (store?.interpreters || []).some(i => i.badgeNumber === candidate || i.interpreterBadgeId === candidate);
+  }
+  return candidate || Math.floor(10000 + Math.random() * 90000).toString();
+}
+
+function ensureInterpreterBadge(item) {
+  if (!item) return;
+  if (!item.badgeNumber && !item.interpreterBadgeId) {
+    const newId = generateNumericBadgeId();
+    item.badgeNumber = newId;
+    item.interpreterBadgeId = newId;
+  } else if (!item.badgeNumber && item.interpreterBadgeId) {
+    item.badgeNumber = item.interpreterBadgeId.toString().replace(/\D/g, '') || generateNumericBadgeId();
+  } else if (!item.interpreterBadgeId && item.badgeNumber) {
+    item.interpreterBadgeId = item.badgeNumber.toString().replace(/\D/g, '') || generateNumericBadgeId();
+  }
+  return item.badgeNumber;
+}
 
 const SEED_WALLETS = {
   'usr-owner-ikram': {
@@ -322,8 +358,18 @@ function loadStore() {
         store.inquiries = [...SEED_INQUIRIES];
       }
 
-      // Ensure Interpreters collection is synchronized
-      store.interpreters = store.users.filter(u => u.role === 'interpreter');
+      // Ensure Interpreters collection is synchronized and all have permanent numeric badge numbers
+      store.users.forEach(u => {
+        if (u.role === 'interpreter') {
+          ensureInterpreterBadge(u);
+        }
+      });
+      store.interpreters = store.users.filter(u => u.role === 'interpreter').map(u => ({
+        ...u,
+        badgeNumber: u.badgeNumber,
+        interpreterBadgeId: u.badgeNumber,
+        displayName: `Interpreter #${u.badgeNumber}`
+      }));
 
       console.log(`[Database Loaded] Users: ${store.users.length}, Interpreters: ${store.interpreters.length}, Applications: ${store.interpreterApplications.length}, Inquiries: ${store.inquiries.length}, Receipts: ${store.paymentReceipts.length}, Appointments: ${store.appointments.length}`);
     } else {
@@ -355,6 +401,16 @@ async function initMongo() {
       }
     }
 
+    // Ensure all interpreters have a unique numeric badge number and persist to MongoDB
+    store.users.forEach(async (u) => {
+      if (u.role === 'interpreter') {
+        const badge = ensureInterpreterBadge(u);
+        if (db && badge) {
+          await db.collection('users').updateOne({ id: u.id }, { $set: { badgeNumber: badge, interpreterBadgeId: badge } }).catch(() => {});
+        }
+      }
+    });
+
     // Sync Wallets from MongoDB
     const mongoWallets = await db.collection('wallets').find({}).toArray();
     if (mongoWallets.length > 0) {
@@ -367,11 +423,21 @@ async function initMongo() {
       }
     }
 
-    // Sync Applications from MongoDB
+    // Sync Applications from MongoDB (Always guarantee all SEED_APPLICATIONS are preserved & merged with Mongo DB records)
     const mongoApps = await db.collection('interpreter_applications').find({}).toArray();
+    let mergedApps = [...SEED_APPLICATIONS];
     if (mongoApps.length > 0) {
-      store.interpreterApplications = mongoApps.map(({ _id, ...a }) => a);
+      const cleanMongoApps = mongoApps.map(({ _id, ...a }) => a);
+      cleanMongoApps.forEach(mApp => {
+        const existingIdx = mergedApps.findIndex(s => (s.id && s.id === mApp.id) || (s.email && mApp.email && s.email.toLowerCase() === mApp.email.toLowerCase()));
+        if (existingIdx >= 0) {
+          mergedApps[existingIdx] = { ...mergedApps[existingIdx], ...mApp };
+        } else {
+          mergedApps.unshift(mApp);
+        }
+      });
     }
+    store.interpreterApplications = mergedApps;
 
     // Sync Inquiries & Support Tickets from MongoDB
     const mongoInquiries = await db.collection('inquiries').find({}).toArray();
@@ -405,8 +471,13 @@ async function initMongo() {
       store.visitorLogs = mongoVisitorLogs.map(({ _id, ...v }) => v);
     }
 
-    store.interpreters = store.users.filter(u => u.role === 'interpreter');
-    console.log(`[MongoDB Sync Complete] Users: ${store.users.length}, Apps: ${store.interpreterApplications.length}, Inquiries: ${store.inquiries.length}, Receipts: ${store.paymentReceipts.length}, Wallets: ${Object.keys(store.wallets).length}`);
+    store.interpreters = store.users.filter(u => u.role === 'interpreter').map(u => ({
+      ...u,
+      badgeNumber: u.badgeNumber,
+      interpreterBadgeId: u.badgeNumber,
+      displayName: `Interpreter #${u.badgeNumber}`
+    }));
+    console.log(`[MongoDB Sync Complete] Users: ${store.users.length}, Interpreters: ${store.interpreters.length}, Apps: ${store.interpreterApplications.length}, Inquiries: ${store.inquiries.length}, Receipts: ${store.paymentReceipts.length}, Wallets: ${Object.keys(store.wallets).length}`);
   } catch (err) {
     console.error('❌ [MongoDB Connection Warning]:', err.message);
   }
@@ -572,18 +643,31 @@ app.post('/api/auth/register', (req, res) => {
     return res.status(400).json({ error: 'Name and email are required.' });
   }
 
-  const existingUser = store.users.find(u => u.email.toLowerCase() === email.toLowerCase());
-  if (existingUser) {
-    return res.status(400).json({ error: 'An account with this email already exists.' });
+  const cleanEmail = email.toLowerCase().trim();
+  const existingUser = store.users.find(u => u.email && u.email.toLowerCase() === cleanEmail);
+  const existingApp = (store.interpreterApplications || []).find(a => a.email && a.email.toLowerCase() === cleanEmail);
+
+  if (existingUser || existingApp) {
+    const roleLabel = existingUser 
+      ? (existingUser.role === 'admin' ? 'Administrator' : existingUser.role === 'interpreter' ? 'Certified Interpreter' : 'Client') 
+      : 'Interpreter Applicant';
+    return res.status(400).json({ 
+      error: `An account already exists for this email address (${roleLabel}). Creating duplicate accounts with the same email is not permitted. Please sign in instead.` 
+    });
   }
 
   const userId = `usr-${Date.now().toString(36)}`;
+  const assignedBadgeNumber = role === 'interpreter' ? generateNumericBadgeId() : null;
+
   const newUser = {
     id: userId,
     name,
     email: email.toLowerCase(),
     password: password || 'password123',
     role: role || 'host', // 'host' (Client/Payer), 'interpreter'
+    badgeNumber: assignedBadgeNumber,
+    interpreterBadgeId: assignedBadgeNumber,
+    displayName: role === 'interpreter' ? `Interpreter #${assignedBadgeNumber}` : name,
     org: org || (role === 'host' ? 'Independent Client' : 'Language Services'),
     primaryLang,
     specialty,
@@ -599,6 +683,9 @@ app.post('/api/auth/register', (req, res) => {
       userId: newUser.id,
       name: newUser.name,
       email: newUser.email,
+      badgeNumber: assignedBadgeNumber,
+      interpreterBadgeId: assignedBadgeNumber,
+      displayName: `Interpreter #${assignedBadgeNumber}`,
       avatar: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 900000000)}?w=150&auto=format&fit=crop&q=80`,
       languages: [primaryLang, 'English'],
       primaryLang,
@@ -629,7 +716,7 @@ app.post('/api/auth/register', (req, res) => {
   saveStore();
   res.json({ 
     success: true, 
-    user: newUser,
+    user: newUser, 
     wallet: store.wallets[userId] || null
   });
 });
@@ -643,37 +730,108 @@ app.post('/api/auth/login', (req, res) => {
 
   const cleanEmail = email.toLowerCase().trim();
 
-  // Check default Owner Account (Ikram-ul-haq Mian)
-  if (cleanEmail === DEFAULT_OWNER.email.toLowerCase() || cleanEmail === 'admin@linguabridge.com' || cleanEmail.includes('admin')) {
-    const ownerUser = store.users.find(u => u.email.toLowerCase() === DEFAULT_OWNER.email.toLowerCase()) || DEFAULT_OWNER;
+  // 1. Check default Owner / Admin Account (Ikram-ul-haq Mian)
+  if (cleanEmail === DEFAULT_OWNER.email.toLowerCase() || cleanEmail === 'iksale9817@gmail.com' || cleanEmail === 'admin@linguabridge.com' || cleanEmail.includes('admin')) {
+    const ownerUser = store.users.find(u => u.email.toLowerCase() === DEFAULT_OWNER.email.toLowerCase() || u.email.toLowerCase() === 'iksale9817@gmail.com') || DEFAULT_OWNER;
     return res.json({ 
       success: true, 
-      user: ownerUser,
+      user: { ...ownerUser, role: 'admin' },
       wallet: store.wallets[ownerUser.id] || { totalPaid: 1000, totalMinutesPurchased: 9999, minutesUsed: 0, minutesRemaining: 9999, billingType: 'unlimited_owner' }
     });
   }
 
-  const user = store.users.find(u => u.email.toLowerCase() === cleanEmail);
-  if (!user) {
-    const isInterp = cleanEmail.includes('interp') || cleanEmail.includes('elena') || cleanEmail.includes('dmitri');
-    const autoUser = {
-      id: `usr-${Date.now().toString(36)}`,
-      name: isInterp ? 'Certified Interpreter' : 'Client / Payer Account',
-      email: cleanEmail,
-      role: isInterp ? 'interpreter' : 'host',
-      org: isInterp ? 'Certified Linguist Pool' : 'Client Account'
-    };
-    store.users.push(autoUser);
-    saveStore();
-    return res.json({ 
-      success: true, 
-      user: autoUser,
-      wallet: store.wallets[autoUser.id] || { totalPaid: 0, totalMinutesPurchased: 0, minutesUsed: 0, minutesRemaining: 0, billingType: 'prepaid' }
-    });
+  // 2. Check existing users in store
+  const user = store.users.find(u => u.email && u.email.toLowerCase() === cleanEmail);
+  if (user) {
+    if (user.role === 'interpreter') {
+      ensureInterpreterBadge(user);
+      user.displayName = `Interpreter #${user.badgeNumber}`;
+    }
+    const userWallet = store.wallets[user.id] || { totalPaid: 0, totalMinutesPurchased: 0, minutesUsed: 0, minutesRemaining: 0, billingType: 'prepaid' };
+    return res.json({ success: true, user, wallet: userWallet });
   }
 
-  const userWallet = store.wallets[user.id] || { totalPaid: 0, totalMinutesPurchased: 0, minutesUsed: 0, minutesRemaining: 0, billingType: 'prepaid' };
-  res.json({ success: true, user, wallet: userWallet });
+  // 3. Check if this email submitted an interpreter application
+  const appItem = (store.interpreterApplications || []).find(a => a.email && a.email.toLowerCase() === cleanEmail);
+  if (appItem) {
+    const assignedBadge = appItem.badgeNumber || generateNumericBadgeId();
+    appItem.badgeNumber = assignedBadge;
+    appItem.interpreterBadgeId = assignedBadge;
+
+    const newInterpUser = {
+      id: appItem.id || `usr-${Date.now().toString(36)}`,
+      name: appItem.name || 'Certified Interpreter',
+      email: cleanEmail,
+      role: 'interpreter',
+      badgeNumber: assignedBadge,
+      interpreterBadgeId: assignedBadge,
+      displayName: `Interpreter #${assignedBadge}`,
+      org: 'Certified Linguist Pool',
+      primaryLang: appItem.primaryLang || (Array.isArray(appItem.languages) ? appItem.languages[0] : 'Spanish'),
+      languages: appItem.languages || ['Spanish', 'English'],
+      specialty: appItem.specialty || 'Medical / Healthcare',
+      status: 'online',
+      hourlyRate: appItem.hourlyRate || 8,
+      minuteRate: appItem.minuteRate || 0.30,
+      monthlySalary: appItem.monthlySalary || 1200,
+      employmentType: appItem.employmentType || 'hourly',
+      rateLabel: appItem.rateLabel || '$8/hr (Scheduled Shift)',
+      createdAt: appItem.createdAt || new Date().toISOString()
+    };
+    store.users.push(newInterpUser);
+
+    let existingInterp = store.interpreters.find(i => i.email.toLowerCase() === cleanEmail || i.userId === newInterpUser.id);
+    if (!existingInterp) {
+      store.interpreters.push({
+        ...newInterpUser,
+        badgeNumber: assignedBadge,
+        interpreterBadgeId: assignedBadge,
+        displayName: `Interpreter #${assignedBadge}`
+      });
+    }
+
+    saveStore();
+    return res.json({ success: true, user: newInterpUser, wallet: null });
+  }
+
+  // 4. Otherwise create clean Client / Hospital user
+  const isInterpHint = cleanEmail.includes('interp') || cleanEmail.includes('linguist');
+  const assignedBadge = isInterpHint ? generateNumericBadgeId() : null;
+  const autoUser = {
+    id: `usr-${Date.now().toString(36)}`,
+    name: cleanEmail.includes('@') ? cleanEmail.split('@')[0] : cleanEmail,
+    email: cleanEmail,
+    role: isInterpHint ? 'interpreter' : 'host',
+    badgeNumber: assignedBadge,
+    interpreterBadgeId: assignedBadge,
+    displayName: isInterpHint ? `Interpreter #${assignedBadge}` : (cleanEmail.includes('@') ? cleanEmail.split('@')[0] : cleanEmail),
+    org: isInterpHint ? 'Certified Linguist Pool' : 'Client / Hospital Account',
+    createdAt: new Date().toISOString()
+  };
+  store.users.push(autoUser);
+  if (!isInterpHint) {
+    store.wallets[autoUser.id] = { totalPaid: 0, totalMinutesPurchased: 0, minutesUsed: 0, minutesRemaining: 0, billingType: 'prepaid' };
+  } else {
+    store.interpreters.push({
+      id: `int-${Date.now().toString(36)}`,
+      userId: autoUser.id,
+      name: autoUser.name,
+      email: autoUser.email,
+      badgeNumber: assignedBadge,
+      interpreterBadgeId: assignedBadge,
+      displayName: `Interpreter #${assignedBadge}`,
+      primaryLang: 'Spanish',
+      languages: ['Spanish', 'English'],
+      status: 'online',
+      rating: 5.0
+    });
+  }
+  saveStore();
+  return res.json({ 
+    success: true, 
+    user: autoUser, 
+    wallet: store.wallets[autoUser.id] || null 
+  });
 });
 
 // 3b. Switch user role (Self-service role fix: Client <-> Interpreter)
@@ -692,6 +850,9 @@ app.post('/api/auth/switch-role', (req, res) => {
   user.org = user.role === 'interpreter' ? 'Certified Linguist Pool' : (user.org && user.org !== 'Certified Linguist Pool' ? user.org : 'Client / Organization Account');
 
   if (user.role === 'interpreter') {
+    const badge = ensureInterpreterBadge(user);
+    user.displayName = `Interpreter #${badge}`;
+
     let interp = store.interpreters.find(i => i.userId === user.id || i.email === user.email);
     if (!interp) {
       interp = {
@@ -699,6 +860,9 @@ app.post('/api/auth/switch-role', (req, res) => {
         userId: user.id,
         name: user.name,
         email: user.email,
+        badgeNumber: badge,
+        interpreterBadgeId: badge,
+        displayName: `Interpreter #${badge}`,
         avatar: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 900000000)}?w=150&auto=format&fit=crop&q=80`,
         languages: [user.primaryLang || 'Spanish', 'English'],
         primaryLang: user.primaryLang || 'Spanish',
@@ -716,6 +880,10 @@ app.post('/api/auth/switch-role', (req, res) => {
       };
       store.interpreters.push(interp);
       io.emit('interpreter-registered', interp);
+    } else {
+      interp.badgeNumber = badge;
+      interp.interpreterBadgeId = badge;
+      interp.displayName = `Interpreter #${badge}`;
     }
   }
 
@@ -737,6 +905,54 @@ app.post('/api/auth/switch-role', (req, res) => {
     user,
     wallet: store.wallets[user.id] || null
   });
+});
+
+// 3c. Interpreter Self Profile Update
+app.post('/api/interpreter/profile', async (req, res) => {
+  const { userId, email, name, phone, bio, primaryLang, languages, specialties, avatar, hourlyRate, minuteRate, employmentType } = req.body;
+  const targetEmail = (email || '').toLowerCase().trim();
+  
+  let user = store.users.find(u => (userId && u.id === userId) || (targetEmail && u.email && u.email.toLowerCase() === targetEmail));
+  if (!user) {
+    return res.status(404).json({ error: 'Interpreter profile not found.' });
+  }
+
+  if (name) user.name = name.trim();
+  if (phone) user.phone = phone.trim();
+  if (bio) user.bio = bio.trim();
+  if (primaryLang) user.primaryLang = primaryLang;
+  if (languages && Array.isArray(languages)) user.languages = languages;
+  if (specialties && Array.isArray(specialties)) user.specialties = specialties;
+  if (avatar) user.avatar = avatar;
+  if (hourlyRate !== undefined) user.hourlyRate = parseInt(hourlyRate) || user.hourlyRate;
+  if (minuteRate !== undefined) user.minuteRate = parseFloat(minuteRate) || user.minuteRate;
+  if (employmentType) user.employmentType = employmentType;
+
+  // Also update store.interpreters
+  let interp = store.interpreters.find(i => i.userId === user.id || (i.email && i.email.toLowerCase() === user.email.toLowerCase()));
+  if (interp) {
+    if (name) interp.name = user.name;
+    if (avatar) interp.avatar = user.avatar;
+    if (primaryLang) interp.primaryLang = user.primaryLang;
+    if (languages) interp.languages = user.languages;
+    if (specialties) interp.specialties = user.specialties;
+    if (bio) interp.bio = user.bio;
+  }
+
+  if (db) {
+    try {
+      await db.collection('users').updateOne(
+        { email: user.email.toLowerCase() },
+        { $set: user },
+        { upsert: true }
+      );
+    } catch (e) {
+      console.error('Error updating profile in MongoDB:', e.message);
+    }
+  }
+
+  saveStore();
+  res.json({ success: true, user, message: 'Profile updated successfully!' });
 });
 
 // 4. Admin Account Management: Get all users & provision new accounts
@@ -778,12 +994,17 @@ app.post('/api/admin/users', (req, res) => {
       : `$${parseInt(hourlyRate) || 8}/hr (Scheduled Shift)`;
 
   const userId = `usr-${Date.now().toString(36)}`;
+  const assignedBadgeNumber = role === 'interpreter' ? generateNumericBadgeId() : null;
+
   const newUser = {
     id: userId,
     name,
     email: email.toLowerCase().trim(),
     password: password || 'admin123',
     role: role || 'host', // 'admin', 'interpreter', 'host', 'guest'
+    badgeNumber: assignedBadgeNumber,
+    interpreterBadgeId: assignedBadgeNumber,
+    displayName: role === 'interpreter' ? `Interpreter #${assignedBadgeNumber}` : name,
     org: org || (role === 'admin' ? 'IK Enterprises Operations' : role === 'interpreter' ? 'Linguist Pool' : 'Client Account'),
     primaryLang,
     specialty,
@@ -804,6 +1025,9 @@ app.post('/api/admin/users', (req, res) => {
       userId: newUser.id,
       name: newUser.name,
       email: newUser.email,
+      badgeNumber: assignedBadgeNumber,
+      interpreterBadgeId: assignedBadgeNumber,
+      displayName: `Interpreter #${assignedBadgeNumber}`,
       avatar: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 900000000)}?w=150&auto=format&fit=crop&q=80`,
       languages: [primaryLang, 'English'],
       primaryLang,
@@ -856,7 +1080,8 @@ app.put('/api/admin/users/:id', (req, res) => {
     totalPaid, 
     password, 
     billingType,
-    shiftSchedule
+    shiftSchedule,
+    badgeNumber
   } = req.body;
 
   const user = store.users.find(u => u.id === id);
@@ -876,6 +1101,10 @@ app.put('/api/admin/users/:id', (req, res) => {
   if (minuteRate !== undefined) user.minuteRate = parseFloat(minuteRate);
   if (monthlySalary !== undefined) user.monthlySalary = parseInt(monthlySalary);
   if (shiftSchedule) user.shiftSchedule = shiftSchedule;
+  if (badgeNumber) {
+    user.badgeNumber = badgeNumber.toString().replace(/\D/g, '');
+    user.interpreterBadgeId = user.badgeNumber;
+  }
   
   const resolvedType = user.employmentType || 'hourly';
   user.rateLabel = resolvedType === 'salary_base'
@@ -889,6 +1118,9 @@ app.put('/api/admin/users/:id', (req, res) => {
   // Update or create corresponding interpreter profile if role is interpreter
   let interp = store.interpreters.find(i => i.userId === id || i.id === id || i.email === user.email);
   if (user.role === 'interpreter') {
+    const assignedBadge = ensureInterpreterBadge(user);
+    user.displayName = `Interpreter #${assignedBadge}`;
+
     if (interp) {
       if (name) interp.name = name;
       if (primaryLang) {
@@ -901,6 +1133,9 @@ app.put('/api/admin/users/:id', (req, res) => {
       if (minuteRate !== undefined) interp.minuteRate = parseFloat(minuteRate);
       if (monthlySalary !== undefined) interp.monthlySalary = parseInt(monthlySalary);
       if (shiftSchedule) interp.shiftSchedule = shiftSchedule;
+      interp.badgeNumber = assignedBadge;
+      interp.interpreterBadgeId = assignedBadge;
+      interp.displayName = `Interpreter #${assignedBadge}`;
       interp.rateLabel = user.rateLabel;
     } else {
       interp = {
@@ -908,6 +1143,9 @@ app.put('/api/admin/users/:id', (req, res) => {
         userId: user.id,
         name: user.name,
         email: user.email,
+        badgeNumber: assignedBadge,
+        interpreterBadgeId: assignedBadge,
+        displayName: `Interpreter #${assignedBadge}`,
         avatar: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 900000000)}?w=150&auto=format&fit=crop&q=80`,
         languages: [user.primaryLang || 'Spanish', 'English'],
         primaryLang: user.primaryLang || 'Spanish',
@@ -934,7 +1172,6 @@ app.put('/api/admin/users/:id', (req, res) => {
     if (totalPaid !== undefined) store.wallets[id].totalPaid = parseFloat(totalPaid);
     if (billingType) store.wallets[id].billingType = billingType;
   }
-
 
   saveStore();
   res.json({ success: true, user, wallet: store.wallets[id], interpreterProfile: interp || null });
@@ -1030,9 +1267,23 @@ app.post('/api/interpreter-applications', (req, res) => {
     return res.status(400).json({ error: 'Full name and email are required.' });
   }
 
-  // Check if an application already exists for this email
+  // Strict duplicate check across users & applications
   const cleanEmail = email.toLowerCase().trim();
-  const existingAppIndex = store.interpreterApplications.findIndex(a => a.email.toLowerCase() === cleanEmail);
+  const existingUser = store.users.find(u => u.email && u.email.toLowerCase() === cleanEmail);
+  const existingApp = (store.interpreterApplications || []).find(a => a.email && a.email.toLowerCase() === cleanEmail);
+
+  if (existingUser) {
+    const roleLabel = existingUser.role === 'admin' ? 'Administrator' : existingUser.role === 'interpreter' ? 'Active Interpreter' : 'Client';
+    return res.status(400).json({ 
+      error: `An active account with this email address already exists as an ${roleLabel}. Duplicate accounts with the same email are not permitted. Please sign in instead.` 
+    });
+  }
+
+  if (existingApp) {
+    return res.status(400).json({ 
+      error: 'An interpreter application for this email is already on file with IK Enterprises and is currently in the review queue. Please sign in or contact administration.' 
+    });
+  }
 
   const parsedHourly = parseInt(hourlyRate) !== undefined && !isNaN(parseInt(hourlyRate)) ? parseInt(hourlyRate) : 0;
   const parsedMinute = parseFloat(minuteRate) !== undefined && !isNaN(parseFloat(minuteRate)) ? parseFloat(minuteRate) : 0;
@@ -1057,6 +1308,8 @@ app.post('/api/interpreter-applications', (req, res) => {
       : `${preferredDailyHours || 9} Hours Daily (09:00 - 18:00 ${timeZone?.split(' ')?.[0] || 'PKT'})`
   };
 
+  const assignedBadgeNumber = generateNumericBadgeId();
+
   const newApp = {
     id: `app-${Date.now().toString(36)}`,
     name: name.trim(),
@@ -1064,6 +1317,9 @@ app.post('/api/interpreter-applications', (req, res) => {
     phone: phone.trim(),
     country: country.trim(),
     timeZone: timeZone,
+    badgeNumber: assignedBadgeNumber,
+    interpreterBadgeId: assignedBadgeNumber,
+    displayName: `Interpreter #${assignedBadgeNumber}`,
     preferredShiftType: preferredShiftType,
     preferredDailyHours: preferredDailyHours,
     shiftSchedule: resolvedSchedule,
@@ -1088,11 +1344,7 @@ app.post('/api/interpreter-applications', (req, res) => {
     submittedAt: new Date().toISOString()
   };
 
-  if (existingAppIndex >= 0) {
-    store.interpreterApplications[existingAppIndex] = { ...store.interpreterApplications[existingAppIndex], ...newApp };
-  } else {
-    store.interpreterApplications.unshift(newApp);
-  }
+  store.interpreterApplications.unshift(newApp);
 
   saveStore();
   io.emit('new-interpreter-application', newApp);
@@ -1110,6 +1362,8 @@ app.get('/api/admin/interpreter-applications', (req, res) => {
     const { cvFileData, docFileData, supportingDocs, ...rest } = app;
     return {
       ...rest,
+      badgeNumber: app.badgeNumber || app.interpreterBadgeId || null,
+      interpreterBadgeId: app.badgeNumber || app.interpreterBadgeId || null,
       hasCv: Boolean(cvFileData || app.cvFileName),
       hasDoc: Boolean(docFileData || app.docFileName)
     };
@@ -1172,8 +1426,15 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
       : '9 Hours Daily (09:00 - 18:00 PKT / UTC+5)'
   };
 
+  // Generate or preserve assigned pure numeric ID
+  let existingUser = store.users.find(u => u.email.toLowerCase() === appItem.email.toLowerCase());
+  const assignedBadgeNumber = appItem.badgeNumber || (existingUser && existingUser.badgeNumber) || generateNumericBadgeId();
+
   // Mark application as approved
   appItem.status = 'approved';
+  appItem.badgeNumber = assignedBadgeNumber;
+  appItem.interpreterBadgeId = assignedBadgeNumber;
+  appItem.displayName = `Interpreter #${assignedBadgeNumber}`;
   appItem.employmentType = finalType;
   appItem.hourlyRate = finalHourlyRate;
   appItem.minuteRate = finalMinuteRate;
@@ -1184,7 +1445,6 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
   appItem.approvedAt = new Date().toISOString();
 
   // Create or Update Active User Account
-  let existingUser = store.users.find(u => u.email.toLowerCase() === appItem.email.toLowerCase());
   const userId = existingUser ? existingUser.id : `usr-${Date.now().toString(36)}`;
 
   const userAccount = {
@@ -1193,6 +1453,9 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
     email: appItem.email.toLowerCase(),
     password: passwordToSet,
     role: 'interpreter',
+    badgeNumber: assignedBadgeNumber,
+    interpreterBadgeId: assignedBadgeNumber,
+    displayName: `Interpreter #${assignedBadgeNumber}`,
     org: finalType === 'salary_base' ? 'In-House Linguist Team (Salaried)' : 'Certified Linguist Pool (Verified)',
     primaryLang: appItem.primaryLang,
     languages: appItem.languages,
@@ -1224,6 +1487,9 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
     userId: userId,
     name: appItem.name,
     email: appItem.email.toLowerCase(),
+    badgeNumber: assignedBadgeNumber,
+    interpreterBadgeId: assignedBadgeNumber,
+    displayName: `Interpreter #${assignedBadgeNumber}`,
     avatar: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 900000000)}?w=150&auto=format&fit=crop&q=80`,
     languages: appItem.languages,
     primaryLang: appItem.primaryLang,
@@ -1252,9 +1518,12 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
   // Simulated Official Credential Dispatch Email Record
   const emailDispatch = {
     to: appItem.email,
-    subject: 'Welcome to LinguaBridge - Your Certified Interpreter Account is Approved & Active',
+    subject: `Welcome to LinguaBridge - Your Certified Interpreter ID is #${assignedBadgeNumber} (Approved & Active)`,
     sentAt: new Date().toISOString(),
     recipientName: appItem.name,
+    officialInterpreterId: assignedBadgeNumber,
+    interpreterBadgeId: assignedBadgeNumber,
+    badgeNumber: assignedBadgeNumber,
     loginEmail: appItem.email,
     temporaryPassword: passwordToSet,
     employmentType: finalType === 'salary_base' ? 'Salary Base (Fixed Full-Time)' : finalType === 'per_minute' ? 'Per-Minute Talk Rate (On-Demand Flex)' : 'Hourly Rate (Scheduled Shifts)',
@@ -1271,7 +1540,7 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
 
   res.json({
     success: true,
-    message: `Account approved and provisioned for ${appItem.name}. Login credentials generated.`,
+    message: `Account approved and provisioned for ${appItem.name}. Assigned Numeric ID: #${assignedBadgeNumber}. Login credentials generated.`,
     user: userAccount,
     interpreter: interpProfile,
     application: appItem,
