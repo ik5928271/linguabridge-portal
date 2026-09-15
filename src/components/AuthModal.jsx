@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Lock, 
@@ -6,70 +6,48 @@ import {
   User, 
   Building2, 
   Headphones, 
-  Globe, 
+  Phone, 
   CheckCircle2, 
   ArrowRight, 
   ShieldCheck,
   Sparkles,
   Zap,
+  Users,
   Award,
-  Camera,
-  Upload
+  Globe
 } from 'lucide-react';
-import { LANGUAGES, SPECIALTIES } from '../data/mockData';
 
 export default function AuthModal({ 
   isOpen, 
   onClose, 
   initialMode = 'signin', // 'signin' or 'signup'
-  initialRole = 'host', // 'host' or 'interpreter'
+  initialRole = 'host', // 'host' (client)
   onSuccessLogin,
   onOpenInterpreterApplication
 }) {
   if (!isOpen) return null;
 
   const [mode, setMode] = useState(initialMode); // 'signin' or 'signup'
-  const [role, setRole] = useState(initialRole || 'host'); // 'host', 'interpreter', 'guest'
   
-  // Update mode/role when modal opens with new initial props
-  React.useEffect(() => {
-    setMode(initialMode);
-    setRole(initialRole || 'host');
-  }, [initialMode, initialRole, isOpen]);
+  // Reset mode when opened
+  useEffect(() => {
+    setMode(initialMode || 'signin');
+  }, [initialMode, isOpen]);
   
-  // Sign in state
+  // Sign in form state
   const [signInEmail, setSignInEmail] = useState('');
   const [signInPassword, setSignInPassword] = useState('');
+  const [signInError, setSignInError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Sign up state
+  // Client Sign up form state
   const [name, setName] = useState('');
+  const [orgName, setOrgName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [orgName, setOrgName] = useState('');
-  const [specialty, setSpecialty] = useState('Medical / Healthcare');
-  const [primaryLang, setPrimaryLang] = useState('Spanish');
-  const [certifications, setCertifications] = useState('Certified Professional Linguist');
+  const [signUpError, setSignUpError] = useState('');
 
-  // Avatar / Profile Picture state (Optional)
-  const [avatarType, setAvatarType] = useState('preset'); // 'preset' or 'custom'
-  const [selectedAvatarPreset, setSelectedAvatarPreset] = useState('male-1');
-  const [customPhotoData, setCustomPhotoData] = useState(null);
-  const [customPhotoName, setCustomPhotoName] = useState('');
-
-  const handlePhotoUpload = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      if (file.size > 5 * 1024 * 1024) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        setCustomPhotoData(ev.target.result);
-        setCustomPhotoName(file.name);
-        setAvatarType('custom');
-      };
-      reader.readAsDataURL(file);
-    }
-  };
   // Helper to get local accounts
   const getLocalAccounts = () => {
     try {
@@ -86,8 +64,7 @@ export default function AuthModal({
       const accounts = getLocalAccounts();
       const existingIdx = accounts.findIndex(a => 
         (user.id && a.user.id === user.id) || 
-        (user.email && a.user.email.toLowerCase() === user.email.toLowerCase()) ||
-        (user.name && a.user.name.toLowerCase() === user.name.toLowerCase())
+        (user.email && a.user.email.toLowerCase() === user.email.toLowerCase())
       );
       if (existingIdx >= 0) {
         accounts[existingIdx] = { user: { ...accounts[existingIdx].user, ...user }, wallet: wallet || accounts[existingIdx].wallet };
@@ -100,8 +77,12 @@ export default function AuthModal({
     }
   };
 
+  // Single Unified Sign-In Submission
   const handleSignInSubmit = (e) => {
     e.preventDefault();
+    setSignInError('');
+    setIsSubmitting(true);
+
     const query = signInEmail.toLowerCase().trim();
 
     fetch('/api/auth/login', {
@@ -111,6 +92,7 @@ export default function AuthModal({
     })
       .then(res => res.json())
       .then(data => {
+        setIsSubmitting(false);
         if (data.success && data.user) {
           saveLocalAccount(data.user, data.wallet);
           onSuccessLogin(data.user, data.wallet);
@@ -120,17 +102,17 @@ export default function AuthModal({
         }
       })
       .catch(() => {
+        setIsSubmitting(false);
         fallbackSignIn(query);
       });
   };
 
   const fallbackSignIn = (query) => {
-    // 1. Check local browser account store first!
+    // 1. Check local browser account store first
     const localAccounts = getLocalAccounts();
     const found = localAccounts.find(a => 
       (a.user.email && a.user.email.toLowerCase() === query) ||
-      (a.user.name && a.user.name.toLowerCase() === query) ||
-      (a.user.name && a.user.name.toLowerCase().includes(query))
+      (a.user.name && a.user.name.toLowerCase() === query)
     );
 
     if (found) {
@@ -139,8 +121,8 @@ export default function AuthModal({
       return;
     }
 
-    // 2. Known system defaults
-    if (query === 'iksale9817@gmail.com' || query === 'iksale9815@gmail.com' || query.includes('admin') || query.includes('ikram')) {
+    // 2. Known system default logins
+    if (query === 'iksale9817@gmail.com' || query === 'ik5928271@gmail.com' || query.includes('admin') || query.includes('ikram')) {
       const ownerUser = {
         id: 'usr-owner-ikram',
         name: 'Ikram-ul-haq Mian',
@@ -152,11 +134,11 @@ export default function AuthModal({
       const ownerWallet = { totalPaid: 1000, totalMinutesPurchased: 9999, minutesRemaining: 9999, billingType: 'unlimited_owner' };
       saveLocalAccount(ownerUser, ownerWallet);
       onSuccessLogin(ownerUser, ownerWallet);
-    } else if (query.includes('elena') || query.includes('interp') || query.includes('linguist')) {
+    } else if (query.includes('interp') || query.includes('elena') || query.includes('alex') || query.includes('wali') || query.includes('sally') || query.includes('mehran')) {
       const interpUser = {
-        id: 'usr-elena',
-        name: 'Elena Rodriguez, CCHI',
-        email: query.includes('@') ? query : `${query}@interpreters.org`,
+        id: `usr-int-${Date.now().toString(36)}`,
+        name: query.includes('@') ? query.split('@')[0] : 'Certified Linguist',
+        email: query,
         role: 'interpreter',
         org: 'Certified Linguist Pool',
         primaryLang: 'Spanish',
@@ -165,13 +147,13 @@ export default function AuthModal({
       saveLocalAccount(interpUser, null);
       onSuccessLogin(interpUser, null);
     } else {
-      // 3. Auto-recover / instantiate user account with their custom input name
+      // 3. Default to Client account
       const customUser = {
         id: `usr-${Date.now().toString(36)}`,
-        name: signInEmail.includes('@') ? signInEmail.split('@')[0] : signInEmail,
-        email: signInEmail.includes('@') ? query : `${query}@linguabridge.com`,
+        name: query.includes('@') ? query.split('@')[0] : query,
+        email: query.includes('@') ? query : `${query}@linguabridge.com`,
         role: 'host',
-        org: 'IK Enterprises Client Pool'
+        org: 'Client / Hospital Account'
       };
       const customWallet = { totalPaid: 0, totalMinutesPurchased: 0, minutesRemaining: 0, billingType: 'prepaid' };
       saveLocalAccount(customUser, customWallet);
@@ -180,27 +162,32 @@ export default function AuthModal({
     onClose();
   };
 
-  const handleSignUpSubmit = (e) => {
+  // Client Sign Up Submission
+  const handleClientSignUpSubmit = (e) => {
     e.preventDefault();
-    const cleanName = name.trim() || 'testing';
-    const cleanEmail = email.trim() || `${cleanName.toLowerCase().replace(/\s+/g, '')}@linguabridge.com`;
+    setSignUpError('');
+    setIsSubmitting(true);
+
+    const cleanName = name.trim() || 'Client User';
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Check local storage accounts first
+    const localAccounts = getLocalAccounts();
+    const existingLocal = localAccounts.find(a => a.user.email && a.user.email.toLowerCase() === cleanEmail);
+    if (existingLocal) {
+      setIsSubmitting(false);
+      setSignUpError(`An account with ${cleanEmail} already exists (${existingLocal.user.role === 'interpreter' ? 'Certified Interpreter' : 'Client'}). Please sign in instead.`);
+      return;
+    }
 
     const userObj = {
       id: `usr-${Date.now().toString(36)}`,
       name: cleanName,
       email: cleanEmail,
       phone: phone.trim(),
-      role: role,
-      avatarType: avatarType,
-      avatarPreset: selectedAvatarPreset,
-      photoUrl: avatarType === 'custom' ? customPhotoData : null,
-      avatarEmoji: selectedAvatarPreset === 'female-1' ? '👩‍💼' :
-                   selectedAvatarPreset === 'male-2' ? '👨‍⚕️' :
-                   selectedAvatarPreset === 'female-2' ? '👩‍⚕️' :
-                   selectedAvatarPreset === 'neutral' ? '🌐' : '👨‍💼',
-      org: orgName || 'IK Enterprises Client',
-      primaryLang: primaryLang,
-      specialty: specialty
+      role: 'host', // Strict client role
+      org: orgName || 'Independent Client / Clinic',
+      primaryLang: 'English'
     };
 
     const walletObj = {
@@ -212,10 +199,6 @@ export default function AuthModal({
       billingType: 'prepaid'
     };
 
-    // 1. Immediately save to persistent browser store
-    saveLocalAccount(userObj, walletObj);
-
-    // 2. Sync to backend database
     fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -224,573 +207,343 @@ export default function AuthModal({
         password: password || 'pass123'
       })
     })
-      .then(res => res.json())
-      .then(data => {
+      .then(res => res.json().then(data => ({ status: res.status, data })))
+      .then(({ status, data }) => {
+        setIsSubmitting(false);
         if (data.success && data.user) {
           saveLocalAccount(data.user, data.wallet);
           onSuccessLogin(data.user, data.wallet);
+          onClose();
         } else {
-          onSuccessLogin(userObj, walletObj);
+          setSignUpError(data.error || 'An account with this email already exists. Duplicate accounts are not permitted.');
         }
-        onClose();
       })
       .catch(() => {
-        onSuccessLogin(userObj, walletObj);
-        onClose();
+        setIsSubmitting(false);
+        setSignUpError('Unable to connect to registration server. Please check your network and try again.');
       });
   };
 
-  const quickDemoLogin = (userRole) => {
-    if (userRole === 'host') {
-      onSuccessLogin({
-        id: 'usr-jenkins',
-        name: 'Dr. Sarah Jenkins, MD',
-        email: 's.jenkins@mercygeneral.org',
-        role: 'host',
-        org: 'Mercy General Hospital - Cardiology'
-      }, { totalPaid: 150, totalMinutesPurchased: 150, minutesRemaining: 150, billingType: 'prepaid' });
-    } else if (userRole === 'interpreter') {
-      onSuccessLogin({
-        id: 'usr-elena',
-        name: 'Elena Rodriguez, CCHI',
-        email: 'elena.rodriguez@interpreters.org',
-        role: 'interpreter',
-        org: 'Certified Linguist Pool',
-        primaryLang: 'Spanish',
-        rating: 4.98
-      }, null);
-    } else if (userRole === 'admin') {
-      onSuccessLogin({
-        id: 'usr-owner-ikram',
-        name: 'Ikram-ul-haq Mian',
-        email: 'iksale9817@gmail.com',
-        role: 'admin',
-        isOwner: true,
-        org: 'IK Enterprises'
-      }, { totalPaid: 1000, totalMinutesPurchased: 9999, minutesRemaining: 9999, billingType: 'unlimited_owner' });
-    }
-    onClose();
-  };
-
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md overflow-y-auto p-4 flex justify-center items-start">
-      <div className={`max-w-md w-full glass-panel p-6 sm:p-8 rounded-3xl border shadow-2xl space-y-6 relative overflow-hidden my-6 sm:my-8 transition-all ${
-        role === 'interpreter' ? 'border-emerald-500/50 ring-1 ring-emerald-500/30' : 'border-brand-500/50 ring-1 ring-brand-500/30'
-      }`}>
-        
-        {/* Background glow */}
-        <div className={`absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl pointer-events-none ${
-          role === 'interpreter' ? 'bg-emerald-500/15' : 'bg-brand-500/15'
-        }`} />
+    <div 
+      className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-start justify-center p-4 sm:p-6 overflow-y-auto"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div 
+        className="w-full max-w-lg bg-slate-900 border-2 border-slate-700/80 rounded-3xl shadow-2xl shadow-black overflow-hidden relative text-white my-6 sm:my-8"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Top Header Glow Bar */}
+        <div className="h-1.5 w-full bg-gradient-to-r from-brand-500 via-purple-500 to-emerald-500" />
 
-        {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-white font-bold shadow-lg ${
-              role === 'interpreter' 
-                ? 'bg-gradient-to-tr from-emerald-600 to-teal-500 ring-2 ring-emerald-400/40' 
-                : 'bg-gradient-to-tr from-brand-600 via-indigo-600 to-cyan-500 ring-2 ring-brand-400/40'
-            }`}>
-              {role === 'interpreter' ? <Headphones className="w-5 h-5 text-white" /> : <Building2 className="w-5 h-5 text-white" />}
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${
-                  role === 'interpreter' 
-                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' 
-                    : 'bg-brand-500/20 text-brand-300 border-brand-500/30'
-                }`}>
-                  {role === 'interpreter' ? '🎧 Interpreter & Linguist Portal' : '🏢 Client & Hospital Portal'}
-                </span>
+        {/* Modal Close Button */}
+        <button 
+          onClick={onClose}
+          className="absolute top-4 right-4 z-20 p-2.5 rounded-full bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition cursor-pointer"
+          aria-label="Close authentication modal"
+        >
+          <X className="w-4 h-4" />
+        </button>
+
+        {/* ========================================================================= */}
+        {/* 1. SINGLE UNIFIED SIGN-IN PORTAL (Auto-detects Admin, Interpreter, Client) */}
+        {/* ========================================================================= */}
+        {mode === 'signin' ? (
+          <div className="p-6 sm:p-8 space-y-6">
+            
+            {/* Header / Branding */}
+            <div className="text-center space-y-2">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-600 text-white shadow-lg shadow-brand-500/25 mx-auto">
+                <Lock className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-black text-white mt-1">
-                {role === 'interpreter' 
-                  ? (mode === 'signin' ? 'Interpreter Sign In' : 'Interpreter Application')
-                  : (mode === 'signin' ? 'Client / Doctor Sign In' : 'Create Client Account')}
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                {role === 'interpreter'
-                  ? 'Access your live encounters, schedule, and earnings'
-                  : 'Access on-demand & scheduled 3-way interpretation'}
+              <h2 className="text-2xl font-black text-white tracking-tight">
+                Sign In to LinguaBridge
+              </h2>
+              <p className="text-xs text-slate-300 max-w-sm mx-auto leading-relaxed">
+                Enter your credentials. The system automatically detects your account and opens your <span className="text-purple-400 font-bold">Admin</span>, <span className="text-emerald-400 font-bold">Interpreter</span>, or <span className="text-brand-400 font-bold">Client</span> dashboard.
               </p>
             </div>
-          </div>
 
-          <button 
-            onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Mode Switcher Tabs */}
-        <div className="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-800 text-xs font-bold">
-          <button
-            type="button"
-            onClick={() => setMode('signin')}
-            className={`flex-1 py-2 rounded-lg transition cursor-pointer ${
-              mode === 'signin' 
-                ? (role === 'interpreter' ? 'bg-emerald-600 text-white shadow-md' : 'bg-brand-600 text-white shadow-md') 
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Sign In
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (role === 'interpreter') {
-                onClose();
-                if (onOpenInterpreterApplication) onOpenInterpreterApplication();
-              } else {
-                setMode('signup');
-              }
-            }}
-            className={`flex-1 py-2 rounded-lg transition cursor-pointer ${
-              mode === 'signup' 
-                ? (role === 'interpreter' ? 'bg-emerald-600 text-white shadow-md' : 'bg-brand-600 text-white shadow-md') 
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            {role === 'interpreter' ? 'Apply as Interpreter ✍️' : 'Create Client Account'}
-          </button>
-        </div>
-
-        {/* SIGN IN FORM */}
-        {mode === 'signin' && (
-          <form onSubmit={handleSignInSubmit} className="space-y-4 text-xs">
-            <div className="space-y-1">
-              <label className="font-semibold text-slate-300">
-                {role === 'interpreter' ? 'Interpreter Registered Email or Username' : 'Client / Hospital Email'}
-              </label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5" />
-                <input
-                  type="email"
-                  value={signInEmail}
-                  onChange={(e) => setSignInEmail(e.target.value)}
-                  placeholder={role === 'interpreter' ? 'e.g. rohim6360ba.en@gmail.com' : 'e.g. doctor@hospital.org'}
-                  className="w-full glass-input pl-10 pr-3 py-2.5 rounded-xl text-xs text-white focus:outline-none bg-slate-950 border border-slate-700"
-                  required
-                />
+            {/* Sign In Form */}
+            <form onSubmit={handleSignInSubmit} className="space-y-4">
+              
+              {/* Email Address */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-300 flex items-center justify-between">
+                  <span>Email or Username</span>
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="email"
+                    required
+                    value={signInEmail}
+                    onChange={(e) => setSignInEmail(e.target.value)}
+                    placeholder="name@example.com"
+                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition"
+                  />
+                </div>
               </div>
-            </div>
 
-            <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <label className="font-semibold text-slate-300">Password</label>
-                <a href="#forgot" onClick={(e) => { e.preventDefault(); alert('Password reset link sent to your registered email.'); }} className="text-[11px] text-brand-400 hover:underline">
-                  Forgot Password?
-                </a>
+              {/* Password */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-300 flex items-center justify-between">
+                  <span>Password</span>
+                  <span className="text-[10px] text-slate-400 font-normal">Default: password123</span>
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="password"
+                    required
+                    value={signInPassword}
+                    onChange={(e) => setSignInPassword(e.target.value)}
+                    placeholder="••••••••••••"
+                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition"
+                  />
+                </div>
               </div>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5" />
-                <input
-                  type="password"
-                  value={signInPassword}
-                  onChange={(e) => setSignInPassword(e.target.value)}
-                  placeholder="••••••••••••"
-                  className="w-full glass-input pl-10 pr-3 py-2.5 rounded-xl text-xs text-white focus:outline-none bg-slate-950 border border-slate-700"
-                  required
-                />
-              </div>
-            </div>
 
-            <button
-              type="submit"
-              className={`w-full py-3.5 rounded-xl text-white font-extrabold text-xs shadow-lg flex items-center justify-center gap-2 transition cursor-pointer transform hover:-translate-y-0.5 ${
-                role === 'interpreter'
-                  ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 shadow-emerald-600/30'
-                  : 'bg-gradient-to-r from-brand-500 via-brand-600 to-indigo-600 hover:from-brand-600 hover:to-indigo-700 shadow-brand-500/25'
-              }`}
-            >
-              <span>{role === 'interpreter' ? 'Sign In to Interpreter Workbench' : 'Sign In to Client Dashboard'}</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-
-            {/* Quick Demo Logins Helper */}
-            <div className="pt-3 border-t border-slate-800 space-y-2">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 text-center">
-                1-Click Instant Demo Login:
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                {role === 'interpreter' ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => quickDemoLogin('interpreter')}
-                      className="py-2 px-2 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-300 font-bold text-[11px] border border-emerald-500/40 transition cursor-pointer flex items-center justify-center gap-1.5"
-                    >
-                      <Headphones className="w-3.5 h-3.5" />
-                      <span>Demo Interpreter</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => quickDemoLogin('admin')}
-                      className="py-2 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-purple-300 font-bold text-[11px] border border-purple-500/30 transition cursor-pointer flex items-center justify-center gap-1.5"
-                    >
-                      <ShieldCheck className="w-3.5 h-3.5" />
-                      <span>Demo Admin</span>
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => quickDemoLogin('host')}
-                      className="py-2 px-2 rounded-xl bg-brand-950/60 hover:bg-brand-900/60 text-brand-300 font-bold text-[11px] border border-brand-500/40 transition cursor-pointer flex items-center justify-center gap-1.5"
-                    >
-                      <Building2 className="w-3.5 h-3.5" />
-                      <span>Demo Client / Doctor</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => quickDemoLogin('admin')}
-                      className="py-2 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-purple-300 font-bold text-[11px] border border-purple-500/30 transition cursor-pointer flex items-center justify-center gap-1.5"
-                    >
-                      <ShieldCheck className="w-3.5 h-3.5" />
-                      <span>Demo Admin</span>
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Discrete Portal Switcher Link at Bottom */}
-            <div className="pt-2 text-center text-[11px]">
-              {role === 'interpreter' ? (
-                <p className="text-slate-400">
-                  Are you a Client or Doctor?{' '}
-                  <button
-                    type="button"
-                    onClick={() => setRole('host')}
-                    className="text-brand-400 hover:text-brand-300 font-bold underline cursor-pointer"
-                  >
-                    Go to Client Portal →
-                  </button>
-                </p>
-              ) : (
-                <p className="text-slate-400">
-                  Are you a Certified Interpreter?{' '}
-                  <button
-                    type="button"
-                    onClick={() => setRole('interpreter')}
-                    className="text-emerald-400 hover:text-emerald-300 font-bold underline cursor-pointer"
-                  >
-                    Go to Interpreter Portal →
-                  </button>
+              {signInError && (
+                <p className="text-xs text-red-400 font-bold bg-red-950/40 p-2.5 rounded-lg border border-red-800/50">
+                  {signInError}
                 </p>
               )}
-            </div>
-          </form>
-        )}
 
-        {/* SIGN UP FORM */}
-        {mode === 'signup' && (
-          <form onSubmit={handleSignUpSubmit} className="space-y-4 text-xs">
+              {/* Sign In Button */}
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full py-3.5 px-4 rounded-xl font-black text-sm bg-gradient-to-r from-brand-600 via-indigo-600 to-purple-600 hover:from-brand-500 hover:to-purple-500 text-white shadow-lg shadow-brand-500/25 transition transform active:scale-98 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>{isSubmitting ? 'Verifying Credentials...' : 'Sign In to Portal'}</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </form>
+
+            {/* Quick Demo Test Access Chips */}
+            <div className="p-3.5 bg-slate-950/70 rounded-2xl border border-slate-800 space-y-2">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider text-center">
+                Quick 1-Click Demo Accounts:
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSignInEmail('iksale9817@gmail.com');
+                    setSignInPassword('admin2026!');
+                  }}
+                  className="p-2 rounded-xl bg-slate-900 hover:bg-purple-900/40 border border-purple-500/30 text-purple-300 text-center transition cursor-pointer"
+                >
+                  <p className="text-[10px] font-extrabold flex items-center justify-center gap-1">
+                    <span>👑 Admin</span>
+                  </p>
+                  <p className="text-[8.5px] text-slate-400 truncate">IK Enterprises</p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSignInEmail('alex@linguabridge.com');
+                    setSignInPassword('interpreter123');
+                  }}
+                  className="p-2 rounded-xl bg-slate-900 hover:bg-emerald-900/40 border border-emerald-500/30 text-emerald-300 text-center transition cursor-pointer"
+                >
+                  <p className="text-[10px] font-extrabold flex items-center justify-center gap-1">
+                    <span>🎧 Linguist</span>
+                  </p>
+                  <p className="text-[8.5px] text-slate-400 truncate">Russian / Arabic</p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSignInEmail('client@linguabridge.com');
+                    setSignInPassword('client123');
+                  }}
+                  className="p-2 rounded-xl bg-slate-900 hover:bg-brand-900/40 border border-brand-500/30 text-brand-300 text-center transition cursor-pointer"
+                >
+                  <p className="text-[10px] font-extrabold flex items-center justify-center gap-1">
+                    <span>🏥 Client</span>
+                  </p>
+                  <p className="text-[8.5px] text-slate-400 truncate">Prepaid 120 Mins</p>
+                </button>
+              </div>
+            </div>
+
+            {/* Separated Registration Links */}
+            <div className="border-t border-slate-800 pt-4 space-y-2.5 text-xs text-center">
+              <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-slate-950/50 border border-slate-800/80">
+                <div className="text-left">
+                  <p className="font-bold text-white">Need a Client Account?</p>
+                  <p className="text-[10.5px] text-slate-400">Book interpreters for clinics & business</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMode('signup')}
+                  className="px-3 py-1.5 rounded-lg bg-brand-600/20 hover:bg-brand-600 text-brand-300 hover:text-white font-extrabold text-[11px] border border-brand-500/40 transition cursor-pointer"
+                >
+                  Register Client
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-emerald-950/30 border border-emerald-800/40">
+                <div className="text-left">
+                  <p className="font-bold text-emerald-300 flex items-center gap-1">
+                    <Headphones className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Are you a Linguist?</span>
+                  </p>
+                  <p className="text-[10.5px] text-slate-400">Apply to join our on-demand roster</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    if (onOpenInterpreterApplication) onOpenInterpreterApplication();
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[11px] shadow-sm shadow-emerald-600/30 transition cursor-pointer"
+                >
+                  Apply as Interpreter
+                </button>
+              </div>
+            </div>
+
+          </div>
+        ) : (
+          /* ========================================================================= */
+          /* 2. DEDICATED CLIENT & HOSPITAL SIGN-UP FORM */
+          /* ========================================================================= */
+          <div className="p-6 sm:p-8 space-y-6">
             
-            {/* Role Selection */}
-            <div className="space-y-1">
-              <label className="font-semibold text-slate-300">I am joining as:</label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setRole('host')}
-                  className={`p-2.5 rounded-xl border text-left transition flex items-center gap-2 ${
-                    role === 'host' ? 'bg-brand-600/20 border-brand-500 text-white ring-1 ring-brand-500' : 'bg-slate-900 border-slate-800 text-slate-400'
-                  }`}
-                >
-                  <Building2 className="w-4 h-4 text-brand-400 shrink-0" />
-                  <div>
-                    <p className="font-bold text-[11px]">Client / Organization (Payer)</p>
-                    <p className="text-[9px] text-slate-400">Individual Client, Doctor, Law Firm, Hospital</p>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setRole('interpreter')}
-                  className={`p-2.5 rounded-xl border text-left transition flex items-center gap-2 ${
-                    role === 'interpreter' ? 'bg-emerald-600/20 border-emerald-500 text-white ring-1 ring-emerald-500' : 'bg-slate-900 border-slate-800 text-slate-400'
-                  }`}
-                >
-                  <Headphones className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <div>
-                    <p className="font-bold text-[11px]">Certified Interpreter</p>
-                    <p className="text-[9px] text-slate-400">Professional Linguist Pool</p>
-                  </div>
-                </button>
+            {/* Header */}
+            <div className="text-center space-y-2">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-600 text-white shadow-lg shadow-brand-500/25 mx-auto">
+                <Users className="w-6 h-6" />
               </div>
+              <h2 className="text-2xl font-black text-white tracking-tight">
+                Create Client & Hospital Account
+              </h2>
+              <p className="text-xs text-slate-300 max-w-sm mx-auto leading-relaxed">
+                Register to dispatch 24/7 on-demand medical, legal, and enterprise interpreters with instant 3-way conference links.
+              </p>
             </div>
 
-            {/* Role specific forms */}
-            {role === 'interpreter' ? (
-              <div className="space-y-4">
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-950 border border-emerald-500/30 space-y-3">
-                  <div className="flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                      <Award className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-white text-xs">Interpreter Verification & Credential Intake</h4>
-                      <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
-                        All prospective interpreters must submit their languages, qualifications, and <strong className="text-white">CV/Resume</strong> for verification by the <strong className="text-emerald-400">IK Enterprises Administration Board</strong> before portal login credentials are provisioned.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-[10px] text-slate-400 space-y-1.5">
-                    <div className="flex items-center gap-1.5 text-emerald-400 font-semibold">
-                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                      <span>Step 1: Fill Application & Attach CV + Credentials</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-brand-400 font-semibold">
-                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                      <span>Step 2: IK Enterprises Review & Verification</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-purple-400 font-semibold">
-                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                      <span>Step 3: Receive Official Login Credentials via Email</span>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (onOpenInterpreterApplication) onOpenInterpreterApplication();
-                    }}
-                    className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition transform hover:scale-[1.01]"
-                  >
-                    <span>Open Interpreter Application & Document Intake</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <>
-                {/* Profile Photo / Avatar Picker (Optional) */}
-                <div className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[11px] font-bold text-slate-200 flex items-center gap-1.5">
-                      <Camera className="w-3.5 h-3.5 text-brand-400" />
-                      <span>Profile Photo / Avatar (Optional)</span>
-                    </label>
-                    <span className="text-[9px] text-slate-400">Choose Avatar or Upload</span>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    {/* Live Preview */}
-                    <div className="relative shrink-0">
-                      {avatarType === 'custom' && customPhotoData ? (
-                        <img 
-                          src={customPhotoData} 
-                          alt="Avatar" 
-                          className="w-12 h-12 rounded-xl object-cover ring-2 ring-brand-500 shadow"
-                        />
-                      ) : (
-                        <div className={`w-12 h-12 rounded-xl bg-gradient-to-tr ${
-                          selectedAvatarPreset === 'female-1' ? 'from-pink-600 to-purple-600' :
-                          selectedAvatarPreset === 'male-2' ? 'from-emerald-600 to-teal-600' :
-                          selectedAvatarPreset === 'female-2' ? 'from-violet-600 to-fuchsia-600' :
-                          selectedAvatarPreset === 'neutral' ? 'from-cyan-600 to-brand-600' :
-                          'from-blue-600 to-indigo-600'
-                        } flex items-center justify-center text-2xl shadow ring-1 ring-brand-400/40`}>
-                          {selectedAvatarPreset === 'female-1' ? '👩‍💼' :
-                           selectedAvatarPreset === 'male-2' ? '👨‍⚕️' :
-                           selectedAvatarPreset === 'female-2' ? '👩‍⚕️' :
-                           selectedAvatarPreset === 'neutral' ? '🌐' : '👨‍💼'}
-                        </div>
-                      )}
-                      {avatarType === 'custom' && customPhotoData && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCustomPhotoData(null);
-                            setCustomPhotoName('');
-                            setAvatarType('preset');
-                          }}
-                          className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-600 text-white flex items-center justify-center text-[9px]"
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Presets */}
-                    <div className="flex-1 space-y-1.5">
-                      <div className="flex flex-wrap gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => { setAvatarType('preset'); setSelectedAvatarPreset('male-1'); }}
-                          className={`px-2 py-1 rounded-lg text-[10px] font-semibold border transition ${
-                            avatarType === 'preset' && selectedAvatarPreset === 'male-1'
-                              ? 'bg-blue-600/30 border-blue-500 text-white'
-                              : 'bg-slate-950 border-slate-800 text-slate-400'
-                          }`}
-                        >
-                          👨‍💼 Male
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setAvatarType('preset'); setSelectedAvatarPreset('female-1'); }}
-                          className={`px-2 py-1 rounded-lg text-[10px] font-semibold border transition ${
-                            avatarType === 'preset' && selectedAvatarPreset === 'female-1'
-                              ? 'bg-pink-600/30 border-pink-500 text-white'
-                              : 'bg-slate-950 border-slate-800 text-slate-400'
-                          }`}
-                        >
-                          👩‍💼 Female
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setAvatarType('preset'); setSelectedAvatarPreset('male-2'); }}
-                          className={`px-2 py-1 rounded-lg text-[10px] font-semibold border transition ${
-                            avatarType === 'preset' && selectedAvatarPreset === 'male-2'
-                              ? 'bg-emerald-600/30 border-emerald-500 text-white'
-                              : 'bg-slate-950 border-slate-800 text-slate-400'
-                          }`}
-                        >
-                          👨‍⚕️ Medical
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setAvatarType('preset'); setSelectedAvatarPreset('neutral'); }}
-                          className={`px-2 py-1 rounded-lg text-[10px] font-semibold border transition ${
-                            avatarType === 'preset' && selectedAvatarPreset === 'neutral'
-                              ? 'bg-cyan-600/30 border-cyan-500 text-white'
-                              : 'bg-slate-950 border-slate-800 text-slate-400'
-                          }`}
-                        >
-                          🌐 Global
-                        </button>
-                      </div>
-
-                      <label className="cursor-pointer inline-flex items-center gap-1 text-[10px] text-brand-400 hover:text-brand-300 font-semibold">
-                        <Upload className="w-3 h-3" />
-                        <span>{customPhotoName ? `✓ ${customPhotoName}` : 'Or upload photo file (JPG/PNG)'}</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handlePhotoUpload}
-                          className="hidden"
-                        />
-                      </label>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Interpreter switch alert */}
-                <div className="p-3 rounded-2xl bg-gradient-to-r from-purple-950/80 to-indigo-950/80 border border-purple-500/40 flex items-center justify-between gap-2 shadow-inner">
-                  <div className="flex items-center gap-2">
-                    <Globe className="w-4 h-4 text-purple-300 shrink-0" />
-                    <div>
-                      <p className="text-[11px] font-bold text-white">Are you a Linguist / Interpreter?</p>
-                      <p className="text-[10px] text-purple-300">Apply to join our paid interpretation roster.</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onClose();
-                      if (onOpenInterpreterApplication) onOpenInterpreterApplication();
-                    }}
-                    className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-[10px] shrink-0 shadow-md shadow-purple-600/30 transition cursor-pointer"
-                  >
-                    Apply as Interpreter ✍️
-                  </button>
-                </div>
-
-                {/* Client / Host Registration Form */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div className="space-y-1">
-                    <label className="font-semibold text-slate-300 text-xs">Full Name</label>
+            {/* Client Registration Form */}
+            <form onSubmit={handleClientSignUpSubmit} className="space-y-3.5">
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Full Name */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-300">Your Full Name</label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
                       type="text"
+                      required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="e.g. Dr. Jennifer Adams"
-                      className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="font-semibold text-slate-300 text-xs">Work Email</label>
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="name@company.com"
-                      className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
-                      required
+                      placeholder="Dr. Sarah Jenkins, MD"
+                      className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-brand-500"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div className="space-y-1">
-                    <label className="font-semibold text-slate-300 text-xs">WhatsApp / Mobile Number</label>
+                {/* Organization */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-300">Organization / Clinic</label>
+                  <div className="relative">
+                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      required
+                      value={orgName}
+                      onChange={(e) => setOrgName(e.target.value)}
+                      placeholder="Mercy Healthcare Network"
+                      className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-brand-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Work Email */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-300">Work Email Address</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="s.jenkins@mercyhealth.org"
+                    className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-brand-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Phone */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-300">Phone Number</label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
                       type="tel"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      placeholder="e.g. +1 555-0199 or +92 300 1234567"
-                      className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
-                      required
+                      placeholder="+1 (555) 234-5678"
+                      className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-brand-500"
                     />
                   </div>
+                </div>
 
-                  <div className="space-y-1">
-                    <label className="font-semibold text-slate-300 text-xs">Organization / Company (Optional)</label>
+                {/* Password */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-300">Account Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
-                      type="text"
-                      value={orgName}
-                      onChange={(e) => setOrgName(e.target.value)}
-                      placeholder="e.g. St. Jude Hospital, Law Firm, or Individual"
-                      className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
+                      type="password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••••••"
+                      className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-brand-500"
                     />
                   </div>
                 </div>
+              </div>
 
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-300 text-xs">Primary Domain</label>
-                  <select
-                    value={specialty}
-                    onChange={(e) => setSpecialty(e.target.value)}
-                    className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none bg-slate-900"
-                  >
-                    {SPECIALTIES.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-                  </select>
-                </div>
+              {signUpError && (
+                <p className="text-xs text-red-400 font-bold bg-red-950/40 p-2.5 rounded-lg border border-red-800/50">
+                  {signUpError}
+                </p>
+              )}
 
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-300">Create Password</label>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="At least 8 characters"
-                    className="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none"
-                    required
-                  />
-                </div>
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full py-3.5 px-4 rounded-xl font-black text-sm bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white shadow-lg shadow-brand-500/25 transition transform active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-2"
+              >
+                <span>{isSubmitting ? 'Creating Account...' : 'Complete Client Registration'}</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </form>
 
-                <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 text-[10px] text-slate-400 flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>By signing up, you agree to HIPAA Business Associate Agreement & Terms.</span>
-                </div>
+            {/* Switch to Sign In */}
+            <div className="border-t border-slate-800 pt-4 text-center text-xs text-slate-400">
+              <span>Already have an account? </span>
+              <button
+                type="button"
+                onClick={() => setMode('signin')}
+                className="text-brand-400 font-extrabold hover:text-brand-300 underline underline-offset-2 ml-1 cursor-pointer"
+              >
+                Sign In to your portal
+              </button>
+            </div>
 
-                <button
-                  type="submit"
-                  className="w-full py-3 rounded-xl bg-gradient-to-r from-brand-500 via-brand-600 to-indigo-600 hover:from-brand-600 hover:to-indigo-700 text-white font-extrabold text-xs shadow-lg shadow-brand-500/25 flex items-center justify-center gap-2 transition"
-                >
-                  <span>Create Account & Start</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </>
-            )}
-          </form>
+          </div>
         )}
 
       </div>

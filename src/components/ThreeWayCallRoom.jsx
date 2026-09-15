@@ -42,7 +42,17 @@ export default function ThreeWayCallRoom({
   onOpenGlossary 
 }) {
   const hostName = sessionData.hostName || sessionData.mainClientName || 'Main Client (Payer)';
-  const interpreterName = sessionData.interpreter?.name || sessionData.interpreterName || 'Certified Interpreter';
+  
+  // Official Numeric Badge ID for Interpreter Privacy ("The Gap")
+  const interpreterBadgeNumber = sessionData.interpreter?.badgeNumber || 
+    sessionData.interpreter?.interpreterBadgeId || 
+    sessionData.interpreterBadgeNumber || 
+    sessionData.interpreterBadgeId || 
+    (sessionData.interpreterName?.replace(/\D/g, '') || '84920');
+
+  const interpreterDisplayName = `Interpreter #${interpreterBadgeNumber}`;
+  const interpreterName = interpreterDisplayName;
+
   const interpreterCert = Array.isArray(sessionData.interpreter?.certifications) 
     ? sessionData.interpreter.certifications[0] 
     : (sessionData.interpreter?.certifications || 'Certified Professional Linguist');
@@ -92,7 +102,7 @@ export default function ThreeWayCallRoom({
   // Connected Participants in this Room via Socket
   const [roomParticipants, setRoomParticipants] = useState([
     { role: 'host', name: hostName, status: 'connected' },
-    { role: 'interpreter', name: interpreterName, status: 'connected' },
+    { role: 'interpreter', name: interpreterDisplayName, status: 'connected' },
     { role: 'guest', name: patientName, status: 'connected' }
   ]);
 
@@ -103,7 +113,7 @@ export default function ThreeWayCallRoom({
       id: 'm1',
       sender: 'System',
       role: 'system',
-      text: `Secure 3-Party Room (${roomId}) established between ${hostName}, ${interpreterName} (${targetLanguage}), and ${patientName}.`,
+      text: `Secure 3-Party Room (${roomId}) established between ${hostName}, ${interpreterDisplayName} (${targetLanguage}), and ${patientName}.`,
       timestamp: '00:01'
     }
   ]);
@@ -111,7 +121,7 @@ export default function ThreeWayCallRoom({
 
   // Live Captions / Spoken Transcripts
   const [liveCaption, setLiveCaption] = useState({
-    speaker: interpreterName,
+    speaker: interpreterDisplayName,
     speakerRole: 'interpreter',
     enText: `Live 3-party session active between ${hostName} and ${patientName}. Certified ${targetLanguage} interpretation in progress.`,
     targetText: `Audio connected. Speak clearly into your microphone.`
@@ -562,9 +572,9 @@ export default function ThreeWayCallRoom({
                     </div>
                   )}
                 </div>
-                <h4 className="text-sm font-bold text-white mt-3 truncate max-w-[200px]">{interpreterName}</h4>
+                <h4 className="text-sm font-extrabold text-white mt-3 truncate max-w-[200px]">{interpreterDisplayName}</h4>
                 <span className="text-[11px] font-semibold text-emerald-400">
-                  Certified Interpreter (English ⟷ {targetLanguage})
+                  ID: #{interpreterBadgeNumber} • English ⟷ {targetLanguage}
                 </span>
                 <span className="text-[10px] text-slate-400 mt-0.5 font-medium">
                   {interpreterCert}
@@ -572,9 +582,9 @@ export default function ThreeWayCallRoom({
               </div>
 
               {/* Top Left Badge */}
-              <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md text-[11px] font-bold text-white">
+              <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md text-[11px] font-bold text-emerald-400 border border-emerald-500/30">
                 <Headphones className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Certified Linguist</span>
+                <span>ID: #{interpreterBadgeNumber}</span>
               </div>
 
               {/* Top Right Pause Action */}

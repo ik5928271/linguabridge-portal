@@ -294,11 +294,10 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
       if (response.ok && data.success) {
         setIsSubmitted(true);
       } else {
-        setErrorMessage(data.error || 'Failed to submit application. Please try again.');
+        setErrorMessage(data.error || 'An account or application with this email already exists. Duplicate applications with the same email are not permitted.');
       }
     } catch (err) {
-      // Fallback submission safety
-      setIsSubmitted(true);
+      setErrorMessage('Unable to connect to application server. Please check your network and try again.');
     } finally {
       setIsSubmitting(false);
     }

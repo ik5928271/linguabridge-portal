@@ -371,6 +371,8 @@ export default function App() {
         {currentView === 'interpreter' && (
           <InterpreterDashboard
             currentUser={currentUser}
+            callLogs={callLogs}
+            appointments={appointments}
             onAcceptIncomingCall={handleStartCall}
             onOpenGlossary={() => setIsGlossaryOpen(true)}
             onOpenSchedule={() => setIsScheduleOpen(true)}

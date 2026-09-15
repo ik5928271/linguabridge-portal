@@ -32,7 +32,8 @@ export default function Navbar({
   onOpenAuth,
   onLogout,
   onOpenGlossary,
-  onOpenSchedule
+  onOpenSchedule,
+  onOpenInterpreterApplication
 }) {
   const [showUserMenu, setShowUserMenu] = useState(false);
 
@@ -284,33 +285,7 @@ export default function Navbar({
                     <span>My Dashboard</span>
                   </button>
 
-                  {/* 1-Click Role Switcher for Non-Admin Users */}
-                  {currentUser?.role !== 'admin' && (
-                    <button
-                      onClick={async () => {
-                        const nextRole = currentUser.role === 'interpreter' ? 'host' : 'interpreter';
-                        try {
-                          const res = await fetch('/api/auth/switch-role', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ userId: currentUser.id || currentUser.email, targetRole: nextRole })
-                          });
-                          const data = await res.json();
-                          if (data.success && data.user) {
-                            localStorage.setItem('linguabridge_user', JSON.stringify(data.user));
-                            if (data.wallet) localStorage.setItem('linguabridge_wallet', JSON.stringify(data.wallet));
-                            window.location.reload();
-                          }
-                        } catch (e) {
-                          console.error(e);
-                        }
-                      }}
-                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-purple-900/40 text-purple-300 font-bold flex items-center gap-2 transition cursor-pointer border border-purple-500/20"
-                    >
-                      <Zap className="w-4 h-4 text-amber-400" />
-                      <span>Switch to {currentUser?.role === 'interpreter' ? 'Client Account' : 'Interpreter Account'}</span>
-                    </button>
-                  )}
+
 
                   <button
                     onClick={() => {
@@ -327,27 +302,29 @@ export default function Navbar({
               )}
             </div>
           ) : (
-            /* Dedicated Dual Visitor Portals: Client Portal vs Interpreter Portal */
+            /* Clean Visitor Actions: Apply as Interpreter + Single Unified Sign In */
             <div className="flex items-center gap-2">
               
-              {/* 1. Client / Hospital Portal Button */}
+              {/* 1. Apply as Interpreter Button */}
               <button
-                onClick={() => onOpenAuth('signin', 'host')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-brand-600/10 to-indigo-600/10 hover:from-brand-600 hover:to-indigo-600 text-brand-600 dark:text-brand-300 hover:text-white text-xs font-bold border border-brand-500/30 hover:border-transparent transition shadow-sm"
-                title="Client & Hospital Sign In / Booking Portal"
-              >
-                <Users className="w-3.5 h-3.5 text-brand-500 group-hover:text-white" />
-                <span>Client Portal</span>
-              </button>
-
-              {/* 2. Interpreter & Linguist Portal Button */}
-              <button
-                onClick={() => onOpenAuth('signin', 'interpreter')}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-extrabold shadow-md shadow-emerald-600/25 border border-emerald-400/30 transition transform hover:scale-105"
-                title="Interpreter Sign In & Application Portal"
+                onClick={() => {
+                  if (onOpenInterpreterApplication) onOpenInterpreterApplication();
+                }}
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-extrabold shadow-md shadow-emerald-600/25 border border-emerald-400/30 transition transform hover:scale-105 cursor-pointer"
+                title="Submit Interpreter Application & CV"
               >
                 <Headphones className="w-3.5 h-3.5 text-white" />
-                <span>Interpreter Portal</span>
+                <span>Apply as Interpreter</span>
+              </button>
+
+              {/* 2. Single Unified Sign-In Portal Button */}
+              <button
+                onClick={() => onOpenAuth('signin')}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white text-xs font-black shadow-md shadow-brand-600/25 border border-brand-400/40 transition transform hover:scale-105 cursor-pointer"
+                title="Sign In to Admin, Interpreter, or Client Portal"
+              >
+                <LogIn className="w-3.5 h-3.5 text-white" />
+                <span>Sign In</span>
               </button>
 
             </div>

@@ -180,6 +180,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       const localSaved = JSON.parse(localStorage.getItem('linguabridge_submitted_applications') || '[]');
       if (Array.isArray(localSaved) && localSaved.length > 0) {
         localSaved.forEach(localApp => {
+          if (localApp.email && localApp.email.toLowerCase() === 'ik5928271@gmail.com') return;
           if (!list.some(d => d.email && d.email.toLowerCase() === localApp.email?.toLowerCase())) {
             list.unshift(localApp);
           }
@@ -371,20 +372,38 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
     fetch('/api/admin/interpreter-applications')
       .then(res => res.json())
       .then(data => {
-        let serverApps = Array.isArray(data) && data.length > 0 ? data : [];
+        let list = Array.isArray(ALL_SEED_APPLICATIONS) && ALL_SEED_APPLICATIONS.length > 0 
+          ? [...ALL_SEED_APPLICATIONS] 
+          : [];
+        
+        let serverApps = Array.isArray(data) ? data : [];
+        serverApps.forEach(sApp => {
+          const idx = list.findIndex(a => (a.id && a.id === sApp.id) || (a.email && sApp.email && a.email.toLowerCase() === sApp.email.toLowerCase()));
+          if (idx >= 0) {
+            list[idx] = { ...list[idx], ...sApp };
+          } else {
+            list.unshift(sApp);
+          }
+        });
+
         try {
           const localSaved = JSON.parse(localStorage.getItem('linguabridge_submitted_applications') || '[]');
           if (Array.isArray(localSaved) && localSaved.length > 0) {
             localSaved.forEach(localApp => {
-              if (!serverApps.some(s => s.email && s.email.toLowerCase() === localApp.email?.toLowerCase())) {
-                serverApps.unshift(localApp);
+              if (localApp.email && localApp.email.toLowerCase() === 'ik5928271@gmail.com') return;
+              const idx = list.findIndex(a => (a.id && a.id === localApp.id) || (a.email && localApp.email && a.email.toLowerCase() === localApp.email.toLowerCase()));
+              if (idx >= 0) {
+                list[idx] = { ...list[idx], ...localApp };
+              } else {
+                list.unshift(localApp);
               }
             });
           }
         } catch {}
 
-        if (serverApps.length > 0) {
-          setApplications(serverApps);
+        const cleanList = list.filter(a => !(a.email && a.email.toLowerCase() === 'ik5928271@gmail.com'));
+        if (cleanList.length > 0) {
+          setApplications(cleanList);
         }
       })
       .catch(() => {});
@@ -819,10 +838,13 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   const pendingApplicationsCount = applications.filter(a => a.status === 'pending').length;
 
   const filteredUsers = usersList.filter(user => {
+    const q = searchTerm.toLowerCase().trim();
     const matchesSearch = 
-      (user.name && user.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (user.org && user.org.toLowerCase().includes(searchTerm.toLowerCase()));
+      (user.name && user.name.toLowerCase().includes(q)) ||
+      (user.email && user.email.toLowerCase().includes(q)) ||
+      (user.badgeNumber && user.badgeNumber.toString().includes(q)) ||
+      (user.interpreterBadgeId && user.interpreterBadgeId.toString().includes(q)) ||
+      (user.org && user.org.toLowerCase().includes(q));
     
     if (userRoleFilter === 'all') return matchesSearch;
     if (userRoleFilter === 'admin') return matchesSearch && user.role === 'admin';
@@ -832,10 +854,13 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   });
 
   const filteredApplications = applications.filter(app => {
+    const q = searchTerm.toLowerCase().trim();
     const matchesSearch = 
-      (app.name && app.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (app.email && app.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (app.primaryLang && app.primaryLang.toLowerCase().includes(searchTerm.toLowerCase()));
+      (app.name && app.name.toLowerCase().includes(q)) ||
+      (app.email && app.email.toLowerCase().includes(q)) ||
+      (app.badgeNumber && app.badgeNumber.toString().includes(q)) ||
+      (app.interpreterBadgeId && app.interpreterBadgeId.toString().includes(q)) ||
+      (app.primaryLang && app.primaryLang.toLowerCase().includes(q));
     
     if (appFilter === 'all') return matchesSearch;
     return matchesSearch && app.status === appFilter;
@@ -1417,8 +1442,13 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                           </div>
                         )}
                         <div>
-                          <div className="flex items-center gap-2.5">
+                          <div className="flex items-center gap-2.5 flex-wrap">
                             <h4 className="text-base font-extrabold text-white">{app.name}</h4>
+                            {(app.badgeNumber || app.interpreterBadgeId) && (
+                              <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                                ID: #{app.badgeNumber || app.interpreterBadgeId}
+                              </span>
+                            )}
                             <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider border ${
                               isPending 
                                 ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse' 
@@ -1837,8 +1867,13 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                               {u.name?.charAt(0) || 'U'}
                             </div>
                             <div>
-                              <p className="font-bold text-white flex items-center gap-1.5">
+                              <p className="font-bold text-white flex items-center gap-1.5 flex-wrap">
                                 <span>{u.name}</span>
+                                {(u.badgeNumber || u.interpreterBadgeId) && (
+                                  <span className="text-[10px] font-mono font-black px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                                    ID: #{u.badgeNumber || u.interpreterBadgeId}
+                                  </span>
+                                )}
                                 {isMasterOwner && (
                                   <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
                                     👑 MASTER OWNER
@@ -3674,7 +3709,14 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                           {i.name?.charAt(0) || 'I'}
                         </div>
                         <div className="overflow-hidden">
-                          <p className="text-xs font-bold text-white truncate">{i.name}</p>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="text-xs font-bold text-white truncate">{i.name}</p>
+                            {(i.badgeNumber || i.interpreterBadgeId) && (
+                              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shrink-0">
+                                ID: #{i.badgeNumber || i.interpreterBadgeId}
+                              </span>
+                            )}
+                          </div>
                           <p className="text-[11px] text-brand-300">{i.primaryLang || 'Spanish'} ⟷ English</p>
                           <span className="text-[10px] text-emerald-400 font-semibold">● Online & Ready</span>
                         </div>

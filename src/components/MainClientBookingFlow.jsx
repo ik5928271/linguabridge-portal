@@ -764,68 +764,64 @@ END:VCALENDAR`;
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {availableInterpreters.map((interp) => (
-                <div
-                  key={interp.id}
-                  onClick={() => setSelectedInterpreter(interp)}
-                  className={`p-5 rounded-2xl border transition-all cursor-pointer space-y-3 relative ${
-                    selectedInterpreter?.id === interp.id
-                      ? 'bg-brand-600/15 border-brand-500 ring-2 ring-brand-500/50 shadow-xl'
-                      : 'bg-slate-900/70 border-slate-800 hover:border-slate-700'
-                  }`}
-                >
-                  <div className="flex items-start gap-3.5">
-                    {interp.avatar ? (
-                      <img src={interp.avatar} alt={interp.name} className="w-14 h-14 rounded-2xl object-cover ring-2 ring-emerald-500/30 shrink-0" />
-                    ) : (
-                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 font-bold text-white flex items-center justify-center text-lg shrink-0 shadow-lg shadow-emerald-500/20">
-                        {interp.name?.charAt(0) || 'I'}
+              {availableInterpreters.map((interp) => {
+                const badgeNum = interp.badgeNumber || interp.interpreterBadgeId || interp.id?.replace(/\D/g, '') || '84920';
+                return (
+                  <div
+                    key={interp.id}
+                    onClick={() => setSelectedInterpreter(interp)}
+                    className={`p-5 rounded-2xl border transition-all cursor-pointer space-y-3 relative ${
+                      selectedInterpreter?.id === interp.id
+                        ? 'bg-brand-600/15 border-brand-500 ring-2 ring-brand-500/50 shadow-xl'
+                        : 'bg-slate-900/70 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3.5">
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 font-black text-white flex flex-col items-center justify-center text-xs shrink-0 shadow-lg shadow-emerald-500/20 ring-2 ring-emerald-500/30">
+                        <Award className="w-5 h-5 mb-0.5 text-white" />
+                        <span className="text-[9px] font-mono font-bold leading-tight">#{badgeNum}</span>
                       </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-bold text-white truncate">{interp.name}</h4>
-                        {clientBillingType === 'prepaid' ? (
-                          <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 shrink-0">
-                            Included (1:1 Mins)
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-sm font-extrabold text-white truncate">
+                            Interpreter #{badgeNum}
+                          </h4>
+                          <span className="text-[10px] font-bold text-brand-300 bg-brand-500/15 px-2 py-0.5 rounded-full border border-brand-500/30 shrink-0">
+                            ID: #{badgeNum}
                           </span>
-                        ) : (
-                          <span className="text-[10px] font-bold text-brand-300 bg-brand-500/10 px-2 py-0.5 rounded-full border border-brand-500/20 shrink-0">
-                            $0.90/min Client Rate
+                        </div>
+                        <p className="text-[11px] text-emerald-400 font-semibold mt-0.5">
+                          {(interp.languages || [interp.primaryLang || selectedLanguage, 'English']).join(' ⟷ ')}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-400">
+                          <span className="flex items-center gap-1 text-emerald-400 font-bold">
+                            ● Online & Ready
                           </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-slate-300 font-medium">
-                        {(interp.languages || [interp.primaryLang || selectedLanguage, 'English']).join(' ⟷ ')}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-400">
-                        <span className="flex items-center gap-1 text-emerald-400 font-bold">
-                          ● Online & Ready
-                        </span>
-                        <span>•</span>
-                        <span>{interp.specialty || interp.specialties?.[0] || 'General / Customer Support'}</span>
+                          <span>•</span>
+                          <span className="truncate">{interp.specialty || interp.specialties?.[0] || 'General / Healthcare'}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed bg-slate-950/40 p-2.5 rounded-xl border border-slate-800/80">
-                    {interp.bio || `Certified ${interp.primaryLang || selectedLanguage} professional linguist ready for live assignments.`}
-                  </p>
+                    <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed bg-slate-950/40 p-2.5 rounded-xl border border-slate-800/80">
+                      {interp.bio || `Certified professional linguist (Badge #${badgeNum}) bridging live encounters with highest accuracy.`}
+                    </p>
 
-                  <div className="flex items-center justify-between pt-1">
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                      {Array.isArray(interp.certifications) ? interp.certifications[0] : (interp.certifications || 'Certified Professional Linguist')}
-                    </span>
-                    {selectedInterpreter?.id === interp.id ? (
-                      <span className="text-xs font-bold text-brand-400 flex items-center gap-1">
-                        <Check className="w-3.5 h-3.5" /> Selected
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        {Array.isArray(interp.certifications) ? interp.certifications[0] : (interp.certifications || 'Certified Professional Linguist')}
                       </span>
-                    ) : (
-                      <span className="text-xs text-slate-500">Click to choose</span>
-                    )}
+                      {selectedInterpreter?.id === interp.id ? (
+                        <span className="text-xs font-bold text-brand-400 flex items-center gap-1">
+                          <Check className="w-3.5 h-3.5" /> Selected
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-500">Click to choose</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -1290,7 +1286,9 @@ END:VCALENDAR`;
             </div>
             <div className="flex justify-between">
               <span className="text-slate-400">Certified Interpreter:</span>
-              <span className="font-semibold text-emerald-400">{selectedInterpreter?.name}</span>
+              <span className="font-semibold text-emerald-400">
+                Interpreter #{selectedInterpreter?.badgeNumber || selectedInterpreter?.interpreterBadgeId || selectedInterpreter?.id?.replace(/\D/g, '') || '84920'}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-400">Guest Recipient:</span>
@@ -1440,7 +1438,9 @@ END:VCALENDAR`;
                   <Award className="w-3.5 h-3.5 text-purple-400" />
                   <span>Certified Interpreter:</span>
                 </span>
-                <p className="font-extrabold text-purple-300">{generatedSession.interpreter?.name || 'Assigned Certified Linguist'}</p>
+                <p className="font-extrabold text-purple-300">
+                  Interpreter #{generatedSession.interpreter?.badgeNumber || generatedSession.interpreter?.interpreterBadgeId || generatedSession.interpreter?.id?.replace(/\D/g, '') || '84920'}
+                </p>
                 <p className="text-[10px] text-slate-400">
                   {Array.isArray(generatedSession.interpreter?.certifications) 
                     ? generatedSession.interpreter.certifications[0] 
