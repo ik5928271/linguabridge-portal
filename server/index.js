@@ -5,6 +5,12 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { MongoClient } from 'mongodb';
+import { 
+  sendEmail, 
+  sendInterpreterApplicationReceivedEmail, 
+  sendInterpreterApprovedEmail, 
+  sendClientWelcomeEmail 
+} from './services/emailService.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -714,6 +720,14 @@ app.post('/api/auth/register', (req, res) => {
   }
 
   saveStore();
+
+  // Send automated email notification asynchronously
+  if (role === 'host') {
+    sendClientWelcomeEmail(newUser).catch(err => console.error('[Email Dispatch Error]', err.message));
+  } else if (role === 'interpreter') {
+    sendInterpreterApplicationReceivedEmail(newUser).catch(err => console.error('[Email Dispatch Error]', err.message));
+  }
+
   res.json({ 
     success: true, 
     user: newUser, 
@@ -1059,6 +1073,14 @@ app.post('/api/admin/users', (req, res) => {
   };
 
   saveStore();
+
+  // Send automated email notification asynchronously
+  if (role === 'interpreter') {
+    sendInterpreterApprovedEmail({ ...newUser, ...newInterpreter }).catch(err => console.error('[Email Dispatch Error]', err.message));
+  } else if (role === 'host') {
+    sendClientWelcomeEmail(newUser).catch(err => console.error('[Email Dispatch Error]', err.message));
+  }
+
   res.json({ success: true, user: newUser, wallet: store.wallets[userId] });
 });
 
@@ -1349,6 +1371,9 @@ app.post('/api/interpreter-applications', (req, res) => {
   saveStore();
   io.emit('new-interpreter-application', newApp);
 
+  // Send confirmation email to applicant asynchronously
+  sendInterpreterApplicationReceivedEmail(newApp).catch(err => console.error('[Email Dispatch Error]', err.message));
+
   res.json({
     success: true,
     message: 'Interpreter application submitted successfully. Our verification team will review your CV and credentials.',
@@ -1537,6 +1562,21 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
 
   saveStore();
   io.emit('interpreter-registered', interpProfile);
+
+  // Send official approval and activation email to interpreter asynchronously
+  sendInterpreterApprovedEmail({
+    ...interpProfile,
+    email: appItem.email,
+    name: appItem.name,
+    badgeNumber: assignedBadgeNumber,
+    primaryLang: appItem.primaryLang,
+    languages: appItem.languages,
+    specialty: appItem.specialties?.[0],
+    hourlyRate: finalHourlyRate,
+    minuteRate: finalMinuteRate,
+    monthlySalary: finalMonthlySalary,
+    employmentType: finalType
+  }).catch(err => console.error('[Email Dispatch Error]', err.message));
 
   res.json({
     success: true,
