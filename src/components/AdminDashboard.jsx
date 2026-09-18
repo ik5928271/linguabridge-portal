@@ -44,7 +44,8 @@ import {
   ExternalLink,
   ChevronRight,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Landmark
 } from 'lucide-react';
 import { getSocket } from '../services/socket';
 import ALL_SEED_APPLICATIONS from '../data/all_seed_applications.json';
@@ -372,37 +373,8 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
     fetch('/api/admin/interpreter-applications')
       .then(res => res.json())
       .then(data => {
-        let list = Array.isArray(ALL_SEED_APPLICATIONS) && ALL_SEED_APPLICATIONS.length > 0 
-          ? [...ALL_SEED_APPLICATIONS] 
-          : [];
-        
-        let serverApps = Array.isArray(data) ? data : [];
-        serverApps.forEach(sApp => {
-          const idx = list.findIndex(a => (a.id && a.id === sApp.id) || (a.email && sApp.email && a.email.toLowerCase() === sApp.email.toLowerCase()));
-          if (idx >= 0) {
-            list[idx] = { ...list[idx], ...sApp };
-          } else {
-            list.unshift(sApp);
-          }
-        });
-
-        try {
-          const localSaved = JSON.parse(localStorage.getItem('linguabridge_submitted_applications') || '[]');
-          if (Array.isArray(localSaved) && localSaved.length > 0) {
-            localSaved.forEach(localApp => {
-              if (localApp.email && localApp.email.toLowerCase() === 'ik5928271@gmail.com') return;
-              const idx = list.findIndex(a => (a.id && a.id === localApp.id) || (a.email && localApp.email && a.email.toLowerCase() === localApp.email.toLowerCase()));
-              if (idx >= 0) {
-                list[idx] = { ...list[idx], ...localApp };
-              } else {
-                list.unshift(localApp);
-              }
-            });
-          }
-        } catch {}
-
-        const cleanList = list.filter(a => !(a.email && a.email.toLowerCase() === 'ik5928271@gmail.com'));
-        if (cleanList.length > 0) {
+        if (Array.isArray(data) && data.length > 0) {
+          const cleanList = data.filter(a => !(a.email && a.email.toLowerCase() === 'ik5928271@gmail.com'));
           setApplications(cleanList);
         }
       })
@@ -461,7 +433,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
     fetchAnalytics();
 
     const socket = getSocket();
-    let handleNewInquiry, handleUpdatedInquiry, handleDeletedInquiry, handleNewApp;
+    let handleNewInquiry, handleUpdatedInquiry, handleDeletedInquiry, handleNewApp, handleNewReceipt;
     if (socket) {
       handleNewInquiry = (inq) => {
         if (inq && inq.id) {
@@ -483,14 +455,21 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
           setApplications(prev => [app, ...prev.filter(a => a.id !== app.id)]);
         }
       };
+      handleNewReceipt = (rcpt) => {
+        if (rcpt && rcpt.id) {
+          setPaymentReceipts(prev => [rcpt, ...prev.filter(r => r.id !== rcpt.id)]);
+        }
+      };
 
       socket.on('new-inquiry', handleNewInquiry);
       socket.on('inquiry-updated', handleUpdatedInquiry);
       socket.on('inquiry-deleted', handleDeletedInquiry);
       socket.on('new-interpreter-application', handleNewApp);
+      socket.on('new-payment-receipt', handleNewReceipt);
     }
 
     const timer = setInterval(() => {
+      fetchUsers();
       fetchApplications();
       fetchInquiries();
       fetchReceipts();
@@ -504,6 +483,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
         if (handleUpdatedInquiry) socket.off('inquiry-updated', handleUpdatedInquiry);
         if (handleDeletedInquiry) socket.off('inquiry-deleted', handleDeletedInquiry);
         if (handleNewApp) socket.off('new-interpreter-application', handleNewApp);
+        if (handleNewReceipt) socket.off('new-payment-receipt', handleNewReceipt);
       }
     };
   }, []);
@@ -1203,7 +1183,10 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
             Live Monitor
           </button>
           <button
-            onClick={() => setActiveTab('applications')}
+            onClick={() => {
+              setActiveTab('applications');
+              fetchApplications();
+            }}
             className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
               activeTab === 'applications' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
             }`}
@@ -1217,7 +1200,10 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
             )}
           </button>
           <button
-            onClick={() => setActiveTab('users')}
+            onClick={() => {
+              setActiveTab('users');
+              fetchUsers();
+            }}
             className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
               activeTab === 'users' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
             }`}
@@ -1226,7 +1212,10 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
             <span>User & Account Manager</span>
           </button>
           <button
-            onClick={() => setActiveTab('inquiries')}
+            onClick={() => {
+              setActiveTab('inquiries');
+              fetchInquiries();
+            }}
             className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
               activeTab === 'inquiries' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
             }`}
@@ -1240,7 +1229,10 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
             )}
           </button>
           <button
-            onClick={() => setActiveTab('receipts')}
+            onClick={() => {
+              setActiveTab('receipts');
+              fetchReceipts();
+            }}
             className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
               activeTab === 'receipts' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
             }`}
@@ -1254,7 +1246,10 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
             )}
           </button>
           <button
-            onClick={() => setActiveTab('roster')}
+            onClick={() => {
+              setActiveTab('roster');
+              fetchUsers();
+            }}
             className={`px-3 py-2 rounded-xl text-xs font-bold transition ${
               activeTab === 'roster' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
             }`}
@@ -1262,7 +1257,10 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
             Active Interpreters
           </button>
           <button
-            onClick={() => setActiveTab('billing')}
+            onClick={() => {
+              setActiveTab('billing');
+              fetchUsers();
+            }}
             className={`px-3 py-2 rounded-xl text-xs font-bold transition ${
               activeTab === 'billing' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'
             }`}
@@ -3134,13 +3132,13 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                             <button
                               onClick={() => {
                                 setSelectedReceiptForReview(rcpt);
-                                setApproveReceiptNotes(`Payment of $${rcpt.amountPaid.toFixed(2)} verified by IK Enterprises Admin`);
+                                setApproveReceiptNotes(`Payment of $${Number(rcpt.amountPaid || rcpt.amount || 0).toFixed(2)} verified by IK Enterprises Admin`);
                                 setIsApproveReceiptModalOpen(true);
                               }}
                               className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-600/30 transition cursor-pointer"
                             >
                               <CheckCircle2 className="w-4 h-4" />
-                              <span>Approve & Credit +{rcpt.packageMinutes} Mins</span>
+                              <span>Approve & Credit +{rcpt.packageMinutes || rcpt.minutes || 30} Mins</span>
                             </button>
 
                             <button
@@ -3173,8 +3171,8 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                       <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80">
                         <span className="text-[10px] uppercase font-bold text-slate-400">Package & Amount</span>
                         <div className="flex items-baseline gap-1.5 mt-0.5">
-                          <p className="text-base font-black text-white">{rcpt.packageMinutes} Minutes</p>
-                          <span className="text-xs font-black text-emerald-400">${rcpt.amountPaid?.toFixed(2)}</span>
+                          <p className="text-base font-black text-white">{rcpt.packageMinutes || rcpt.minutes || 30} Minutes</p>
+                          <span className="text-xs font-black text-emerald-400">${Number(rcpt.amountPaid || rcpt.amount || 0).toFixed(2)}</span>
                         </div>
                         {rcpt.discountApplied > 0 && (
                           <span className="text-[9px] font-black text-amber-300 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20 mt-1 inline-block">
@@ -3284,15 +3282,15 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Package to Credit:</span>
-                <span className="font-black text-emerald-400">+{selectedReceiptForReview.packageMinutes} Minutes</span>
+                <span className="font-black text-emerald-400">+{selectedReceiptForReview.packageMinutes || selectedReceiptForReview.minutes || 30} Minutes</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Amount Verified:</span>
-                <span className="font-black text-emerald-400">${selectedReceiptForReview.amountPaid?.toFixed(2)}</span>
+                <span className="font-black text-emerald-400">${Number(selectedReceiptForReview.amountPaid || selectedReceiptForReview.amount || 0).toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Transfer Reference:</span>
-                <span className="font-mono font-bold text-amber-300">{selectedReceiptForReview.bankReference}</span>
+                <span className="font-mono font-bold text-amber-300">{selectedReceiptForReview.bankReference || selectedReceiptForReview.reference || 'N/A'}</span>
               </div>
             </div>
 
@@ -3401,10 +3399,10 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                 <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800 font-mono text-xs space-y-2">
                   <p className="text-emerald-400 font-bold uppercase">Official Verified Deposit Receipt Details</p>
                   <p><span className="text-slate-400">Client:</span> {receiptPreviewModal.clientName} ({receiptPreviewModal.clientEmail})</p>
-                  <p><span className="text-slate-400">Package:</span> {receiptPreviewModal.packageMinutes} Minutes (${receiptPreviewModal.amountPaid?.toFixed(2)})</p>
-                  <p><span className="text-slate-400">Method:</span> {receiptPreviewModal.paymentMethod}</p>
-                  <p><span className="text-slate-400">Reference:</span> {receiptPreviewModal.bankReference}</p>
-                  <p><span className="text-slate-400">Date:</span> {new Date(receiptPreviewModal.submittedAt).toLocaleString()}</p>
+                  <p><span className="text-slate-400">Package:</span> {receiptPreviewModal.packageMinutes || receiptPreviewModal.minutes || 30} Minutes (${Number(receiptPreviewModal.amountPaid || receiptPreviewModal.amount || 0).toFixed(2)})</p>
+                  <p><span className="text-slate-400">Method:</span> {receiptPreviewModal.paymentMethod || 'Bank Wire / Remitly'}</p>
+                  <p><span className="text-slate-400">Reference:</span> {receiptPreviewModal.bankReference || receiptPreviewModal.reference || 'N/A'}</p>
+                  <p><span className="text-slate-400">Date:</span> {new Date(receiptPreviewModal.submittedAt || Date.now()).toLocaleString()}</p>
                 </div>
               )}
             </div>
