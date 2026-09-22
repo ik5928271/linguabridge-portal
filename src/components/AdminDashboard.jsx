@@ -52,7 +52,7 @@ import {
 } from 'lucide-react';
 import { getSocket } from '../services/socket';
 import ALL_SEED_APPLICATIONS from '../data/all_seed_applications.json';
-import { SHIFT_WINDOWS, SPECIALTY_DOMAINS, HARDWARE_STANDARDS } from '../data/mockData';
+import { SHIFT_WINDOWS, SPECIALTY_DOMAINS, HARDWARE_STANDARDS, LANGUAGES } from '../data/mockData';
 
 
 const TIMEZONES = [
@@ -197,6 +197,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
 
   const [appFilter, setAppFilter] = useState('all'); // 'all', 'pending', 'approved', 'rejected'
   const [shiftFilter, setShiftFilter] = useState('all'); // 'all', 'shift_a', 'shift_b', 'shift_c', 'shift_d', 'shift_e', 'on_call'
+  const [langFilter, setLangFilter] = useState('all'); // 'all' or specific language name
   const [selectedAppForReview, setSelectedAppForReview] = useState(null);
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
   const [reviewApprovedType, setReviewApprovedType] = useState('hourly'); // 'hourly', 'per_minute', 'salary_base'
@@ -774,6 +775,36 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
     return matchesSearch;
   });
 
+  // Dynamic aggregation of all languages available in the applications queue
+  const applicationLanguages = React.useMemo(() => {
+    const counts = {};
+    applications.forEach(app => {
+      const langs = new Set();
+      if (app.primaryLang && app.primaryLang !== 'English') {
+        langs.add(app.primaryLang);
+      }
+      if (Array.isArray(app.languages)) {
+        app.languages.forEach(l => {
+          if (l && l !== 'English') langs.add(l);
+        });
+      }
+      langs.forEach(lang => {
+        counts[lang] = (counts[lang] || 0) + 1;
+      });
+    });
+
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([name, count]) => {
+        const match = LANGUAGES.find(l => l.name.toLowerCase() === name.toLowerCase());
+        return {
+          name,
+          count,
+          flag: match ? match.flag : '🌐'
+        };
+      });
+  }, [applications]);
+
   const filteredApplications = applications.filter(app => {
     const q = searchTerm.toLowerCase().trim();
     const matchesSearch = 
@@ -794,7 +825,15 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       matchesShift = Array.isArray(app.shiftWindows) && app.shiftWindows.includes(shiftFilter);
     }
 
-    return matchesSearch && matchesStatus && matchesShift;
+    let matchesLang = true;
+    if (langFilter !== 'all') {
+      const targetLang = langFilter.toLowerCase();
+      matchesLang = 
+        (app.primaryLang && app.primaryLang.toLowerCase() === targetLang) ||
+        (Array.isArray(app.languages) && app.languages.some(l => l.toLowerCase() === targetLang));
+    }
+
+    return matchesSearch && matchesStatus && matchesShift && matchesLang;
   });
 
   // Inquiries Actions
@@ -1391,6 +1430,79 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                 <Zap className="w-3 h-3" />
                 <span>⚡ Surge On-Call</span>
               </button>
+            </div>
+
+            {/* Language Filter Pills & Selection */}
+            <div className="flex flex-wrap items-center gap-1.5 bg-slate-950/60 p-2.5 rounded-2xl border border-slate-800 text-xs">
+              <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1 px-1.5">
+                <Globe className="w-3.5 h-3.5 text-blue-400" />
+                <span>Filter by Language:</span>
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setLangFilter('all')}
+                className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold transition ${
+                  langFilter === 'all'
+                    ? 'bg-blue-600 text-white shadow'
+                    : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                }`}
+              >
+                All Languages ({applications.length})
+              </button>
+
+              {/* Top Applied Languages as Quick-Select Pills */}
+              {applicationLanguages.slice(0, 8).map(item => (
+                <button
+                  key={item.name}
+                  type="button"
+                  onClick={() => setLangFilter(langFilter.toLowerCase() === item.name.toLowerCase() ? 'all' : item.name)}
+                  className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold transition flex items-center gap-1.5 ${
+                    langFilter.toLowerCase() === item.name.toLowerCase()
+                      ? 'bg-blue-500 text-slate-950 font-bold shadow'
+                      : 'bg-slate-900 text-slate-300 hover:text-white border border-slate-800'
+                  }`}
+                >
+                  <span>{item.flag}</span>
+                  <span>{item.name}</span>
+                  <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-black ml-0.5 ${
+                    langFilter.toLowerCase() === item.name.toLowerCase() ? 'bg-slate-950 text-white' : 'bg-slate-800 text-slate-400'
+                  }`}>
+                    {item.count}
+                  </span>
+                </button>
+              ))}
+
+              {/* More Languages Dropdown */}
+              {applicationLanguages.length > 8 && (
+                <select
+                  value={applicationLanguages.slice(0, 8).some(l => l.name.toLowerCase() === langFilter.toLowerCase()) || langFilter === 'all' ? '' : langFilter}
+                  onChange={(e) => setLangFilter(e.target.value || 'all')}
+                  className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold transition border bg-slate-900 text-slate-300 border-slate-800 focus:outline-none focus:border-blue-500 ${
+                    !applicationLanguages.slice(0, 8).some(l => l.name.toLowerCase() === langFilter.toLowerCase()) && langFilter !== 'all'
+                      ? 'bg-blue-500 text-slate-950 font-bold border-blue-400 shadow'
+                      : ''
+                  }`}
+                >
+                  <option value="" className="bg-slate-900 text-white">More Languages ({applicationLanguages.length - 8}+)...</option>
+                  {applicationLanguages.slice(8).map(item => (
+                    <option key={item.name} value={item.name} className="bg-slate-900 text-white">
+                      {item.flag} {item.name} ({item.count})
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              {langFilter !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => setLangFilter('all')}
+                  className="px-2 py-1 rounded-xl text-[10px] font-bold bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30 flex items-center gap-1 ml-auto"
+                >
+                  <X className="w-3 h-3" />
+                  <span>Clear Language Filter</span>
+                </button>
+              )}
             </div>
           </div>
 
