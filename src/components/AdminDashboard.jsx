@@ -757,7 +757,27 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       .catch(() => {});
   };
 
-  const pendingApplicationsCount = applications.filter(a => a.status === 'pending').length;
+  // Resolved Applications synchronized with live provisioned accounts in usersList
+  const resolvedApplications = React.useMemo(() => {
+    return applications.map(app => {
+      const existingUser = usersList.find(u => 
+        u.role === 'interpreter' && 
+        ((u.email && app.email && u.email.toLowerCase() === app.email.toLowerCase()) ||
+         (u.badgeNumber && app.badgeNumber && u.badgeNumber.toString() === app.badgeNumber.toString()))
+      );
+      const isApproved = Boolean(existingUser || app.status === 'approved');
+      const badgeNumber = (existingUser && (existingUser.badgeNumber || existingUser.interpreterBadgeId)) || app.badgeNumber || app.interpreterBadgeId;
+      return {
+        ...app,
+        status: isApproved ? 'approved' : (app.status || 'pending'),
+        badgeNumber,
+        interpreterBadgeId: badgeNumber
+      };
+    });
+  }, [applications, usersList]);
+
+  const pendingApplicationsCount = resolvedApplications.filter(a => a.status === 'pending').length;
+  const approvedApplicationsCount = resolvedApplications.filter(a => a.status === 'approved').length;
 
   const filteredUsers = usersList.filter(user => {
     const q = searchTerm.toLowerCase().trim();
@@ -778,7 +798,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   // Dynamic aggregation of all languages available in the applications queue
   const applicationLanguages = React.useMemo(() => {
     const counts = {};
-    applications.forEach(app => {
+    resolvedApplications.forEach(app => {
       const langs = new Set();
       if (app.primaryLang && app.primaryLang !== 'English') {
         langs.add(app.primaryLang);
@@ -803,9 +823,9 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
           flag: match ? match.flag : '🌐'
         };
       });
-  }, [applications]);
+  }, [resolvedApplications]);
 
-  const filteredApplications = applications.filter(app => {
+  const filteredApplications = resolvedApplications.filter(app => {
     const q = searchTerm.toLowerCase().trim();
     const matchesSearch = 
       (app.name && app.name.toLowerCase().includes(q)) ||
@@ -1344,7 +1364,7 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                   onClick={() => setAppFilter('all')}
                   className={`px-3 py-1.5 rounded-lg transition ${appFilter === 'all' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
                 >
-                  All Applications ({applications.length})
+                  All Applications ({resolvedApplications.length})
                 </button>
                 <button
                   onClick={() => setAppFilter('pending')}
@@ -1361,13 +1381,13 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                   onClick={() => setAppFilter('approved')}
                   className={`px-3 py-1.5 rounded-lg transition ${appFilter === 'approved' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
                 >
-                  Approved & Active ({applications.filter(a => a.status === 'approved').length})
+                  Approved & Active ({approvedApplicationsCount})
                 </button>
                 <button
                   onClick={() => setAppFilter('rejected')}
                   className={`px-3 py-1.5 rounded-lg transition ${appFilter === 'rejected' ? 'bg-red-600 text-white' : 'text-slate-400 hover:text-white'}`}
                 >
-                  Declined ({applications.filter(a => a.status === 'rejected').length})
+                  Declined ({resolvedApplications.filter(a => a.status === 'rejected').length})
                 </button>
               </div>
 
