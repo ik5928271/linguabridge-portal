@@ -25,10 +25,17 @@ import {
   Mail,
   Globe,
   Sparkles,
-  Check
+  Check,
+  Wifi,
+  Lock,
+  Sun,
+  Sunrise,
+  Sunset,
+  Moon
 } from 'lucide-react';
 import { playTelephoneRing, playConnectedChime } from '../services/audioService';
 import { getSocket } from '../services/socket';
+import { SHIFT_WINDOWS, SPECIALTY_DOMAINS, HARDWARE_STANDARDS } from '../data/mockData';
 
 export default function InterpreterDashboard({ 
   onAcceptIncomingCall, 
@@ -51,7 +58,7 @@ export default function InterpreterDashboard({
       : (propInterpreter?.languages || ['English']),
     specialties: Array.isArray(currentUser?.specialties) && currentUser.specialties.length > 0 
       ? currentUser.specialties 
-      : (propInterpreter?.specialties || ['General / Customer Support']),
+      : (propInterpreter?.specialties || ['General Healthcare & Patient Intake']),
     bio: currentUser?.bio || propInterpreter?.bio || 'Certified professional interpreter bridging languages for live encounters.',
     status: currentUser?.status || propInterpreter?.status || 'online',
     rating: currentUser?.rating !== undefined ? currentUser.rating : (propInterpreter?.rating || 5.0),
@@ -61,6 +68,17 @@ export default function InterpreterDashboard({
     minuteRate: currentUser?.minuteRate !== undefined ? currentUser.minuteRate : (propInterpreter?.minuteRate !== undefined ? propInterpreter.minuteRate : 0.30),
     monthlySalary: currentUser?.monthlySalary !== undefined ? currentUser.monthlySalary : (propInterpreter?.monthlySalary || 1200),
     badgeNumber: currentUser?.badgeNumber || propInterpreter?.badgeNumber || currentUser?.interpreterBadgeId || '',
+    shiftWindows: Array.isArray(currentUser?.shiftWindows) && currentUser.shiftWindows.length > 0
+      ? currentUser.shiftWindows
+      : (Array.isArray(propInterpreter?.shiftWindows) && propInterpreter.shiftWindows.length > 0 ? propInterpreter.shiftWindows : ['shift_a', 'shift_b']),
+    emergencyOnCall: currentUser?.emergencyOnCall !== undefined 
+      ? currentUser.emergencyOnCall 
+      : (propInterpreter?.emergencyOnCall !== undefined ? propInterpreter.emergencyOnCall : true),
+    hardwareAudit: currentUser?.hardwareAudit || propInterpreter?.hardwareAudit || {
+      headsetVerified: true,
+      internetVerified: true,
+      privateOfficeSetting: true
+    },
     certifications: Array.isArray(currentUser?.certifications) && currentUser.certifications.length > 0
       ? currentUser.certifications 
       : (currentUser?.certifications ? [currentUser.certifications] : (propInterpreter?.certifications || ['Certified Professional Linguist']))
@@ -74,7 +92,10 @@ export default function InterpreterDashboard({
         ...currentUser,
         avatar: currentUser.avatar || prev.avatar,
         languages: Array.isArray(currentUser.languages) && currentUser.languages.length > 0 ? currentUser.languages : prev.languages,
-        specialties: Array.isArray(currentUser.specialties) && currentUser.specialties.length > 0 ? currentUser.specialties : prev.specialties
+        specialties: Array.isArray(currentUser.specialties) && currentUser.specialties.length > 0 ? currentUser.specialties : prev.specialties,
+        shiftWindows: Array.isArray(currentUser.shiftWindows) && currentUser.shiftWindows.length > 0 ? currentUser.shiftWindows : prev.shiftWindows,
+        emergencyOnCall: currentUser.emergencyOnCall !== undefined ? currentUser.emergencyOnCall : prev.emergencyOnCall,
+        hardwareAudit: currentUser.hardwareAudit || prev.hardwareAudit
       }));
     }
   }, [currentUser]);
@@ -90,6 +111,10 @@ export default function InterpreterDashboard({
   const [editPhone, setEditPhone] = useState('');
   const [editPrimaryLang, setEditPrimaryLang] = useState('');
   const [editLanguages, setEditLanguages] = useState([]);
+  const [editSpecialties, setEditSpecialties] = useState([]);
+  const [editShiftWindows, setEditShiftWindows] = useState([]);
+  const [editEmergencyOnCall, setEditEmergencyOnCall] = useState(true);
+  const [editHardwareAudit, setEditHardwareAudit] = useState({ headsetVerified: true, internetVerified: true, privateOfficeSetting: true });
   const [newLangInput, setNewLangInput] = useState('');
   const [editBio, setEditBio] = useState('');
   const [editAvatar, setEditAvatar] = useState('');
@@ -184,10 +209,32 @@ export default function InterpreterDashboard({
     setEditPhone(profile.phone || '');
     setEditPrimaryLang(profile.primaryLang);
     setEditLanguages([...profile.languages]);
+    setEditSpecialties(Array.isArray(profile.specialties) ? [...profile.specialties] : ['General Healthcare & Patient Intake']);
+    setEditShiftWindows(Array.isArray(profile.shiftWindows) && profile.shiftWindows.length > 0 ? [...profile.shiftWindows] : ['shift_a', 'shift_b']);
+    setEditEmergencyOnCall(profile.emergencyOnCall !== undefined ? profile.emergencyOnCall : true);
+    setEditHardwareAudit(profile.hardwareAudit || { headsetVerified: true, internetVerified: true, privateOfficeSetting: true });
     setEditBio(profile.bio || '');
     setEditAvatar(profile.avatar || '');
     setSaveSuccessMsg('');
     setIsEditModalOpen(true);
+  };
+
+  const handleToggleEmergencyOnCall = async () => {
+    const newVal = !profile.emergencyOnCall;
+    const updated = { ...profile, emergencyOnCall: newVal };
+    setProfile(updated);
+    try {
+      localStorage.setItem('linguabridge_user', JSON.stringify(updated));
+      await fetch('/api/interpreter/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: profile.id,
+          email: profile.email,
+          emergencyOnCall: newVal
+        })
+      });
+    } catch {}
   };
 
   const handleAddLanguage = (e) => {
@@ -205,6 +252,26 @@ export default function InterpreterDashboard({
     }
   };
 
+  const handleToggleEditShift = (shiftId) => {
+    if (editShiftWindows.includes(shiftId)) {
+      if (editShiftWindows.length > 1) {
+        setEditShiftWindows(prev => prev.filter(s => s !== shiftId));
+      }
+    } else {
+      setEditShiftWindows(prev => [...prev, shiftId]);
+    }
+  };
+
+  const handleToggleEditSpecialty = (specName) => {
+    if (editSpecialties.includes(specName)) {
+      if (editSpecialties.length > 1) {
+        setEditSpecialties(prev => prev.filter(s => s !== specName));
+      }
+    } else {
+      setEditSpecialties(prev => [...prev, specName]);
+    }
+  };
+
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     setIsSaving(true);
@@ -216,6 +283,10 @@ export default function InterpreterDashboard({
       phone: editPhone.trim() || profile.phone,
       primaryLang: editPrimaryLang.trim() || profile.primaryLang,
       languages: editLanguages.length > 0 ? editLanguages : profile.languages,
+      specialties: editSpecialties.length > 0 ? editSpecialties : profile.specialties,
+      shiftWindows: editShiftWindows.length > 0 ? editShiftWindows : profile.shiftWindows,
+      emergencyOnCall: Boolean(editEmergencyOnCall),
+      hardwareAudit: editHardwareAudit,
       bio: editBio.trim() || profile.bio,
       avatar: editAvatar.trim() || profile.avatar
     };
@@ -239,11 +310,15 @@ export default function InterpreterDashboard({
           phone: updatedProfile.phone,
           primaryLang: updatedProfile.primaryLang,
           languages: updatedProfile.languages,
+          specialties: updatedProfile.specialties,
+          shiftWindows: updatedProfile.shiftWindows,
+          emergencyOnCall: updatedProfile.emergencyOnCall,
+          hardwareAudit: updatedProfile.hardwareAudit,
           bio: updatedProfile.bio,
           avatar: updatedProfile.avatar
         })
       });
-      setSaveSuccessMsg('Profile updated successfully!');
+      setSaveSuccessMsg('Profile & shift availability updated successfully!');
       setTimeout(() => {
         setIsEditModalOpen(false);
         setSaveSuccessMsg('');
@@ -482,6 +557,107 @@ export default function InterpreterDashboard({
       </div>
 
 
+      {/* Weekly Shift Availability & Technical Readiness Overview Panel */}
+      <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+              <Clock className="w-5 h-5 text-amber-400" />
+              <span>Weekly Shift Availability & HIPAA Compliance Matrix</span>
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              US EST Shift Coverage, Surge On-Call Status & Hardware Verification
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Surge On-Call Quick Toggle */}
+            <button
+              onClick={handleToggleEmergencyOnCall}
+              className={`px-3.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-2 transition cursor-pointer ${
+                profile.emergencyOnCall
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                  : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700'
+              }`}
+            >
+              <Zap className={`w-3.5 h-3.5 ${profile.emergencyOnCall ? 'text-emerald-400 fill-emerald-400' : 'text-slate-500'}`} />
+              <span>Surge On-Call: {profile.emergencyOnCall ? 'Active (Open for urgent alerts)' : 'Disabled'}</span>
+            </button>
+
+            <button
+              onClick={openEditModal}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition"
+            >
+              Adjust Shifts
+            </button>
+          </div>
+        </div>
+
+        {/* Shift Badges & Technical Indicators Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-1">
+          {SHIFT_WINDOWS.map(shift => {
+            const isCovered = (profile.shiftWindows || []).includes(shift.id);
+            return (
+              <div
+                key={shift.id}
+                className={`p-3.5 rounded-2xl border transition flex flex-col justify-between ${
+                  isCovered
+                    ? 'bg-amber-500/10 border-amber-500/40 text-white shadow-sm'
+                    : 'bg-slate-950/40 border-slate-800/80 text-slate-500 opacity-60'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-bold flex items-center gap-1.5">
+                      <span>{shift.icon}</span>
+                      <span>{shift.name}</span>
+                    </span>
+                    {isCovered && (
+                      <span className="w-4 h-4 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center text-[10px] font-black">
+                        ✓
+                      </span>
+                    )}
+                  </div>
+                  <p className={`text-[11px] font-mono font-bold ${isCovered ? 'text-amber-300' : 'text-slate-500'}`}>
+                    {shift.timeEST}
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-1 leading-snug">
+                    {shift.description}
+                  </p>
+                </div>
+                <div className="mt-2.5 pt-2 border-t border-slate-800/60">
+                  <span className={`text-[10px] font-extrabold uppercase tracking-wider ${isCovered ? 'text-emerald-400' : 'text-slate-600'}`}>
+                    {isCovered ? '● Scheduled Shift' : '○ Off-Duty'}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Hardware & Compliance Footer */}
+        <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <span className="font-semibold text-slate-300">HIPAA Compliance & Environment Status:</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-[11px] font-medium">
+              <span>🎧</span>
+              <span>USB Headset Verified</span>
+            </span>
+            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-[11px] font-medium">
+              <span>🌐</span>
+              <span>High-Speed Internet Verified</span>
+            </span>
+            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-[11px] font-medium">
+              <span>🔒</span>
+              <span>Private Room HIPAA Verified</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* Quick Tools & Scheduled Sessions Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
@@ -644,7 +820,7 @@ export default function InterpreterDashboard({
       {/* Edit Profile & Credentials Modal */}
       {isEditModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="max-w-xl w-full glass-panel p-6 sm:p-8 rounded-3xl border border-slate-700/80 shadow-2xl space-y-6 my-8 animate-fade-in relative bg-slate-900/95">
+          <div className="max-w-2xl w-full glass-panel p-6 sm:p-8 rounded-3xl border border-slate-700/80 shadow-2xl space-y-6 my-8 animate-fade-in relative bg-slate-900/95 max-h-[90vh] overflow-y-auto">
             
             {/* Header */}
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -653,8 +829,8 @@ export default function InterpreterDashboard({
                   <Edit className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-white">Edit Profile & Credentials</h3>
-                  <p className="text-xs text-slate-400">Update your public profile, languages, and contact details</p>
+                  <h3 className="text-lg font-black text-white">Edit Profile, Shifts & Credentials</h3>
+                  <p className="text-xs text-slate-400">Update your shift windows, specialties, and equipment audit</p>
                 </div>
               </div>
               <button 
@@ -775,6 +951,92 @@ export default function InterpreterDashboard({
                   >
                     <Plus className="w-3.5 h-3.5" /> Add
                   </button>
+                </div>
+              </div>
+
+              {/* Weekly Shift Availability Windows (US EST) */}
+              <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                    <Clock className="w-4 h-4 text-amber-400" />
+                    <span>Weekly Shift Availability Windows (EST)</span>
+                  </label>
+                  <span className="text-[10px] text-slate-400">{editShiftWindows.length} Active Shifts</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {SHIFT_WINDOWS.map(shift => {
+                    const isSel = editShiftWindows.includes(shift.id);
+                    return (
+                      <button
+                        key={shift.id}
+                        type="button"
+                        onClick={() => handleToggleEditShift(shift.id)}
+                        className={`p-2.5 rounded-xl border text-left transition flex items-center justify-between gap-2 ${
+                          isSel 
+                            ? 'bg-amber-500/20 border-amber-500 text-white ring-1 ring-amber-400' 
+                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold truncate flex items-center gap-1">
+                            <span>{shift.icon}</span>
+                            <span>{shift.name}</span>
+                          </p>
+                          <p className="text-[10px] font-mono text-amber-300">{shift.timeEST}</p>
+                        </div>
+                        {isSel && <Check className="w-4 h-4 text-amber-400 shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Emergency On-Call Toggle */}
+                <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-emerald-400" />
+                    <div>
+                      <p className="text-xs font-bold text-white">Emergency / Surge On-Call</p>
+                      <p className="text-[10px] text-slate-400">Receive priority alert notifications outside shifts</p>
+                    </div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editEmergencyOnCall}
+                      onChange={(e) => setEditEmergencyOnCall(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Primary Specialty Domains */}
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-slate-300 block">Primary Specialty Domains</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {SPECIALTY_DOMAINS.map(domain => {
+                    const isSel = editSpecialties.includes(domain.name);
+                    return (
+                      <button
+                        key={domain.id}
+                        type="button"
+                        onClick={() => handleToggleEditSpecialty(domain.name)}
+                        className={`p-2.5 rounded-xl border text-left transition flex items-center justify-between gap-2 ${
+                          isSel
+                            ? 'bg-brand-500/20 border-brand-500 text-white ring-1 ring-brand-400'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          <span>{domain.icon}</span>
+                          <span className="text-xs font-semibold truncate">{domain.name}</span>
+                        </div>
+                        {isSel && <Check className="w-3.5 h-3.5 text-brand-400 shrink-0" />}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

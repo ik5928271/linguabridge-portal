@@ -45,10 +45,14 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronUp,
-  Landmark
+  Landmark,
+  Zap,
+  Wifi,
+  Lock
 } from 'lucide-react';
 import { getSocket } from '../services/socket';
 import ALL_SEED_APPLICATIONS from '../data/all_seed_applications.json';
+import { SHIFT_WINDOWS, SPECIALTY_DOMAINS, HARDWARE_STANDARDS } from '../data/mockData';
 
 
 const TIMEZONES = [
@@ -192,6 +196,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   });
 
   const [appFilter, setAppFilter] = useState('all'); // 'all', 'pending', 'approved', 'rejected'
+  const [shiftFilter, setShiftFilter] = useState('all'); // 'all', 'shift_a', 'shift_b', 'shift_c', 'shift_d', 'shift_e', 'on_call'
   const [selectedAppForReview, setSelectedAppForReview] = useState(null);
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
   const [reviewApprovedType, setReviewApprovedType] = useState('hourly'); // 'hourly', 'per_minute', 'salary_base'
@@ -776,10 +781,20 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       (app.email && app.email.toLowerCase().includes(q)) ||
       (app.badgeNumber && app.badgeNumber.toString().includes(q)) ||
       (app.interpreterBadgeId && app.interpreterBadgeId.toString().includes(q)) ||
-      (app.primaryLang && app.primaryLang.toLowerCase().includes(q));
+      (app.primaryLang && app.primaryLang.toLowerCase().includes(q)) ||
+      (Array.isArray(app.languages) && app.languages.some(l => l.toLowerCase().includes(q))) ||
+      (Array.isArray(app.specialties) && app.specialties.some(s => s.toLowerCase().includes(q)));
     
-    if (appFilter === 'all') return matchesSearch;
-    return matchesSearch && app.status === appFilter;
+    const matchesStatus = appFilter === 'all' || app.status === appFilter;
+
+    let matchesShift = true;
+    if (shiftFilter === 'on_call') {
+      matchesShift = Boolean(app.emergencyOnCall);
+    } else if (shiftFilter !== 'all') {
+      matchesShift = Array.isArray(app.shiftWindows) && app.shiftWindows.includes(shiftFilter);
+    }
+
+    return matchesSearch && matchesStatus && matchesShift;
   });
 
   // Inquiries Actions
@@ -1283,48 +1298,99 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
           </div>
 
           {/* Filter Bar & Search */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-            <div className="flex items-center bg-slate-900/80 p-1 rounded-xl border border-slate-800 text-xs font-bold">
-              <button
-                onClick={() => setAppFilter('all')}
-                className={`px-3 py-1.5 rounded-lg transition ${appFilter === 'all' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
-              >
-                All Applications ({applications.length})
-              </button>
-              <button
-                onClick={() => setAppFilter('pending')}
-                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${appFilter === 'pending' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'}`}
-              >
-                <span>Pending Review</span>
-                {pendingApplicationsCount > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black">
-                    {pendingApplicationsCount}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => setAppFilter('approved')}
-                className={`px-3 py-1.5 rounded-lg transition ${appFilter === 'approved' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
-              >
-                Approved & Active ({applications.filter(a => a.status === 'approved').length})
-              </button>
-              <button
-                onClick={() => setAppFilter('rejected')}
-                className={`px-3 py-1.5 rounded-lg transition ${appFilter === 'rejected' ? 'bg-red-600 text-white' : 'text-slate-400 hover:text-white'}`}
-              >
-                Declined ({applications.filter(a => a.status === 'rejected').length})
-              </button>
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="flex items-center bg-slate-900/80 p-1 rounded-xl border border-slate-800 text-xs font-bold">
+                <button
+                  onClick={() => setAppFilter('all')}
+                  className={`px-3 py-1.5 rounded-lg transition ${appFilter === 'all' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                >
+                  All Applications ({applications.length})
+                </button>
+                <button
+                  onClick={() => setAppFilter('pending')}
+                  className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${appFilter === 'pending' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                >
+                  <span>Pending Review</span>
+                  {pendingApplicationsCount > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black">
+                      {pendingApplicationsCount}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => setAppFilter('approved')}
+                  className={`px-3 py-1.5 rounded-lg transition ${appFilter === 'approved' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                >
+                  Approved & Active ({applications.filter(a => a.status === 'approved').length})
+                </button>
+                <button
+                  onClick={() => setAppFilter('rejected')}
+                  className={`px-3 py-1.5 rounded-lg transition ${appFilter === 'rejected' ? 'bg-red-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                >
+                  Declined ({applications.filter(a => a.status === 'rejected').length})
+                </button>
+              </div>
+
+              <div className="relative flex-1 max-w-xs">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search applicant name, email, language..."
+                  className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                />
+              </div>
             </div>
 
-            <div className="relative flex-1 max-w-xs">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search applicant name, email, language..."
-                className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
-              />
+            {/* Shift Window Filter Pills (US EST Shifts) */}
+            <div className="flex flex-wrap items-center gap-1.5 bg-slate-950/60 p-2.5 rounded-2xl border border-slate-800 text-xs">
+              <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1 px-1.5">
+                <Clock className="w-3.5 h-3.5 text-amber-400" />
+                <span>Filter by Shift:</span>
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setShiftFilter('all')}
+                className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold transition ${
+                  shiftFilter === 'all'
+                    ? 'bg-purple-600 text-white shadow'
+                    : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                }`}
+              >
+                All Shifts
+              </button>
+
+              {SHIFT_WINDOWS.map(sw => (
+                <button
+                  key={sw.id}
+                  type="button"
+                  onClick={() => setShiftFilter(sw.id)}
+                  className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold transition flex items-center gap-1 ${
+                    shiftFilter === sw.id
+                      ? 'bg-amber-500 text-slate-950 font-bold shadow'
+                      : 'bg-slate-900 text-slate-300 hover:text-white border border-slate-800'
+                  }`}
+                >
+                  <span>{sw.icon}</span>
+                  <span>{sw.code}</span>
+                </button>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => setShiftFilter('on_call')}
+                className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold transition flex items-center gap-1 ${
+                  shiftFilter === 'on_call'
+                    ? 'bg-emerald-500 text-slate-950 font-bold shadow'
+                    : 'bg-slate-900 text-emerald-400 hover:text-emerald-300 border border-slate-800'
+                }`}
+              >
+                <Zap className="w-3 h-3" />
+                <span>⚡ Surge On-Call</span>
+              </button>
             </div>
           </div>
 
@@ -1399,6 +1465,34 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                             <span>• {app.country || 'United States'}</span>
                             <span className="text-slate-500">• Submitted {new Date(app.submittedAt || Date.now()).toLocaleDateString()}</span>
                           </p>
+
+                          {/* Candidate Shift Coverage Badges */}
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                            {Array.isArray(app.shiftWindows) && app.shiftWindows.length > 0 ? (
+                              app.shiftWindows.map(sId => {
+                                const sw = SHIFT_WINDOWS.find(w => w.id === sId);
+                                if (!sw) return null;
+                                return (
+                                  <span key={sw.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[10px] font-bold">
+                                    <span>{sw.icon}</span>
+                                    <span>{sw.code} ({sw.timeEST.split('–')[0]?.trim()})</span>
+                                  </span>
+                                );
+                              })
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 text-[10px]">
+                                <span>🏢</span>
+                                <span>{app.preferredDailyHours ? `${app.preferredDailyHours}h Daily Shift` : 'Standard Scheduled Shift'}</span>
+                              </span>
+                            )}
+
+                            {app.emergencyOnCall && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-bold">
+                                <Zap className="w-3 h-3 text-emerald-400" />
+                                <span>Surge On-Call Ready</span>
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -1461,6 +1555,21 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                             </span>
                           ))}
                         </div>
+
+                        {/* HIPAA Hardware Verification Indicators */}
+                        <div className="pt-2 border-t border-slate-800/60 flex flex-wrap gap-2 text-[10px] text-slate-400">
+                          <span className={`inline-flex items-center gap-1 ${app.hardwareAudit?.headsetVerified !== false ? 'text-emerald-400' : 'text-slate-500'}`}>
+                            <span>🎧</span> Headset
+                          </span>
+                          <span>•</span>
+                          <span className={`inline-flex items-center gap-1 ${app.hardwareAudit?.internetVerified !== false ? 'text-emerald-400' : 'text-slate-500'}`}>
+                            <span>🌐</span> Fiber/Net
+                          </span>
+                          <span>•</span>
+                          <span className={`inline-flex items-center gap-1 ${app.hardwareAudit?.privateOfficeSetting !== false ? 'text-emerald-400' : 'text-slate-500'}`}>
+                            <span>🔒</span> HIPAA Room
+                          </span>
+                        </div>
                       </div>
 
                       {/* Column 2: Employment Model & Qualifications */}
@@ -1494,20 +1603,15 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                         <p className="text-[11px] text-slate-300">
                           Experience: <span className="font-bold text-white">{app.experienceYears || 3} Years</span>
                         </p>
-                        <p className="text-[10px] text-slate-400 truncate">
-                          Certifications: {Array.isArray(app.certifications) ? app.certifications.join(', ') : app.certifications}
-                        </p>
-                        {app.shiftSchedule && (
-                          <div className="pt-1.5 border-t border-slate-800/80 flex items-center justify-between gap-1 text-[10px]">
-                            <span className="text-slate-400 flex items-center gap-1 shrink-0">
-                              <Clock className="w-3 h-3 text-amber-400" />
-                              <span>Shift:</span>
+                        
+                        {/* Specialties */}
+                        <div className="flex flex-wrap gap-1 pt-0.5">
+                          {(Array.isArray(app.specialties) ? app.specialties : [app.specialties || 'General Healthcare']).slice(0, 3).map((spec, sIdx) => (
+                            <span key={sIdx} className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] text-slate-300 font-medium">
+                              {spec}
                             </span>
-                            <span className="font-bold text-amber-300 truncate font-mono">
-                              {app.shiftSchedule.scheduleLabel || (app.shiftSchedule.shiftType === 'open_unlimited' ? '⚡ Open 24/7 Unlimited' : `${app.shiftSchedule.dailyHours}h/day (${app.shiftSchedule.timeZone?.split(' ')?.[0]})`)}
-                            </span>
-                          </div>
-                        )}
+                          ))}
+                        </div>
                       </div>
 
                       {/* Column 3: Submitted CV & Documents */}

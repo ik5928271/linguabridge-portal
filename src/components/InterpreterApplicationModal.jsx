@@ -20,9 +20,17 @@ import {
   Building2,
   FileCheck,
   Camera,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Headphones,
+  Wifi,
+  Lock,
+  Zap,
+  Sun,
+  Sunrise,
+  Sunset,
+  Moon
 } from 'lucide-react';
-import { LANGUAGES, SPECIALTIES, EMPLOYMENT_MODELS } from '../data/mockData';
+import { LANGUAGES, SPECIALTIES, EMPLOYMENT_MODELS, SHIFT_WINDOWS, SPECIALTY_DOMAINS, HARDWARE_STANDARDS } from '../data/mockData';
 
 const TIMEZONES = [
   { value: 'PKT (UTC+5:00 - Pakistan / South Asia)', label: '🇵🇰 PKT (UTC+5:00 - Pakistan / South Asia)' },
@@ -52,6 +60,18 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
   const [timeZone, setTimeZone] = useState('PKT (UTC+5:00 - Pakistan / South Asia)');
   const [preferredShiftType, setPreferredShiftType] = useState('fixed_9h'); // 'fixed_9h', 'fixed_6h', 'fixed_3h', 'open_unlimited'
 
+  // Weekly Shift Availability Windows (Shifts A, B, C, D, E)
+  const [selectedShiftWindows, setSelectedShiftWindows] = useState(['shift_a', 'shift_b']);
+  // Emergency / Surge On-Call
+  const [emergencyOnCall, setEmergencyOnCall] = useState(true);
+  
+  // Hardware & Technical Environment Checklist
+  const [hardwareAudit, setHardwareAudit] = useState({
+    headsetVerified: true,
+    internetVerified: true,
+    privateOfficeSetting: true
+  });
+
   // Avatar / Profile Picture state (Optional)
   const [avatarType, setAvatarType] = useState('preset'); // 'preset' or 'custom'
   const [selectedAvatarPreset, setSelectedAvatarPreset] = useState('male-1'); // 'male-1', 'female-1', 'male-2', 'female-2', 'neutral'
@@ -62,7 +82,7 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
   const [customPrimaryLang, setCustomPrimaryLang] = useState('');
   const [selectedLanguages, setSelectedLanguages] = useState(['Spanish', 'English']);
   const [customWorkingLangInput, setCustomWorkingLangInput] = useState('');
-  const [selectedSpecialties, setSelectedSpecialties] = useState(['Medical / Healthcare']);
+  const [selectedSpecialties, setSelectedSpecialties] = useState(['General Healthcare & Patient Intake', 'Medical / Healthcare']);
   const [certificationsText, setCertificationsText] = useState('');
   const [experienceYears, setExperienceYears] = useState(3);
   
@@ -240,10 +260,15 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
       timeZone: timeZone,
       preferredShiftType: preferredShiftType,
       preferredDailyHours: dailyHrs,
+      shiftWindows: selectedShiftWindows,
+      emergencyOnCall: Boolean(emergencyOnCall),
+      hardwareAudit: hardwareAudit,
       shiftSchedule: {
         shiftType: preferredShiftType,
         dailyHours: dailyHrs,
         timeZone: timeZone,
+        shiftWindows: selectedShiftWindows,
+        emergencyOnCall: Boolean(emergencyOnCall),
         startTime: preferredShiftType === 'open_unlimited' ? null : '09:00',
         endTime: preferredShiftType === 'open_unlimited' ? null : (preferredShiftType === 'fixed_12h' ? '21:00' : preferredShiftType === 'fixed_3h' ? '12:00' : preferredShiftType === 'fixed_6h' ? '15:00' : '18:00'),
         scheduleLabel
@@ -779,41 +804,82 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
                 </div>
               </div>
 
-              {/* Specialties */}
-              <div>
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1.5">Specialty Domains</label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {SPECIALTIES.map(spec => {
-                    const isSel = selectedSpecialties.includes(spec.name);
+              {/* Primary Specialty Domains */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-semibold text-slate-300 block">
+                    Primary Specialty Domains ({selectedSpecialties.length} Selected)
+                  </label>
+                  <span className="text-[10px] text-slate-400">Click to select all matching disciplines</span>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {SPECIALTY_DOMAINS.map(domain => {
+                    const isSel = selectedSpecialties.includes(domain.name);
                     return (
                       <button
-                        key={spec.id}
+                        key={domain.id}
                         type="button"
-                        onClick={() => handleToggleSpecialty(spec.name)}
-                        className={`p-2.5 rounded-xl border text-left text-xs font-bold transition flex items-center justify-between gap-1.5 ${
+                        onClick={() => handleToggleSpecialty(domain.name)}
+                        className={`p-3 rounded-2xl border text-left transition relative flex items-start gap-2.5 ${
                           isSel 
-                            ? 'bg-brand-600 border-brand-500 !text-white shadow-md shadow-brand-600/30 ring-2 ring-brand-400' 
-                            : 'bg-slate-900/90 border-slate-700/80 text-slate-200 hover:text-white hover:bg-slate-800'
+                            ? 'bg-brand-950/80 border-brand-500 text-white ring-2 ring-brand-400/50 shadow-md shadow-brand-500/10' 
+                            : 'bg-slate-950/80 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700'
                         }`}
                       >
-                        <span className="truncate">{spec.name}</span>
-                        {isSel && <span className="text-white text-xs font-black shrink-0">✓</span>}
+                        <span className="text-xl p-1.5 rounded-xl bg-slate-900 border border-slate-800 shrink-0">
+                          {domain.icon}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-white truncate">{domain.name}</span>
+                            {isSel && <Check className="w-3.5 h-3.5 text-brand-400 shrink-0 ml-1" />}
+                          </div>
+                          <p className="text-[10px] text-slate-400 mt-0.5 leading-snug line-clamp-2">
+                            {domain.desc}
+                          </p>
+                        </div>
                       </button>
                     );
                   })}
                 </div>
+
+                {/* Additional Standard Specialties */}
+                <div className="pt-1.5">
+                  <span className="text-[10px] text-slate-400 font-semibold block mb-1.5">Additional General Fields:</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {SPECIALTIES.filter(s => !SPECIALTY_DOMAINS.some(d => d.name === s.name)).map(spec => {
+                      const isSel = selectedSpecialties.includes(spec.name);
+                      return (
+                        <button
+                          key={spec.id}
+                          type="button"
+                          onClick={() => handleToggleSpecialty(spec.name)}
+                          className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition flex items-center gap-1.5 ${
+                            isSel 
+                              ? 'bg-brand-600/30 border-brand-500 text-brand-300 ring-1 ring-brand-400' 
+                              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                          }`}
+                        >
+                          <span>{spec.name}</span>
+                          {isSel && <Check className="w-3 h-3 text-brand-400" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* SECTION 3: COMPENSATION, SHIFTS & BIO */}
+            {/* SECTION 3: COMPENSATION & WEEKLY SHIFT WINDOWS */}
             <div className="space-y-4 pt-2 border-t border-slate-800">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-brand-400 flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5" />
-                  <span>3. Compensation Model & Shift Availability</span>
+                  <span>3. Compensation Model & Weekly Shift Windows</span>
                 </h3>
                 <span className="text-[10px] text-amber-400 font-semibold bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20 w-fit">
-                  Choose Your Preferred Billing & Work Structure
+                  Choose Your Billing Model & Shift Windows
                 </span>
               </div>
 
@@ -889,7 +955,7 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
                 </button>
               </div>
 
-              {/* Dynamic Rate Input & Shift Selection */}
+              {/* Dynamic Rate Input */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-2xl bg-slate-950/70 border border-slate-800">
                 {employmentType === 'hourly' && (
                   <div>
@@ -964,90 +1030,110 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
                 </div>
               </div>
 
-              {/* Preferred Daily Shift Timing & Working Hours (Interactive Tabs with 12 Hours First) */}
+              {/* Weekly Shift Availability Windows (Shifts A, B, C, D, E) */}
               <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                   <label className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
                     <Clock className="w-4 h-4 text-amber-400" />
-                    <span>Preferred Daily Shift Timing & Working Hours</span>
+                    <span>Weekly Shift Availability Windows (EST - US Standard Time)</span>
                   </label>
-                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-300 font-mono flex items-center gap-1">
-                    <span>🏢</span>
-                    <span>{preferredShiftType === 'open_unlimited' ? 'Open 24/7' : preferredShiftType === 'fixed_12h' ? '12 Hours/Day' : preferredShiftType === 'fixed_6h' ? '6 Hours/Day' : preferredShiftType === 'fixed_3h' ? '3 Hours/Day' : '9 Hours/Day'}</span>
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedShiftWindows.length === SHIFT_WINDOWS.length) {
+                        setSelectedShiftWindows(['shift_a']);
+                      } else {
+                        setSelectedShiftWindows(SHIFT_WINDOWS.map(s => s.id));
+                      }
+                    }}
+                    className="text-[10px] font-bold text-brand-400 hover:text-brand-300 transition underline underline-offset-2 w-fit"
+                  >
+                    {selectedShiftWindows.length === SHIFT_WINDOWS.length ? 'Reset to Single Shift' : '✓ Select All 5 Shifts'}
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Select all time windows you are able to commit to for scheduled hospital & telehealth coverage:
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                  {SHIFT_WINDOWS.map(shift => {
+                    const isSelected = selectedShiftWindows.includes(shift.id);
+                    return (
+                      <button
+                        key={shift.id}
+                        type="button"
+                        onClick={() => {
+                          if (selectedShiftWindows.includes(shift.id)) {
+                            if (selectedShiftWindows.length > 1) {
+                              setSelectedShiftWindows(prev => prev.filter(s => s !== shift.id));
+                            }
+                          } else {
+                            setSelectedShiftWindows(prev => [...prev, shift.id]);
+                          }
+                        }}
+                        className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between ${
+                          isSelected
+                            ? 'bg-amber-500/10 border-amber-500 ring-2 ring-amber-400/40 text-white shadow-md'
+                            : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:border-slate-700 hover:text-white'
+                        }`}
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-extrabold flex items-center gap-1.5">
+                              <span>{shift.icon}</span>
+                              <span>{shift.name}</span>
+                            </span>
+                            {isSelected ? (
+                              <span className="w-4 h-4 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center text-[10px] font-black">
+                                ✓
+                              </span>
+                            ) : (
+                              <span className="w-4 h-4 rounded-full border border-slate-700" />
+                            )}
+                          </div>
+                          <p className="text-[11px] font-mono font-bold text-amber-300">
+                            {shift.timeEST}
+                          </p>
+                          <p className="text-[10px] text-slate-400 leading-snug">
+                            {shift.description}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPreferredShiftType('fixed_12h')}
-                    className={`p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center ${
-                      preferredShiftType === 'fixed_12h'
-                        ? 'bg-amber-600/30 border-amber-500 ring-2 ring-amber-400 text-white shadow-lg'
-                        : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700'
-                    }`}
-                  >
-                    <p className="text-xs font-extrabold flex items-center gap-1">🏢 12 Hours</p>
-                    <p className="text-[9px] text-slate-400 mt-0.5">Extended Shift Daily</p>
-                  </button>
+                {/* Emergency / Surge On-Call Availability Card */}
+                <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-slate-900 to-teal-950/40 border border-emerald-500/30 flex items-start sm:items-center justify-between gap-3 mt-3">
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30">
+                      <Zap className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-extrabold text-white block">
+                        Emergency & Surge On-Call Readiness
+                      </span>
+                      <p className="text-[10px] text-slate-300 mt-0.5">
+                        Receive priority call alerts and instant notifications outside your scheduled hours during hospital surges.
+                      </p>
+                    </div>
+                  </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setPreferredShiftType('fixed_9h')}
-                    className={`p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center ${
-                      preferredShiftType === 'fixed_9h'
-                        ? 'bg-amber-600/30 border-amber-500 ring-2 ring-amber-400 text-white shadow-lg'
-                        : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700'
-                    }`}
-                  >
-                    <p className="text-xs font-extrabold flex items-center gap-1">🏢 9 Hours</p>
-                    <p className="text-[9px] text-slate-400 mt-0.5">Full Shift Daily</p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPreferredShiftType('fixed_6h')}
-                    className={`p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center ${
-                      preferredShiftType === 'fixed_6h'
-                        ? 'bg-amber-600/30 border-amber-500 ring-2 ring-amber-400 text-white shadow-lg'
-                        : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700'
-                    }`}
-                  >
-                    <p className="text-xs font-extrabold flex items-center gap-1">💼 6 Hours</p>
-                    <p className="text-[9px] text-slate-400 mt-0.5">Standard Shift</p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPreferredShiftType('fixed_3h')}
-                    className={`p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center ${
-                      preferredShiftType === 'fixed_3h'
-                        ? 'bg-amber-600/30 border-amber-500 ring-2 ring-amber-400 text-white shadow-lg'
-                        : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700'
-                    }`}
-                  >
-                    <p className="text-xs font-extrabold flex items-center gap-1">⏱️ 3 Hours</p>
-                    <p className="text-[9px] text-slate-400 mt-0.5">Part-Time Shift</p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPreferredShiftType('open_unlimited')}
-                    className={`p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center col-span-2 sm:col-span-1 ${
-                      preferredShiftType === 'open_unlimited'
-                        ? 'bg-emerald-600/30 border-emerald-500 ring-2 ring-emerald-400 text-white shadow-lg'
-                        : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700'
-                    }`}
-                  >
-                    <p className="text-xs font-extrabold flex items-center gap-1 text-emerald-400">⚡ Open 24/7</p>
-                    <p className="text-[9px] text-slate-400 mt-0.5">Unlimited / Flex</p>
-                  </button>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={emergencyOnCall}
+                      onChange={(e) => setEmergencyOnCall(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                  </label>
                 </div>
 
                 {/* Local Time Zone Selection */}
-                <div className="space-y-1 pt-1.5 border-t border-slate-800/80">
+                <div className="space-y-1 pt-2 border-t border-slate-800/80">
                   <label className="text-[11px] font-semibold text-slate-300 block">
-                    Your Local Time Zone (for Shift Scheduling)
+                    Your Local Time Zone (for Shift Conversion)
                   </label>
                   <select
                     value={timeZone}
@@ -1185,6 +1271,50 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* SECTION 5: HARDWARE & HIPAA TECHNICAL COMPLIANCE CHECK */}
+            <div className="space-y-3 pt-2 border-t border-slate-800">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>5. Hardware & Technical Environment Audit (HIPAA)</span>
+                </h3>
+                <span className="text-[10px] text-emerald-300 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                  Mandatory Compliance Check
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                {HARDWARE_STANDARDS.map(hw => {
+                  const isChecked = hardwareAudit[hw.id];
+                  return (
+                    <button
+                      key={hw.id}
+                      type="button"
+                      onClick={() => setHardwareAudit(prev => ({ ...prev, [hw.id]: !prev[hw.id] }))}
+                      className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between ${
+                        isChecked 
+                          ? 'bg-emerald-950/40 border-emerald-500/80 text-white ring-1 ring-emerald-500/40 shadow-sm'
+                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-base">{hw.icon}</span>
+                          <span className={`w-4 h-4 rounded-md border flex items-center justify-center text-[10px] font-black ${
+                            isChecked ? 'bg-emerald-500 border-emerald-500 text-slate-950' : 'border-slate-700'
+                          }`}>
+                            {isChecked ? '✓' : ''}
+                          </span>
+                        </div>
+                        <p className="text-xs font-bold text-slate-200">{hw.name}</p>
+                        <p className="text-[10px] text-slate-400 mt-1 leading-snug">{hw.desc}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {errorMessage && (

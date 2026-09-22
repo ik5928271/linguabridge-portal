@@ -332,3 +332,109 @@ export const EMPLOYMENT_MODELS = [
   }
 ];
 
+// 5 Weekly Shift Availability Windows (EST - US Standard Time)
+export const SHIFT_WINDOWS = [
+  {
+    id: 'shift_a',
+    code: 'Shift A',
+    name: 'Shift A (Morning)',
+    timeEST: '08:00 AM – 12:00 PM US EST',
+    description: 'US East Coast Clinic Intake & Primary Care',
+    icon: '🌅',
+    badgeColor: 'from-amber-500/20 to-orange-500/20 border-amber-500/40 text-amber-300'
+  },
+  {
+    id: 'shift_b',
+    code: 'Shift B',
+    name: 'Shift B (Mid-Day)',
+    timeEST: '12:00 PM – 04:00 PM US EST',
+    description: 'Peak Clinical, Hospital Encounters & Triage',
+    icon: '☀️',
+    badgeColor: 'from-yellow-500/20 to-amber-500/20 border-yellow-500/40 text-yellow-300'
+  },
+  {
+    id: 'shift_c',
+    code: 'Shift C',
+    name: 'Shift C (Afternoon/Evening)',
+    timeEST: '04:00 PM – 08:00 PM US EST',
+    description: 'West Coast, Specialty Consults & Follow-ups',
+    icon: '🌇',
+    badgeColor: 'from-orange-500/20 to-red-500/20 border-orange-500/40 text-orange-300'
+  },
+  {
+    id: 'shift_d',
+    code: 'Shift D',
+    name: 'Shift D (Night / Urgent Care)',
+    timeEST: '08:00 PM – 12:00 AM US EST',
+    description: 'Emergency Room (ER) & Urgent Care Intake',
+    icon: '🌙',
+    badgeColor: 'from-indigo-500/20 to-blue-500/20 border-indigo-500/40 text-indigo-300'
+  },
+  {
+    id: 'shift_e',
+    code: 'Shift E',
+    name: 'Shift E (Graveyard / Overnight)',
+    timeEST: '12:00 AM – 08:00 AM US EST',
+    description: '24/7 Global Emergencies & Night Coverage',
+    icon: '🌌',
+    badgeColor: 'from-purple-500/20 to-violet-500/20 border-purple-500/40 text-purple-300'
+  }
+];
+
+// Primary Specialty Domains
+export const SPECIALTY_DOMAINS = [
+  {
+    id: 'general_healthcare',
+    name: 'General Healthcare & Patient Intake',
+    icon: '🏥',
+    desc: 'Primary care, clinic appointments, patient histories, triage & telehealth'
+  },
+  {
+    id: 'er_trauma',
+    name: 'ER, Trauma & Emergency Surgery',
+    icon: '🚨',
+    desc: 'Emergency rooms, trauma units, surgical consultations & critical care'
+  },
+  {
+    id: 'female_obgyn',
+    name: 'Female-Only OB/GYN & Maternity',
+    icon: '🤰',
+    desc: 'Obstetrics, gynecology, labor & delivery, female-patient culturally sensitive care'
+  },
+  {
+    id: 'legal_court',
+    name: 'Legal, Court, Immigration & Asylum',
+    icon: '⚖️',
+    desc: 'Depositions, courtroom trials, USCIS asylum hearings, attorney-client consults'
+  },
+  {
+    id: 'insurance_financial',
+    name: 'Insurance, Financial & Commercial',
+    icon: '💼',
+    desc: 'Insurance claims, underwriting, banking, mortgages, worker compensation'
+  }
+];
+
+// Hardware & Technical Environment Standards (HIPAA)
+export const HARDWARE_STANDARDS = [
+  {
+    id: 'headsetVerified',
+    name: 'USB Noise-Cancelling Headset Verified',
+    icon: '🎧',
+    desc: 'Dedicated wired USB headset with active noise cancelling microphone'
+  },
+  {
+    id: 'internetVerified',
+    name: 'High-Speed Internet Verified',
+    icon: '🌐',
+    desc: 'Wired Ethernet or stable high-speed fiber (>25 Mbps low-jitter connection)'
+  },
+  {
+    id: 'privateOfficeSetting',
+    name: 'Quiet Private Home Office Setting',
+    icon: '🔒',
+    desc: 'Secure, closed-door private room free from background noise (HIPAA Compliant)'
+  }
+];
+
+
