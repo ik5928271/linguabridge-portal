@@ -334,13 +334,13 @@ function saveStore() {
       
       if (db) {
         const batchPromises = [
-          ...store.users.slice(0, 50).map(u => db.collection('users').updateOne({ id: u.id }, { $set: u }, { upsert: true }).catch(() => {})),
-          ...store.interpreterApplications.slice(0, 50).map(app => db.collection('interpreter_applications').updateOne({ id: app.id }, { $set: app }, { upsert: true }).catch(() => {})),
-          ...(store.inquiries || []).slice(0, 50).map(inq => db.collection('inquiries').updateOne({ id: inq.id }, { $set: inq }, { upsert: true }).catch(() => {})),
-          ...(store.paymentReceipts || []).slice(0, 50).map(rcpt => db.collection('payment_receipts').updateOne({ id: rcpt.id }, { $set: rcpt }, { upsert: true }).catch(() => {})),
-          ...Object.keys(store.wallets).slice(0, 50).map(uId => db.collection('wallets').updateOne({ userId: uId }, { $set: store.wallets[uId] }, { upsert: true }).catch(() => {})),
-          ...store.appointments.slice(0, 50).map(a => db.collection('appointments').updateOne({ id: a.id }, { $set: a }, { upsert: true }).catch(() => {})),
-          ...store.callLogs.slice(0, 50).map(c => db.collection('call_logs').updateOne({ id: c.id }, { $set: c }, { upsert: true }).catch(() => {}))
+          ...store.users.map(u => db.collection('users').updateOne({ id: u.id }, { $set: u }, { upsert: true }).catch(() => {})),
+          ...store.interpreterApplications.map(app => db.collection('interpreter_applications').updateOne({ id: app.id }, { $set: app }, { upsert: true }).catch(() => {})),
+          ...(store.inquiries || []).map(inq => db.collection('inquiries').updateOne({ id: inq.id }, { $set: inq }, { upsert: true }).catch(() => {})),
+          ...(store.paymentReceipts || []).map(rcpt => db.collection('payment_receipts').updateOne({ id: rcpt.id }, { $set: rcpt }, { upsert: true }).catch(() => {})),
+          ...Object.keys(store.wallets).map(uId => db.collection('wallets').updateOne({ userId: uId }, { $set: store.wallets[uId] }, { upsert: true }).catch(() => {})),
+          ...store.appointments.map(a => db.collection('appointments').updateOne({ id: a.id }, { $set: a }, { upsert: true }).catch(() => {})),
+          ...store.callLogs.map(c => db.collection('call_logs').updateOne({ id: c.id }, { $set: c }, { upsert: true }).catch(() => {}))
         ];
         await Promise.allSettled(batchPromises);
       }
@@ -1239,14 +1239,25 @@ app.post('/api/interpreter-applications', (req, res) => {
   });
 });
 
-// 2. Admin: Get all applications (Ultra-fast lightweight payload)
+// 2. Admin: Get all applications (Ultra-fast lightweight payload synced with active users)
 app.get('/api/admin/interpreter-applications', (req, res) => {
   const cleanList = (store.interpreterApplications || []).map(app => {
     const { cvFileData, docFileData, supportingDocs, ...rest } = app;
+    const existingUser = (store.users || []).find(u => 
+      u.role === 'interpreter' && 
+      ((u.email && app.email && u.email.toLowerCase() === app.email.toLowerCase()) || 
+       (u.id && app.id && u.id === app.id) ||
+       (u.badgeNumber && app.badgeNumber && u.badgeNumber.toString() === app.badgeNumber.toString()))
+    );
+
+    const isApproved = Boolean(existingUser || app.status === 'approved');
+    const badgeNumber = (existingUser && (existingUser.badgeNumber || existingUser.interpreterBadgeId)) || app.badgeNumber || app.interpreterBadgeId || null;
+
     return {
       ...rest,
-      badgeNumber: app.badgeNumber || app.interpreterBadgeId || null,
-      interpreterBadgeId: app.badgeNumber || app.interpreterBadgeId || null,
+      status: isApproved ? 'approved' : (app.status || 'pending'),
+      badgeNumber,
+      interpreterBadgeId: badgeNumber,
       hasCv: Boolean(cvFileData || app.cvFileName),
       hasDoc: Boolean(docFileData || app.docFileName)
     };
