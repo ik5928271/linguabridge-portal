@@ -15,7 +15,7 @@ const PORTAL_URL = process.env.PORTAL_URL || 'https://linguabridge-portal.onrend
  * Core Universal Email Dispatcher
  */
 export async function sendEmail({ to, subject, html, text }) {
-  const apiKey = process.env.RESEND_API_KEY || 're_6fXYEFhk_FtEXCkgo98M93NkQwbz72dZ7';
+  const apiKey = process.env.RESEND_API_KEY;
 
   if (!to) {
     console.warn('[EmailService] Skipped: No recipient email provided.');
@@ -296,4 +296,70 @@ export async function sendClientWelcomeEmail(client) {
   `;
 
   return sendEmail({ to: email, subject, html });
+}
+
+/**
+ * 5. Send Email When Admin Replies to an Inquiry / Support Message
+ */
+export async function sendInquiryReplyEmail(inquiry, adminReplyText) {
+  if (!inquiry || !inquiry.userEmail) return;
+
+  const email = inquiry.userEmail.trim();
+  const name = inquiry.userName || 'Valued User';
+  const originalSubject = inquiry.subject || 'Inquiry';
+  const subject = `[LinguaBridge / IK Enterprises] Response to: ${originalSubject}`;
+
+  const html = `
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="utf-8">
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b1120; color: #e2e8f0; margin: 0; padding: 24px; }
+      .container { max-width: 600px; margin: 0 auto; background: #0f172a; border: 1px solid #1e293b; border-radius: 20px; overflow: hidden; }
+      .header { background: linear-gradient(135deg, #4338ca 0%, #3b82f6 100%); padding: 28px 24px; text-align: center; }
+      .header h1 { color: #ffffff; margin: 0; font-size: 22px; font-weight: 800; }
+      .header p { color: #c7d2fe; margin: 6px 0 0 0; font-size: 13px; }
+      .content { padding: 28px 24px; }
+      .reply-box { background: #1e293b; border-left: 4px solid #3b82f6; border-radius: 12px; padding: 18px; margin: 20px 0; color: #f8fafc; font-size: 14px; line-height: 1.6; }
+      .orig-box { background: #0b1120; border: 1px solid #1e293b; border-radius: 10px; padding: 14px; margin: 16px 0; font-size: 12px; color: #94a3b8; }
+      .btn { display: inline-block; background: #2563eb; color: #ffffff !important; text-decoration: none; padding: 12px 26px; border-radius: 10px; font-weight: 700; font-size: 13px; margin-top: 15px; }
+      .footer { background: #0b1120; padding: 18px 24px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #1e293b; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>LinguaBridge Dispatch & Operations</h1>
+        <p>IK Enterprises Communication Center</p>
+      </div>
+      <div class="content">
+        <h3 style="color: #ffffff; margin-top: 0;">Hello ${name},</h3>
+        <p style="font-size: 14px; line-height: 1.6; color: #cbd5e1;">
+          Ikram-ul-haq Mian (Platform Owner & Admin Dispatch) has replied to your message:
+        </p>
+
+        <div class="reply-box">
+          <strong style="color: #60a5fa; display: block; margin-bottom: 6px; font-size: 12px; text-transform: uppercase;">Official Response:</strong>
+          ${adminReplyText.replace(/\n/g, '<br/>')}
+        </div>
+
+        <div class="orig-box">
+          <strong style="color: #cbd5e1; display: block; margin-bottom: 4px;">Your Original Message:</strong>
+          "${inquiry.message || originalSubject}"
+        </div>
+
+        <div style="text-align: center;">
+          <a href="${PORTAL_URL}" class="btn">Open LinguaBridge Portal</a>
+        </div>
+      </div>
+      <div class="footer">
+        &copy; ${new Date().getFullYear()} LinguaBridge • IK Enterprises Operations
+      </div>
+    </div>
+  </body>
+  </html>
+  `;
+
+  return sendEmail({ to: email, subject, html, text: adminReplyText });
 }

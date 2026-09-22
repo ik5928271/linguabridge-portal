@@ -3,5 +3,7 @@
   "interpreters": [],
   "appointments": [],
   "callLogs": [],
-  "wallets": {}
+  "wallets": {},
+  "paymentReceipts": [],
+  "inquiries": []
 }

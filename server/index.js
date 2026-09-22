@@ -9,7 +9,8 @@ import {
   sendEmail, 
   sendInterpreterApplicationReceivedEmail, 
   sendInterpreterApprovedEmail, 
-  sendClientWelcomeEmail 
+  sendClientWelcomeEmail,
+  sendInquiryReplyEmail
 } from './services/emailService.js';
 
 const app = express();
@@ -46,101 +47,7 @@ const DEFAULT_OWNER = {
 };
 
 // Permanent Seed Accounts (Always available across every deployment)
-const SEED_USERS = [
-  DEFAULT_OWNER,
-  {
-    id: 'usr-interp-kamila',
-    name: 'Kamila',
-    email: 'kamila@linguabridge.com',
-    password: 'interpreter123',
-    role: 'interpreter',
-    badgeNumber: '84921',
-    interpreterBadgeId: '84921',
-    primaryLang: 'Russian',
-    languages: ['Russian', 'English', 'Ukrainian'],
-    specialty: 'General / Customer Support',
-    hourlyRate: 5,
-    rating: 4.98,
-    status: 'online',
-    certifications: ['Certified Professional Russian Linguist', 'State Judiciary Certified'],
-    bio: 'Professional Russian and Ukrainian consecutive & simultaneous interpreter with over 8 years of live interpretation experience.',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'usr-interp-wali',
-    name: 'Wali',
-    email: 'wali@linguabridge.com',
-    password: 'interpreter123',
-    role: 'interpreter',
-    badgeNumber: '84922',
-    interpreterBadgeId: '84922',
-    primaryLang: 'Arabic',
-    languages: ['Arabic', 'English'],
-    specialty: 'Medical / Healthcare',
-    hourlyRate: 5,
-    rating: 4.97,
-    status: 'online',
-    certifications: ['Certified Arabic Healthcare Linguist', 'Court Certified'],
-    bio: 'Certified Arabic interpreter specializing in healthcare encounters, customer care, and legal proceedings.',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'usr-interp-tariq',
-    name: 'Tariq Khan',
-    email: 'tariq@linguabridge.com',
-    password: 'interpreter123',
-    role: 'interpreter',
-    badgeNumber: '84923',
-    interpreterBadgeId: '84923',
-    primaryLang: 'Urdu',
-    languages: ['Urdu', 'Punjabi', 'English'],
-    specialty: 'General / Customer Support',
-    hourlyRate: 5,
-    rating: 4.99,
-    status: 'online',
-    certifications: ['Certified Urdu & Punjabi Court Interpreter', 'Healthcare Certified'],
-    bio: 'Native Urdu and Punjabi professional linguist providing high-accuracy remote translation services.',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'usr-interp-sofia',
-    name: 'Sofia Martinez',
-    email: 'sofia@linguabridge.com',
-    password: 'interpreter123',
-    role: 'interpreter',
-    badgeNumber: '84924',
-    interpreterBadgeId: '84924',
-    primaryLang: 'Spanish',
-    languages: ['Spanish', 'English'],
-    specialty: 'Medical / Healthcare',
-    hourlyRate: 5,
-    rating: 4.98,
-    status: 'online',
-    certifications: ['Certified Spanish Healthcare Interpreter (CCHI)', 'State Certified'],
-    bio: 'Experienced Spanish medical and judicial interpreter bridging communication in clinics and corporate meetings.',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'usr-client-demo',
-    name: 'IK Client (Prepaid 120 Mins)',
-    email: 'client@linguabridge.com',
-    password: 'client123',
-    role: 'host',
-    org: 'IK Enterprises Client Corp',
-    billingType: 'prepaid',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'usr-client-hospital',
-    name: 'Mercy Hospital Client (Net 30)',
-    email: 'hospital@linguabridge.com',
-    password: 'client123',
-    role: 'host',
-    org: 'Mercy Healthcare Network',
-    billingType: 'postpaid_hospital',
-    createdAt: new Date().toISOString()
-  }
-];
+const SEED_USERS = [];
 
 // Helper to generate unique pure numeric ID for interpreters (e.g. 5 digits)
 function generateNumericBadgeId() {
@@ -200,95 +107,18 @@ const SEED_WALLETS = {
 // Permanent Seed Applications (Preserved across all deployments & container restarts)
 let SEED_APPLICATIONS = [];
 try {
-  const seedAppsPath = path.join(__dirname, 'seed_applications.json');
-  if (fs.existsSync(seedAppsPath)) {
-    SEED_APPLICATIONS = JSON.parse(fs.readFileSync(seedAppsPath, 'utf8'));
+  const seedAppsPath = path.join(process.cwd(), 'server', 'seed_applications.json');
+  const fallbackPath = path.join(process.cwd(), 'seed_applications.json');
+  const targetPath = fs.existsSync(seedAppsPath) ? seedAppsPath : (fs.existsSync(fallbackPath) ? fallbackPath : null);
+  if (targetPath) {
+    SEED_APPLICATIONS = JSON.parse(fs.readFileSync(targetPath, 'utf8'));
   }
 } catch (e) {
   console.warn('Could not read seed_applications.json:', e.message);
 }
 
 
-// Permanent Seed Inquiries & Conversations Box
-const SEED_INQUIRIES = [
-  {
-    id: 'inq-seed-1',
-    userName: 'Dr. Sarah Jenkins, MD',
-    userEmail: 's.jenkins@mercyhealth.org',
-    userRole: 'client',
-    subject: 'Question on Net-30 Invoicing for Clinic Encounters',
-    message: 'Hello, we are onboarding our outpatient clinic and want to confirm if our Net-30 hospital invoice covers Russian and Arabic emergency dispatches without pre-funding wallet minutes.',
-    category: 'Billing & Invoicing',
-    status: 'resolved',
-    adminReply: 'Yes, Dr. Jenkins! Your Mercy Hospital Net-30 corporate account allows unlimited emergency 3-way dispatches across all 150+ languages with monthly itemized invoicing.',
-    createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
-    messages: [
-      { sender: 'user', text: 'Hello, we are onboarding our outpatient clinic and want to confirm if our Net-30 hospital invoice covers Russian and Arabic emergency dispatches without pre-funding wallet minutes.', time: '10:15 AM' },
-      { sender: 'bot', text: 'Hello Dr. Jenkins! Yes, Net 30 Hospital billing supports direct post-paid dispatches. I have also alerted platform administration.', time: '10:16 AM' }
-    ]
-  },
-  {
-    id: 'inq-seed-2',
-    userName: 'Elizaveta Khirevich',
-    userEmail: 'lkhirevich@gmail.com',
-    userRole: 'interpreter',
-    subject: 'Propio Training Certificate & Live Talk Availability',
-    message: 'Hello IK Enterprises admin, I submitted my Propio training certificate. I am available for Russian/English VRI/OPI live talk shifts. Please let me know when my profile will be live for dispatch.',
-    category: 'Interpreter Onboarding',
-    status: 'new',
-    adminReply: '',
-    createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
-    messages: [
-      { sender: 'user', text: 'Hello IK Enterprises admin, I submitted my Propio training certificate. I am available for Russian/English VRI/OPI live talk shifts. Please let me know when my profile will be live for dispatch.', time: '02:30 PM' }
-    ]
-  },
-  {
-    id: 'inq-seed-3',
-    userName: 'Muhammad Talha Khan',
-    userEmail: 'talhakhan.interpreter@gmail.com',
-    userRole: 'interpreter',
-    subject: 'Pashto / Urdu / Hindi Shift Availability Confirmation',
-    message: 'Greetings Administration, I submitted my application for Pashto, Urdu, and Hindi OPI/VRI interpretation. I can commit to 9 hours daily fixed shift in PKT timezone. Looking forward to verification.',
-    category: 'Shift Scheduling',
-    status: 'new',
-    adminReply: '',
-    createdAt: new Date(Date.now() - 3600000 * 8).toISOString(),
-    messages: [
-      { sender: 'user', text: 'Greetings Administration, I submitted my application for Pashto, Urdu, and Hindi OPI/VRI interpretation. I can commit to 9 hours daily fixed shift in PKT timezone. Looking forward to verification.', time: '11:45 AM' }
-    ]
-  },
-  {
-    id: 'inq-seed-4',
-    userName: 'Carlos Mendez',
-    userEmail: 'carlos.mendez@houstoncardio.com',
-    userRole: 'client',
-    subject: 'On-Demand Spanish Medical OPI Interpreter Dispatch',
-    message: 'We require certified Spanish medical interpreters for consecutive patient encounters starting next Monday. Can we schedule a recurrent daily interpreter or use on-demand dispatch?',
-    category: 'Medical Dispatch',
-    status: 'resolved',
-    adminReply: 'Both options are supported, Carlos! You can dispatch on-demand 24/7 or reserve certified Spanish medical specialists in advance from your Client Dashboard.',
-    createdAt: new Date(Date.now() - 3600000 * 36).toISOString(),
-    messages: [
-      { sender: 'user', text: 'We require certified Spanish medical interpreters for consecutive patient encounters starting next Monday. Can we schedule a recurrent daily interpreter or use on-demand dispatch?', time: '09:00 AM' },
-      { sender: 'bot', text: 'IK Enterprises dispatch supports both instant 30-second live matches and scheduled encounters.', time: '09:02 AM' }
-    ]
-  },
-  {
-    id: 'inq-seed-5',
-    userName: 'Elena Rostova',
-    userEmail: 'e.rostova@global-immigrations.com',
-    userRole: 'client',
-    subject: 'Emergency Russian Legal VRI Session Support',
-    message: 'Urgent inquiry regarding live video interpretation for an immigration hearing. We need a sworn Russian linguist with screen sharing enabled.',
-    category: 'Legal / Judiciary',
-    status: 'new',
-    adminReply: '',
-    createdAt: new Date(Date.now() - 3600000 * 12).toISOString(),
-    messages: [
-      { sender: 'user', text: 'Urgent inquiry regarding live video interpretation for an immigration hearing. We need a sworn Russian linguist with screen sharing enabled.', time: '04:15 PM' }
-    ]
-  }
-];
+const SEED_INQUIRIES = [];
 
 // Initial State Structure
 let store = {
@@ -1707,6 +1537,13 @@ app.put('/api/inquiries/:id', (req, res) => {
   if (Array.isArray(messages)) inq.messages = messages;
   inq.updatedAt = new Date().toISOString();
 
+  // If admin provided a reply, send an email to the user so they receive it offline
+  if (adminReply && inq.userEmail) {
+    sendInquiryReplyEmail(inq, adminReply).catch(err => {
+      console.error('[Email Reply Dispatch Warning]:', err.message);
+    });
+  }
+
   saveStore();
   io.emit('inquiry-updated', inq);
 
@@ -2196,6 +2033,23 @@ app.post('/api/payment-receipts/:id/reject', (req, res) => {
     message: 'Payment receipt marked as rejected.',
     receipt
   });
+});
+
+// Admin: Delete Payment Receipt Permanently
+app.delete('/api/payment-receipts/:id', async (req, res) => {
+  const { id } = req.params;
+  store.paymentReceipts = (store.paymentReceipts || []).filter(r => r.id !== id);
+  if (db) {
+    try {
+      await db.collection('payment_receipts').deleteOne({ id });
+      await db.collection('inquiries').deleteMany({ receiptId: id });
+    } catch (e) {
+      console.error('Error deleting receipt from MongoDB:', e.message);
+    }
+  }
+  saveStore();
+  io.emit('payment-receipt-deleted', { id });
+  res.json({ success: true, message: 'Payment receipt deleted permanently.' });
 });
 
 // 9. Terminology Glossary
