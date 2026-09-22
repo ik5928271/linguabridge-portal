@@ -555,6 +555,35 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
     setIsEditModalOpen(true);
   };
 
+  const handleEditApprovedInterpreter = (app) => {
+    let targetUser = usersList.find(u => 
+      (u.email && app.email && u.email.toLowerCase() === app.email.toLowerCase()) ||
+      (u.badgeNumber && app.badgeNumber && u.badgeNumber.toString() === app.badgeNumber.toString()) ||
+      (u.id && app.id && u.id === app.id)
+    );
+
+    if (!targetUser) {
+      targetUser = {
+        id: app.id || `usr-${Date.now()}`,
+        name: app.name,
+        email: app.email,
+        role: 'interpreter',
+        org: 'Certified Linguist Pool (Verified)',
+        badgeNumber: app.badgeNumber || app.interpreterBadgeId,
+        interpreterBadgeId: app.badgeNumber || app.interpreterBadgeId,
+        primaryLang: app.primaryLang || 'Spanish',
+        specialty: app.specialties?.[0] || 'Medical / Healthcare',
+        employmentType: app.employmentType || 'hourly',
+        hourlyRate: app.hourlyRate || 8,
+        minuteRate: app.minuteRate || 0.30,
+        monthlySalary: app.monthlySalary || 1200,
+        shiftSchedule: app.shiftSchedule
+      };
+    }
+
+    handleOpenEditModal(targetUser);
+  };
+
   const handleSaveEdit = (e) => {
     e.preventDefault();
     const resolvedRateLabel = editEmploymentType === 'salary_base'
@@ -604,11 +633,38 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       .then(data => {
         if (data.success) {
           setUsersList(prev => prev.map(u => u.id === editingUserId ? { ...u, ...payload, wallet: data.wallet || { ...u.wallet, ...payload } } : u));
+          setApplications(prev => prev.map(a => (a.id === editingUserId || (a.email && editEmail && a.email.toLowerCase() === editEmail.toLowerCase())) ? {
+            ...a,
+            name: editName,
+            email: editEmail,
+            primaryLang: editLang,
+            specialty: editSpecialty,
+            employmentType: editEmploymentType,
+            hourlyRate: parseInt(editHourlyRate) || 8,
+            minuteRate: parseFloat(editMinuteRate) || 0.30,
+            monthlySalary: parseInt(editMonthlySalary) || 1200,
+            rateLabel: resolvedRateLabel,
+            shiftSchedule: shiftSchedulePayload
+          } : a));
           setIsEditModalOpen(false);
+          fetchApplications();
         }
       })
       .catch(() => {
         setUsersList(prev => prev.map(u => u.id === editingUserId ? { ...u, ...payload, wallet: { ...u.wallet, ...payload } } : u));
+        setApplications(prev => prev.map(a => (a.id === editingUserId || (a.email && editEmail && a.email.toLowerCase() === editEmail.toLowerCase())) ? {
+          ...a,
+          name: editName,
+          email: editEmail,
+          primaryLang: editLang,
+          specialty: editSpecialty,
+          employmentType: editEmploymentType,
+          hourlyRate: parseInt(editHourlyRate) || 8,
+          minuteRate: parseFloat(editMinuteRate) || 0.30,
+          monthlySalary: parseInt(editMonthlySalary) || 1200,
+          rateLabel: resolvedRateLabel,
+          shiftSchedule: shiftSchedulePayload
+        } : a));
         setIsEditModalOpen(false);
       });
   };
@@ -1648,14 +1704,27 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                           </>
                         )}
 
-                        {isApproved && app.emailDispatch && (
-                          <button
-                            onClick={() => setEmailDispatchModal(app.emailDispatch)}
-                            className="px-3.5 py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 font-bold text-xs flex items-center gap-1.5 transition"
-                          >
-                            <Mail className="w-3.5 h-3.5" />
-                            <span>View Email Dispatch</span>
-                          </button>
+                        {isApproved && (
+                          <>
+                            <button
+                              onClick={() => handleEditApprovedInterpreter(app)}
+                              className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition"
+                              title="Edit Profile, Rates, Shift Windows & Contract Terms"
+                            >
+                              <Edit className="w-3.5 h-3.5" />
+                              <span>Edit Profile & Rates</span>
+                            </button>
+
+                            {app.emailDispatch && (
+                              <button
+                                onClick={() => setEmailDispatchModal(app.emailDispatch)}
+                                className="px-3.5 py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 font-bold text-xs flex items-center gap-1.5 transition"
+                              >
+                                <Mail className="w-3.5 h-3.5" />
+                                <span>View Email Dispatch</span>
+                              </button>
+                            )}
+                          </>
                         )}
 
                         <button
