@@ -753,7 +753,23 @@ app.post('/api/auth/switch-role', (req, res) => {
 
 // 3c. Interpreter Self Profile Update
 app.post('/api/interpreter/profile', async (req, res) => {
-  const { userId, email, name, phone, bio, primaryLang, languages, specialties, avatar, hourlyRate, minuteRate, employmentType } = req.body;
+  const { 
+    userId, 
+    email, 
+    name, 
+    phone, 
+    bio, 
+    primaryLang, 
+    languages, 
+    specialties, 
+    shiftWindows,
+    emergencyOnCall,
+    hardwareAudit,
+    avatar, 
+    hourlyRate, 
+    minuteRate, 
+    employmentType 
+  } = req.body;
   const targetEmail = (email || '').toLowerCase().trim();
   
   let user = store.users.find(u => (userId && u.id === userId) || (targetEmail && u.email && u.email.toLowerCase() === targetEmail));
@@ -767,6 +783,9 @@ app.post('/api/interpreter/profile', async (req, res) => {
   if (primaryLang) user.primaryLang = primaryLang;
   if (languages && Array.isArray(languages)) user.languages = languages;
   if (specialties && Array.isArray(specialties)) user.specialties = specialties;
+  if (shiftWindows && Array.isArray(shiftWindows)) user.shiftWindows = shiftWindows;
+  if (emergencyOnCall !== undefined) user.emergencyOnCall = Boolean(emergencyOnCall);
+  if (hardwareAudit) user.hardwareAudit = hardwareAudit;
   if (avatar) user.avatar = avatar;
   if (hourlyRate !== undefined) user.hourlyRate = parseInt(hourlyRate) || user.hourlyRate;
   if (minuteRate !== undefined) user.minuteRate = parseFloat(minuteRate) || user.minuteRate;
@@ -780,6 +799,9 @@ app.post('/api/interpreter/profile', async (req, res) => {
     if (primaryLang) interp.primaryLang = user.primaryLang;
     if (languages) interp.languages = user.languages;
     if (specialties) interp.specialties = user.specialties;
+    if (shiftWindows) interp.shiftWindows = user.shiftWindows;
+    if (emergencyOnCall !== undefined) interp.emergencyOnCall = user.emergencyOnCall;
+    if (hardwareAudit) interp.hardwareAudit = user.hardwareAudit;
     if (bio) interp.bio = user.bio;
   }
 
@@ -1112,7 +1134,10 @@ app.post('/api/interpreter-applications', (req, res) => {
     docFileName = '',
     docFileData = '',
     supportingDocs = [],
-    shiftSchedule = null
+    shiftSchedule = null,
+    shiftWindows = ['shift_a', 'shift_b'],
+    emergencyOnCall = true,
+    hardwareAudit = { headsetVerified: true, internetVerified: true, privateOfficeSetting: true }
   } = req.body;
 
   if (!name || !email) {
@@ -1174,6 +1199,9 @@ app.post('/api/interpreter-applications', (req, res) => {
     displayName: `Interpreter #${assignedBadgeNumber}`,
     preferredShiftType: preferredShiftType,
     preferredDailyHours: preferredDailyHours,
+    shiftWindows: Array.isArray(shiftWindows) && shiftWindows.length > 0 ? shiftWindows : ['shift_a', 'shift_b'],
+    emergencyOnCall: Boolean(emergencyOnCall),
+    hardwareAudit: hardwareAudit || { headsetVerified: true, internetVerified: true, privateOfficeSetting: true },
     shiftSchedule: resolvedSchedule,
     primaryLang,
     languages: Array.isArray(languages) && languages.length > 0 ? languages : [primaryLang, 'English'],
