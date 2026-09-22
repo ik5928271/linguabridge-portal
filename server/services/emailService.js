@@ -159,7 +159,9 @@ export async function sendInterpreterApprovedEmail(interpreter) {
       ? `$${minuteRate.toFixed(2)}/min Live On-Demand Talk`
       : `$${hourlyRate}/hr Scheduled Shift Billing`;
 
-  const subject = `?? Congratulations! Your LinguaBridge Interpreter Account is Approved (Official ID: #${badgeNumber})`;
+  const password = interpreter.password || interpreter.temporaryPassword || 'interp2026!';
+
+  const subject = `🎉 Congratulations! Your LinguaBridge Interpreter Account is Approved (Official ID: #${badgeNumber})`;
 
   const html = `
   <!DOCTYPE html>
@@ -175,6 +177,7 @@ export async function sendInterpreterApprovedEmail(interpreter) {
       .content { padding: 32px 24px; }
       .badge-card { background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%); border: 2px solid #059669; border-radius: 16px; padding: 24px; margin: 24px 0; text-align: center; }
       .badge-pill { display: inline-block; background: rgba(5, 150, 105, 0.2); border: 1px solid #10b981; color: #34d399; font-family: monospace; font-size: 22px; font-weight: 900; padding: 8px 20px; border-radius: 9999px; letter-spacing: 1px; margin: 12px 0; }
+      .credentials-box { background: rgba(15, 23, 42, 0.9); border: 1px solid #3b82f6; border-radius: 12px; padding: 18px; margin: 20px 0; text-align: left; }
       .details-grid { text-align: left; background: #1e293b; border-radius: 12px; padding: 16px; margin-top: 16px; font-size: 13px; line-height: 1.8; }
       .btn { display: inline-block; background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: #ffffff !important; text-decoration: none; padding: 16px 36px; border-radius: 12px; font-weight: 800; font-size: 15px; text-align: center; box-shadow: 0 10px 15px -3px rgba(5, 150, 105, 0.4); margin: 24px 0 12px 0; }
       .step-box { background: rgba(15, 23, 42, 0.6); border-left: 4px solid #10b981; padding: 12px 16px; margin: 12px 0; border-radius: 0 8px 8px 0; font-size: 13px; }
@@ -199,21 +202,46 @@ export async function sendInterpreterApprovedEmail(interpreter) {
           <p style="font-size: 11px; color: #94a3b8; margin: 0;">This 5-digit number is your official identifier for all client encounters and billing.</p>
 
           <div class="details-grid">
-            <div><strong style="color: #94a3b8;">Primary Pair:</strong> <span style="color: #ffffff; font-weight: bold;">${primaryLang} ? English</span></div>
+            <div><strong style="color: #94a3b8;">Primary Pair:</strong> <span style="color: #ffffff; font-weight: bold;">${primaryLang} ⟷ English</span></div>
             <div><strong style="color: #94a3b8;">Approved Languages:</strong> <span style="color: #93c5fd;">${languages}</span></div>
             <div><strong style="color: #94a3b8;">Domain / Specialty:</strong> <span style="color: #ffffff;">${specialty}</span></div>
             <div><strong style="color: #94a3b8;">Billing Rate:</strong> <span style="color: #34d399; font-weight: bold;">${rateText}</span></div>
           </div>
         </div>
 
+        <!-- Official Login Credentials Box -->
+        <div class="credentials-box">
+          <div style="font-size: 13px; font-weight: 800; color: #60a5fa; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+            🔐 YOUR OFFICIAL PORTAL LOGIN CREDENTIALS
+          </div>
+          <table style="width: 100%; font-size: 13px; border-collapse: collapse; color: #cbd5e1;">
+            <tr style="border-bottom: 1px solid #334155;">
+              <td style="padding: 6px 0; color: #94a3b8; width: 140px;">Login Email:</td>
+              <td style="padding: 6px 0; font-weight: bold; color: #ffffff;"><code style="background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #38bdf8;">${email}</code></td>
+            </tr>
+            <tr style="border-bottom: 1px solid #334155;">
+              <td style="padding: 6px 0; color: #94a3b8;">Temporary Password:</td>
+              <td style="padding: 6px 0; font-weight: bold; color: #fbbf24;"><code style="background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #fbbf24;">${password}</code></td>
+            </tr>
+            <tr style="border-bottom: 1px solid #334155;">
+              <td style="padding: 6px 0; color: #94a3b8;">Interpreter Badge ID:</td>
+              <td style="padding: 6px 0; font-weight: bold; color: #34d399;">#${badgeNumber}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #94a3b8;">Portal URL:</td>
+              <td style="padding: 6px 0;"><a href="${PORTAL_URL}" style="color: #38bdf8; text-decoration: underline;">${PORTAL_URL}</a></td>
+            </tr>
+          </table>
+        </div>
+
         <div style="text-align: center;">
-          <a href="${PORTAL_URL}" class="btn">?? Open Interpreter Workbench</a>
+          <a href="${PORTAL_URL}" class="btn">🚀 Open Interpreter Workbench & Log In</a>
         </div>
 
         <h3 style="color: #ffffff; font-size: 15px; margin-top: 24px;">How to start taking live calls:</h3>
         
         <div class="step-box">
-          <strong style="color: #34d399;">Step 1:</strong> Log in to your account at <a href="${PORTAL_URL}" style="color: #38bdf8;">${PORTAL_URL}</a> using your registered email (<code>${email}</code>).
+          <strong style="color: #34d399;">Step 1:</strong> Go to <a href="${PORTAL_URL}" style="color: #38bdf8;">${PORTAL_URL}</a> and log in using your email (<code>${email}</code>) and temporary password (<code>${password}</code>).
         </div>
         <div class="step-box">
           <strong style="color: #34d399;">Step 2:</strong> Toggle your <strong>Queue Status</strong> to <strong>Online</strong> in your top dashboard banner.

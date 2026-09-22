@@ -1433,7 +1433,8 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
     hourlyRate: finalHourlyRate,
     minuteRate: finalMinuteRate,
     monthlySalary: finalMonthlySalary,
-    employmentType: finalType
+    employmentType: finalType,
+    password: passwordToSet
   }).catch(err => console.error('[Email Dispatch Error]', err.message));
 
   res.json({
