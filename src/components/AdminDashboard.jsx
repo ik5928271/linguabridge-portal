@@ -52,6 +52,7 @@ import {
 } from 'lucide-react';
 import { getSocket } from '../services/socket';
 import ALL_SEED_APPLICATIONS from '../data/all_seed_applications.json';
+import ALL_SEED_INQUIRIES from '../data/all_seed_inquiries.json';
 import { SHIFT_WINDOWS, SPECIALTY_DOMAINS, HARDWARE_STANDARDS, LANGUAGES } from '../data/mockData';
 
 
@@ -279,7 +280,9 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   const [docPreviewModal, setDocPreviewModal] = useState(null);
 
   // Inquiries & Support Messages Box State
-  const [inquiriesList, setInquiriesList] = useState([]);
+  const [inquiriesList, setInquiriesList] = useState(() => {
+    return Array.isArray(ALL_SEED_INQUIRIES) ? ALL_SEED_INQUIRIES : [];
+  });
   const [inquiryFilter, setInquiryFilter] = useState('all'); // 'all', 'new', 'client', 'interpreter', 'resolved'
   const [inquirySearchTerm, setInquirySearchTerm] = useState('');
   const [selectedInquiryId, setSelectedInquiryId] = useState(null);
@@ -398,7 +401,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
     fetch('/api/inquiries')
       .then(res => res.json())
       .then(data => {
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && data.length > 0) {
           setInquiriesList(data);
         }
       })

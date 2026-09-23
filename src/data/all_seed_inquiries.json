@@ -1,0 +1,301 @@
+[
+  {
+    "id": "inq-seed-2",
+    "adminReply": "",
+    "category": "Interpreter Onboarding",
+    "createdAt": "2026-09-22T06:45:10.452Z",
+    "message": "Hello IK Enterprises admin, I submitted my Propio training certificate. I am available for Russian/English VRI/OPI live talk shifts. Please let me know when my profile will be live for dispatch.",
+    "messages": [
+      {
+        "sender": "user",
+        "text": "Hello IK Enterprises admin, I submitted my Propio training certificate. I am available for Russian/English VRI/OPI live talk shifts. Please let me know when my profile will be live for dispatch.",
+        "time": "02:30 PM"
+      }
+    ],
+    "status": "new",
+    "subject": "Propio Training Certificate & Live Talk Availability",
+    "userEmail": "lkhirevich@gmail.com",
+    "userName": "Elizaveta Khirevich",
+    "userRole": "interpreter",
+    "updatedAt": "2026-09-14T10:19:28.463Z"
+  },
+  {
+    "id": "inq-mtyq73cw-572",
+    "adminReply": "",
+    "category": "Rates & Custom Proposals",
+    "createdAt": "2026-09-12T18:35:48.800Z",
+    "message": "Visitor submitted contact details via LinguaBot AI widget.\nName: IK Enterprises\nEmail: ik5928271@gmail.com\nPhone/WhatsApp: +923224574475\nRecent Question: \"Pricing / General Inquiry\"",
+    "messages": [
+      {
+        "id": "msg-welcome",
+        "sender": "bot",
+        "text": "Hello! 👋 Welcome to **LinguaBridge 3-Way Interpretation Network** (powered by IK Enterprises).\n\nTo connect you with Admin Dispatch, prepare custom rate proposals, or assist with interpreter onboarding, **please enter your Name and Contact Details below to start our chat:**",
+        "time": "23:35",
+        "category": "welcome"
+      }
+    ],
+    "status": "new",
+    "subject": "⚡ Direct Lead / Rate Request from IK Enterprises",
+    "userEmail": "iksale9817@gmail.com",
+    "userName": "IK Enterprises",
+    "userPhone": "+923224574475",
+    "userRole": "host"
+  },
+  {
+    "id": "inq-chat-mtzl5jo6-remd",
+    "adminReply": "",
+    "category": "AI Concierge & Live Chat",
+    "createdAt": "2026-09-13T09:06:21.566Z",
+    "message": "i want to edit my language",
+    "messages": [
+      {
+        "id": "msg-welcome",
+        "sender": "bot",
+        "text": "Hello **Rohim Ullah**! 👋 I'm **LinguaBot**, your 24/7 AI Concierge for the **LinguaBridge 3-Way Interpretation Network** (powered by IK Enterprises).\n\nHow can I help you today? You can ask me about our **live 3-way calling protocols, client workflows, interpreter profile creation, 150+ supported languages**, or submit an inquiry directly to Admin Dispatch!",
+        "time": "03:02 PM",
+        "category": "welcome"
+      },
+      {
+        "id": "msg-usr-1789290377947",
+        "sender": "user",
+        "text": "i want to edit my language",
+        "time": "03:06 PM"
+      },
+      {
+        "id": "msg-bot-1789290378549",
+        "sender": "bot",
+        "text": "Thank you for your question! LinguaBridge is an enterprise on-demand 3-way interpretation portal bridging Doctors, Patients, and Certified Interpreters in 150+ languages.\n\n* **Workflows & 3-Way Calling**: Learn how instant calls, guest invites, and scheduled appointments operate.\n* **Protocols & Ethics**: Learn about clinical and court interpretation standards.\n* **Profile Setup**: Step-by-step guidance for interpreter applications and document uploads.\n* **Rates & Inquiries**: Pricing and compensation are provided separately by Admin Dispatch:\n  - 🏥 **For Clients**: `iksale9817@gmail.com`\n  - 🗣️ **For Interpreters**: `iksale9815@gmail.com`\n\n👇 **Please share your contact details below if you would like Admin Dispatch to reach out directly!**",
+        "time": "03:06 PM"
+      }
+    ],
+    "status": "new",
+    "subject": "💬 Live Guest Chat: \"i want to edit my language\"",
+    "updatedAt": "2026-09-13T09:06:21.566Z",
+    "userEmail": "rohim6360ba.en@gmail.com",
+    "userName": "Rohim Ullah",
+    "userPhone": "",
+    "userRole": "interpreter"
+  },
+  {
+    "id": "inq-chat-mtzt50lh-u0cy",
+    "adminReply": "",
+    "category": "AI Concierge & Live Chat",
+    "createdAt": "2026-09-13T12:46:22.139Z",
+    "message": "what are my language pairs?",
+    "messages": [
+      {
+        "id": "msg-welcome",
+        "sender": "bot",
+        "text": "Hello **Client / Payer Account**! 👋 I'm **LinguaBot**, your 24/7 AI Concierge for the **LinguaBridge 3-Way Interpretation Network** (powered by IK Enterprises).\n\nHow can I help you today? You can ask me about our **live 3-way calling protocols, client workflows, interpreter profile creation, 150+ supported languages**, or submit an inquiry directly to Admin Dispatch!",
+        "time": "08:45 AM",
+        "category": "welcome"
+      },
+      {
+        "id": "msg-usr-1789303579154",
+        "sender": "user",
+        "text": "what are my language pairs?",
+        "time": "08:46 AM"
+      },
+      {
+        "id": "msg-bot-1789303579761",
+        "sender": "bot",
+        "text": "Thank you for your question! LinguaBridge is an enterprise on-demand 3-way interpretation portal bridging Doctors, Patients, and Certified Interpreters in 150+ languages.\n\n* **Workflows & 3-Way Calling**: Learn how instant calls, guest invites, and scheduled appointments operate.\n* **Protocols & Ethics**: Learn about clinical and court interpretation standards.\n* **Profile Setup**: Step-by-step guidance for interpreter applications and document uploads.\n* **Rates & Inquiries**: Pricing and compensation are provided separately by Admin Dispatch:\n  - 🏥 **For Clients**: `iksale9817@gmail.com`\n  - 🗣️ **For Interpreters**: `iksale9815@gmail.com`\n\n👇 **Please share your contact details below if you would like Admin Dispatch to reach out directly!**",
+        "time": "08:46 AM"
+      }
+    ],
+    "status": "new",
+    "subject": "💬 Live Guest Chat: \"what are my language pairs?\"",
+    "updatedAt": "2026-09-13T12:46:22.139Z",
+    "userEmail": "talhakhan334546@gmail.com",
+    "userName": "Client / Payer Account",
+    "userPhone": "",
+    "userRole": "interpreter"
+  },
+  {
+    "id": "inq-mtzt9ekc-o39",
+    "adminReply": "",
+    "category": "Interpreter Profile & Onboarding",
+    "createdAt": "2026-09-13T12:49:21.660Z",
+    "message": "please look into this matter,how can I get credentials for logging in.",
+    "messages": [
+      {
+        "sender": "user",
+        "text": "please look into this matter,how can I get credentials for logging in.",
+        "time": "08:49 AM"
+      }
+    ],
+    "status": "new",
+    "subject": "I COMPLETED MY PROFILE.",
+    "updatedAt": "2026-09-13T12:49:21.660Z",
+    "userEmail": "talhakhan334546@gmail.com",
+    "userName": "Muhammad Talha Khan",
+    "userPhone": "",
+    "userRole": "interpreter"
+  },
+  {
+    "id": "inq-seed-3",
+    "adminReply": "",
+    "category": "Shift Scheduling",
+    "createdAt": "2026-09-22T02:45:10.452Z",
+    "message": "Greetings Administration, I submitted my application for Pashto, Urdu, and Hindi OPI/VRI interpretation. I can commit to 9 hours daily fixed shift in PKT timezone. Looking forward to verification.",
+    "messages": [
+      {
+        "sender": "user",
+        "text": "Greetings Administration, I submitted my application for Pashto, Urdu, and Hindi OPI/VRI interpretation. I can commit to 9 hours daily fixed shift in PKT timezone. Looking forward to verification.",
+        "time": "11:45 AM"
+      }
+    ],
+    "status": "new",
+    "subject": "Pashto / Urdu / Hindi Shift Availability Confirmation",
+    "userEmail": "talhakhan.interpreter@gmail.com",
+    "userName": "Muhammad Talha Khan",
+    "userRole": "interpreter"
+  },
+  {
+    "id": "inq-chat-mudmvt8a-fv78",
+    "adminReply": "",
+    "category": "AI Concierge & Live Chat",
+    "createdAt": "2026-09-23T05:01:45.536Z",
+    "message": "does Rohingya language has any calls",
+    "messages": [
+      {
+        "id": "msg-welcome",
+        "sender": "bot",
+        "text": "Hello **Rohim Ullah**! 👋 I'm **LinguaBot**, your 24/7 AI Concierge for the **LinguaBridge 3-Way Interpretation Network** (powered by IK Enterprises).\n\nHow can I help you today? You can ask me about our **live 3-way calling protocols, client workflows, interpreter profile creation, 150+ supported languages**, or submit an inquiry directly to Admin Dispatch!",
+        "time": "10:59 AM",
+        "category": "welcome"
+      },
+      {
+        "id": "msg-usr-1790139700992",
+        "sender": "user",
+        "text": "How does the 3-way conference calling work for doctor, patient, and interpreter?",
+        "time": "11:01 AM"
+      },
+      {
+        "id": "msg-bot-1790139701594",
+        "sender": "bot",
+        "text": "### 📞 How LinguaBridge 3-Way Calling Works:\n1. **Host Initiates**: The Host (e.g. Doctor, Attorney, or Customer Rep) selects their target language (e.g. Spanish, Russian, Arabic) and specialty.\n2. **Instant Match**: The system connects a verified, certified live interpreter into the encrypted WebRTC room in **under 15 seconds**.\n3. **Patient / Client Joins**: The host clicks **\"Invite Patient\"** to send an instant SMS or copy a direct guest join link. The third party joins on any phone or browser with zero downloads required!\n4. **Live Audio/Video**: Everyone communicates with crystal-clear 3-way simultaneous audio, video toggle, and live terminology glossary aids.",
+        "time": "11:01 AM"
+      },
+      {
+        "id": "msg-usr-1790139780483",
+        "sender": "user",
+        "text": "does Rohingya language has any calls",
+        "time": "11:03 AM"
+      },
+      {
+        "id": "msg-bot-1790139781085",
+        "sender": "bot",
+        "text": "Thank you for your question! LinguaBridge is an enterprise on-demand 3-way interpretation portal bridging Doctors, Patients, and Certified Interpreters in 150+ languages.\n\n* **Workflows & 3-Way Calling**: Learn how instant calls, guest invites, and scheduled appointments operate.\n* **Protocols & Ethics**: Learn about clinical and court interpretation standards.\n* **Profile Setup**: Step-by-step guidance for interpreter applications and document uploads.\n* **Rates & Inquiries**: Pricing and compensation are provided separately by Admin Dispatch:\n  - 🏥 **For Clients**: `iksale9817@gmail.com`\n  - 🗣️ **For Interpreters**: `iksale9815@gmail.com`\n\n👇 **Please share your contact details below if you would like Admin Dispatch to reach out directly!**",
+        "time": "11:03 AM"
+      }
+    ],
+    "status": "new",
+    "subject": "💬 Live Guest Chat: \"does Rohingya language has any calls\"",
+    "updatedAt": "2026-09-23T05:03:05.066Z",
+    "userEmail": "rohim6360ba.en@gmail.com",
+    "userName": "Rohim Ullah",
+    "userPhone": "",
+    "userRole": "interpreter"
+  },
+  {
+    "id": "inq-chat-mue2r0n7-b78j",
+    "adminReply": "",
+    "category": "AI Concierge & Live Chat",
+    "createdAt": "2026-09-23T12:34:15.699Z",
+    "message": "Dear IK Enterprises Administration,  I hope you are doing well.  I am trying to apply for an interpreter position, but I received a message stating that an interpreter application for my email address is already on file and is currently in the review queue.  Could you please confirm the status of my existing application and let me know if I need to take any further action?  Thank you for your assistance. I look forward to hearing from you.",
+    "messages": [
+      {
+        "id": "msg-welcome",
+        "sender": "bot",
+        "text": "Hello! 👋 Welcome to **LinguaBridge 3-Way Interpretation Network** (powered by IK Enterprises).\n\nTo connect you with Admin Dispatch, prepare custom rate proposals, or assist with interpreter onboarding, **please enter your Name and Contact Details below to start our chat:**",
+        "time": "15:23",
+        "category": "welcome"
+      },
+      {
+        "id": "msg-confirm-1790166855695",
+        "sender": "bot",
+        "text": "✅ **Thank you, Aya Mokhtar Mostafa Hussain!**\n\nYour contact details have been successfully transmitted to the **IK Enterprises Admin Dispatch** team. We will review your inquiry regarding *\"Pricing / General Inquiry\"* and reach out to you directly at **ayamokhtar912@gmail.com** / **+201201555764** with your customized rate proposal!",
+        "time": "15:34"
+      },
+      {
+        "id": "msg-usr-1790166918670",
+        "sender": "user",
+        "text": "Dear IK Enterprises Administration,  I hope you are doing well.  I am trying to apply for an interpreter position, but I received a message stating that an interpreter application for my email address is already on file and is currently in the review queue.  Could you please confirm the status of my existing application and let me know if I need to take any further action?  Thank you for your assistance. I look forward to hearing from you.",
+        "time": "15:35"
+      },
+      {
+        "id": "msg-bot-1790166919273",
+        "sender": "bot",
+        "text": "### 👤 Interpreter Profile Setup & Onboarding:\n1. Click **\"Apply as Interpreter\"** on the top navigation bar.\n2. **Personal & Contact Info**: Enter your full name, email, phone number, and country.\n3. **Working Language Pairs**: Select your primary and secondary language pairs (e.g. English ⟷ Russian, Spanish, Arabic, Urdu, etc.).\n4. **Specialties & Certifications**: Select your areas of expertise (Medical, Legal, Immigration) and list your professional credentials.\n5. **Attach Verification Files**:\n   * **CV / Resume** (PDF/DOCX)\n   * **Training / Credential Certificate** (such as **Propio Healthcare Training**, CCHI/NBCMI, Court Certification, or Diploma).\n6. **Review & Approval**: Our **IK Enterprises Verification Board** reviews your application and documents. Once approved, your certified portal account is activated with your separate compensation schedule!\n📧 **Interpreter Onboarding Support**: `iksale9815@gmail.com`",
+        "time": "15:35"
+      }
+    ],
+    "status": "new",
+    "subject": "💬 Live Guest Chat: \"Dear IK Enterprises Administration,  I h...\"",
+    "updatedAt": "2026-09-23T12:35:19.554Z",
+    "userEmail": "ayamokhtar912@gmail.com",
+    "userName": "Aya Mokhtar Mostafa Hussain",
+    "userPhone": "+201201555764",
+    "userRole": "host"
+  },
+  {
+    "id": "inq-chat-muednpjm-7js4",
+    "adminReply": "",
+    "category": "AI Concierge & Live Chat",
+    "createdAt": "2026-09-23T17:32:30.336Z",
+    "message": "any body here???",
+    "messages": [
+      {
+        "id": "msg-welcome",
+        "sender": "bot",
+        "text": "Hello! 👋 Welcome to **LinguaBridge 3-Way Interpretation Network** (powered by IK Enterprises).\n\nTo connect you with Admin Dispatch, prepare custom rate proposals, or assist with interpreter onboarding, **please enter your Name and Contact Details below to start our chat:**",
+        "time": "22:29",
+        "category": "welcome"
+      },
+      {
+        "id": "msg-usr-1790184747997",
+        "sender": "user",
+        "text": "hi, how are you?",
+        "time": "22:32"
+      },
+      {
+        "id": "msg-bot-1790184748600",
+        "sender": "bot",
+        "text": "Thank you for your question! LinguaBridge is an enterprise on-demand 3-way interpretation portal bridging Doctors, Patients, and Certified Interpreters in 150+ languages.\n\n* **Workflows & 3-Way Calling**: Learn how instant calls, guest invites, and scheduled appointments operate.\n* **Protocols & Ethics**: Learn about clinical and court interpretation standards.\n* **Profile Setup**: Step-by-step guidance for interpreter applications and document uploads.\n* **Rates & Inquiries**: Pricing and compensation are provided separately by Admin Dispatch:\n  - 🏥 **For Clients**: `iksale9817@gmail.com`\n  - 🗣️ **For Interpreters**: `iksale9815@gmail.com`\n\n👇 **Please share your contact details below if you would like Admin Dispatch to reach out directly!**",
+        "time": "22:32"
+      },
+      {
+        "id": "msg-usr-1790184774163",
+        "sender": "user",
+        "text": "hello",
+        "time": "22:32"
+      },
+      {
+        "id": "msg-bot-1790184774769",
+        "sender": "bot",
+        "text": "Thank you for your question! LinguaBridge is an enterprise on-demand 3-way interpretation portal bridging Doctors, Patients, and Certified Interpreters in 150+ languages.\n\n* **Workflows & 3-Way Calling**: Learn how instant calls, guest invites, and scheduled appointments operate.\n* **Protocols & Ethics**: Learn about clinical and court interpretation standards.\n* **Profile Setup**: Step-by-step guidance for interpreter applications and document uploads.\n* **Rates & Inquiries**: Pricing and compensation are provided separately by Admin Dispatch:\n  - 🏥 **For Clients**: `iksale9817@gmail.com`\n  - 🗣️ **For Interpreters**: `iksale9815@gmail.com`\n\n👇 **Please share your contact details below if you would like Admin Dispatch to reach out directly!**",
+        "time": "22:32"
+      },
+      {
+        "id": "msg-usr-1790184781522",
+        "sender": "user",
+        "text": "any body here???",
+        "time": "22:33"
+      },
+      {
+        "id": "msg-bot-1790184782126",
+        "sender": "bot",
+        "text": "Thank you for your question! LinguaBridge is an enterprise on-demand 3-way interpretation portal bridging Doctors, Patients, and Certified Interpreters in 150+ languages.\n\n* **Workflows & 3-Way Calling**: Learn how instant calls, guest invites, and scheduled appointments operate.\n* **Protocols & Ethics**: Learn about clinical and court interpretation standards.\n* **Profile Setup**: Step-by-step guidance for interpreter applications and document uploads.\n* **Rates & Inquiries**: Pricing and compensation are provided separately by Admin Dispatch:\n  - 🏥 **For Clients**: `iksale9817@gmail.com`\n  - 🗣️ **For Interpreters**: `iksale9815@gmail.com`\n\n👇 **Please share your contact details below if you would like Admin Dispatch to reach out directly!**",
+        "time": "22:33"
+      }
+    ],
+    "status": "resolved",
+    "subject": "💬 Live Guest Chat: \"any body here???\"",
+    "updatedAt": "2026-09-23T17:39:13.125Z",
+    "userEmail": "ik5928271@gmail.com",
+    "userName": "Ikram-ul-haq Mian",
+    "userPhone": "",
+    "userRole": "admin"
+  }
+]
