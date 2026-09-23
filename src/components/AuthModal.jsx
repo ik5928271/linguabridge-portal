@@ -14,7 +14,9 @@ import {
   Zap,
   Users,
   Award,
-  Globe
+  Globe,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 export default function AuthModal({ 
@@ -37,6 +39,7 @@ export default function AuthModal({
   // Sign in form state
   const [signInEmail, setSignInEmail] = useState('');
   const [signInPassword, setSignInPassword] = useState('');
+  const [showSignInPassword, setShowSignInPassword] = useState(false);
   const [signInError, setSignInError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -46,6 +49,7 @@ export default function AuthModal({
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [showSignUpPassword, setShowSignUpPassword] = useState(false);
   const [signUpError, setSignUpError] = useState('');
 
   // Forgot Password / Credential Recovery State
@@ -335,13 +339,21 @@ export default function AuthModal({
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
-                    type="password"
+                    type={showSignInPassword ? "text" : "password"}
                     required
                     value={signInPassword}
                     onChange={(e) => setSignInPassword(e.target.value)}
                     placeholder="••••••••••••"
-                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition"
+                    className="w-full pl-10 pr-11 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition font-mono tracking-wide"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowSignInPassword(!showSignInPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition cursor-pointer p-1"
+                    title={showSignInPassword ? "Hide password" : "Show password"}
+                  >
+                    {showSignInPassword ? <EyeOff className="w-4 h-4 text-brand-400" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
 
@@ -615,13 +627,21 @@ export default function AuthModal({
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
-                      type="password"
+                      type={showSignUpPassword ? "text" : "password"}
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••••••"
-                      className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-brand-500"
+                      className="w-full pl-9 pr-9 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-brand-500 font-mono"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowSignUpPassword(!showSignUpPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition cursor-pointer p-0.5"
+                      title={showSignUpPassword ? "Hide password" : "Show password"}
+                    >
+                      {showSignUpPassword ? <EyeOff className="w-3.5 h-3.5 text-brand-400" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
                   </div>
                 </div>
               </div>

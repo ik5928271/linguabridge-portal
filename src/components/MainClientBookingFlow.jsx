@@ -74,9 +74,16 @@ export default function MainClientBookingFlow({
   const [selectedInterpreter, setSelectedInterpreter] = useState(null);
   const [is100LangModalOpen, setIs100LangModalOpen] = useState(false);
   const [lang100Search, setLang100Search] = useState('');
+  const [onlinePresence, setOnlinePresence] = useState({
+    total: 0,
+    users: [],
+    interpreters: [],
+    clients: [],
+    admins: []
+  });
 
   // Fetch real registered interpreters from database
-  useEffect(() => {
+  const fetchInterpreters = () => {
     fetch('/api/interpreters')
       .then(res => res.json())
       .then(data => {
@@ -95,7 +102,60 @@ export default function MainClientBookingFlow({
         }
       })
       .catch(() => {});
+  };
+
+  // Fetch live online presence
+  const fetchOnlinePresence = () => {
+    fetch('/api/admin/online-presence')
+      .then(r => r.json())
+      .then(data => {
+        if (data && Array.isArray(data.users)) {
+          setOnlinePresence(data);
+        }
+      })
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    fetchInterpreters();
+    fetchOnlinePresence();
+
+    const socket = getSocket();
+    let handlePresenceUpdate;
+    if (socket) {
+      handlePresenceUpdate = (presence) => {
+        if (presence && Array.isArray(presence.users)) {
+          setOnlinePresence(presence);
+        }
+      };
+      socket.on('online-presence-updated', handlePresenceUpdate);
+    }
+
+    const interval = setInterval(() => {
+      fetchInterpreters();
+      fetchOnlinePresence();
+    }, 6000);
+
+    return () => {
+      clearInterval(interval);
+      if (socket && handlePresenceUpdate) {
+        socket.off('online-presence-updated', handlePresenceUpdate);
+      }
+    };
   }, []);
+
+  // Helper to determine if an interpreter is currently online via active socket connection
+  const isInterpreterOnline = (interp) => {
+    if (!interp) return false;
+    const isSocketOnline = (onlinePresence.interpreters || []).some(
+      op => (op.userId && (op.userId === interp.id || op.userId === interp.userId)) ||
+            (op.email && interp.email && op.email.toLowerCase() === interp.email.toLowerCase())
+    );
+    return isSocketOnline;
+  };
+
+  // Active online interpreters list
+  const onlineInterpreters = realInterpreters.filter(isInterpreterOnline);
 
   // Filter registered interpreters for selected language
   const availableInterpreters = realInterpreters.filter(i => {
@@ -108,11 +168,13 @@ export default function MainClientBookingFlow({
            allLangs.some(l => l === lang || l.includes(lang) || lang.includes(l));
   });
 
-  // Helper to count available interpreters for any language in real time
+  const onlineAvailableInterpreters = availableInterpreters.filter(isInterpreterOnline);
+
+  // Helper to count ONLY ONLINE interpreters for any language in real time
   const getInterpreterCountForLang = (langName) => {
     if (!langName) return 0;
     const target = langName.toLowerCase().trim();
-    return realInterpreters.filter(i => {
+    return onlineInterpreters.filter(i => {
       const pLang = (i.primaryLang || '').toLowerCase().trim();
       const allLangs = Array.isArray(i.languages) 
         ? i.languages.map(l => (typeof l === 'string' ? l : l?.name || '').toLowerCase().trim()) 
@@ -122,16 +184,20 @@ export default function MainClientBookingFlow({
     }).length;
   };
 
-  // Keep selected interpreter in sync
+  // Keep selected interpreter in sync (prioritize online interpreter first)
   useEffect(() => {
-    if (availableInterpreters.length > 0) {
+    if (onlineAvailableInterpreters.length > 0) {
+      if (!selectedInterpreter || !onlineAvailableInterpreters.some(i => i.id === selectedInterpreter.id)) {
+        setSelectedInterpreter(onlineAvailableInterpreters[0]);
+      }
+    } else if (availableInterpreters.length > 0) {
       if (!selectedInterpreter || !availableInterpreters.some(i => i.id === selectedInterpreter.id)) {
         setSelectedInterpreter(availableInterpreters[0]);
       }
     } else {
       setSelectedInterpreter(null);
     }
-  }, [selectedLanguage, realInterpreters]);
+  }, [selectedLanguage, realInterpreters, onlinePresence]);
 
   // Auto-scroll to top smoothly whenever the step changes so user view is never stuck or cut off
   useEffect(() => {
@@ -582,7 +648,7 @@ END:VCALENDAR`;
                       {count > 0 ? (
                         <span className="flex items-center gap-1.5 text-emerald-400 font-bold truncate">
                           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                          <span>{count} {count === 1 ? 'Interpreter Available' : 'Interpreters Available'}</span>
+                          <span>{count} {count === 1 ? 'Online Interpreter' : 'Online Interpreters'}</span>
                         </span>
                       ) : (
                         <span className="flex items-center gap-1.5 text-amber-400/90 font-medium truncate">
@@ -628,7 +694,7 @@ END:VCALENDAR`;
                         customCount > 0 ? (
                           <span className="flex items-center gap-1.5 text-emerald-400 font-bold truncate">
                             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                            <span>{customCount} {customCount === 1 ? 'Interpreter' : 'Interpreters'} Available</span>
+                            <span>{customCount} {customCount === 1 ? 'Online Interpreter' : 'Online Interpreters'}</span>
                           </span>
                         ) : (
                           <span className="flex items-center gap-1.5 text-amber-400/90 font-medium truncate">
@@ -647,13 +713,13 @@ END:VCALENDAR`;
               })()}
             </div>
 
-            {/* Warning banner if selected language currently has 0 interpreters */}
+            {/* Warning banner if selected language currently has 0 online interpreters */}
             {getInterpreterCountForLang(selectedLanguage) === 0 && (
               <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2.5 mt-2">
                 <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-bold text-amber-200">
-                    We don't have an active interpreter for {selectedLanguage} right now
+                    No interpreter is currently online for {selectedLanguage}
                   </p>
                   <p className="text-[11px] text-amber-300/80 mt-0.5">
                     You can still schedule your appointment in advance. Our admin dispatch team will assign a certified {selectedLanguage} linguist before your session begins.
@@ -1666,7 +1732,7 @@ END:VCALENDAR`;
                         {count > 0 ? (
                           <span className="text-emerald-400 font-bold flex items-center gap-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                            <span>{count} Available</span>
+                            <span>{count} Online</span>
                           </span>
                         ) : (
                           <span className="text-amber-400/90 font-medium flex items-center gap-1">

@@ -185,6 +185,24 @@ export default function App() {
     }
   }, []);
 
+  // Sync user presence with socket server
+  useEffect(() => {
+    const socket = getSocket();
+    if (socket && currentUser) {
+      socket.emit('register-user', {
+        userId: currentUser.id,
+        role: currentUser.role || (currentRole === 'host' ? 'host' : currentRole),
+        name: currentUser.name,
+        email: currentUser.email,
+        language: currentUser.primaryLang || currentUser.language || 'English',
+        org: currentUser.org || '',
+        specialty: currentUser.specialty || '',
+        badgeNumber: currentUser.badgeNumber || '',
+        phone: currentUser.phone || ''
+      });
+    }
+  }, [currentUser, currentRole]);
+
   // Read URL query parameters for direct guest join links (e.g. ?view=guest&roomId=xyz&lang=es)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
