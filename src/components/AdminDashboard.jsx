@@ -851,10 +851,24 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
     return matchesSearch;
   });
 
-  // Dynamic aggregation of all languages available in the applications queue
+  // Filter applications by current status & shift tab to drive dynamic language badge counts
+  const currentTabApplications = React.useMemo(() => {
+    return resolvedApplications.filter(app => {
+      const matchesStatus = appFilter === 'all' || app.status === appFilter;
+      let matchesShift = true;
+      if (shiftFilter === 'on_call') {
+        matchesShift = Boolean(app.emergencyOnCall);
+      } else if (shiftFilter !== 'all') {
+        matchesShift = Array.isArray(app.shiftWindows) && app.shiftWindows.includes(shiftFilter);
+      }
+      return matchesStatus && matchesShift;
+    });
+  }, [resolvedApplications, appFilter, shiftFilter]);
+
+  // Dynamic aggregation of all languages available in the current active view queue
   const applicationLanguages = React.useMemo(() => {
     const counts = {};
-    resolvedApplications.forEach(app => {
+    currentTabApplications.forEach(app => {
       const langs = new Set();
       if (app.primaryLang && app.primaryLang !== 'English') {
         langs.add(app.primaryLang);
@@ -879,7 +893,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
           flag: match ? match.flag : '🌐'
         };
       });
-  }, [resolvedApplications]);
+  }, [currentTabApplications]);
 
   const filteredApplications = resolvedApplications.filter(app => {
     const q = searchTerm.toLowerCase().trim();
@@ -1524,7 +1538,7 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                     : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
                 }`}
               >
-                All Languages ({applications.length})
+                All Languages ({currentTabApplications.length})
               </button>
 
               {/* Top Applied Languages as Quick-Select Pills */}
