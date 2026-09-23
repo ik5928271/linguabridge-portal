@@ -119,7 +119,18 @@ try {
 }
 
 
-const SEED_INQUIRIES = [];
+// Permanent Seed Inquiries (Preserved across all deployments & container restarts)
+let SEED_INQUIRIES = [];
+try {
+  const seedInqsPath = path.join(process.cwd(), 'server', 'seed_inquiries.json');
+  const fallbackInqsPath = path.join(process.cwd(), 'seed_inquiries.json');
+  const targetInqsPath = fs.existsSync(seedInqsPath) ? seedInqsPath : (fs.existsSync(fallbackInqsPath) ? fallbackInqsPath : null);
+  if (targetInqsPath) {
+    SEED_INQUIRIES = JSON.parse(fs.readFileSync(targetInqsPath, 'utf8'));
+  }
+} catch (e) {
+  console.warn('Could not read seed_inquiries.json:', e.message);
+}
 
 // Initial State Structure
 let store = {
@@ -278,12 +289,20 @@ async function initMongo() {
 
     // Sync Inquiries & Support Tickets from MongoDB
     const mongoInquiries = await db.collection('inquiries').find({}).toArray();
+    const mergedInquiries = [...store.inquiries];
     if (mongoInquiries.length > 0) {
-      store.inquiries = mongoInquiries.map(({ _id, ...inq }) => inq);
-    } else {
-      for (const inq of store.inquiries) {
-        await db.collection('inquiries').updateOne({ id: inq.id }, { $set: inq }, { upsert: true }).catch(() => {});
-      }
+      mongoInquiries.forEach(({ _id, ...mInq }) => {
+        const existingIdx = mergedInquiries.findIndex(i => i.id === mInq.id);
+        if (existingIdx >= 0) {
+          mergedInquiries[existingIdx] = { ...mergedInquiries[existingIdx], ...mInq };
+        } else {
+          mergedInquiries.unshift(mInq);
+        }
+      });
+    }
+    store.inquiries = mergedInquiries;
+    for (const inq of store.inquiries) {
+      await db.collection('inquiries').updateOne({ id: inq.id }, { $set: inq }, { upsert: true }).catch(() => {});
     }
 
     // Sync Payment Receipts from MongoDB
@@ -1580,7 +1599,27 @@ app.delete('/api/admin/interpreter-applications/:id', async (req, res) => {
 // ==========================================
 
 // 1. Get all inquiries & support conversations
-app.get('/api/inquiries', (req, res) => {
+app.get('/api/inquiries', async (req, res) => {
+  try {
+    if (db) {
+      const mongoInquiries = await db.collection('inquiries').find({}).toArray();
+      if (mongoInquiries && mongoInquiries.length > 0) {
+        const cleanInqs = mongoInquiries.map(({ _id, ...inq }) => inq);
+        const merged = [...(store.inquiries || [])];
+        cleanInqs.forEach(mInq => {
+          const idx = merged.findIndex(i => i.id === mInq.id);
+          if (idx >= 0) {
+            merged[idx] = { ...merged[idx], ...mInq };
+          } else {
+            merged.unshift(mInq);
+          }
+        });
+        store.inquiries = merged;
+      }
+    }
+  } catch (err) {
+    console.warn('MongoDB inquiry fetch warning:', err.message);
+  }
   res.json(store.inquiries || []);
 });
 
