@@ -10,7 +10,8 @@ import {
   sendInterpreterApplicationReceivedEmail, 
   sendInterpreterApprovedEmail, 
   sendClientWelcomeEmail,
-  sendInquiryReplyEmail
+  sendInquiryReplyEmail,
+  sendPasswordResetEmail
 } from './services/emailService.js';
 
 const app = express();
@@ -1051,6 +1052,89 @@ app.put('/api/admin/users/:id', (req, res) => {
   res.json({ success: true, user, wallet: store.wallets[id], interpreterProfile: interp || null });
 });
 
+// Admin: Dispatch Password Reset / Account Credentials Email
+app.post('/api/admin/users/:id/send-credentials', async (req, res) => {
+  const { id } = req.params;
+  const { newPassword } = req.body;
+
+  const user = store.users.find(u => u.id === id || (u.email && req.body.email && u.email.toLowerCase() === req.body.email.toLowerCase()));
+  if (!user) {
+    return res.status(404).json({ error: 'User account not found' });
+  }
+
+  if (newPassword && newPassword.trim()) {
+    user.password = newPassword.trim();
+    saveStore();
+  }
+
+  const passToSend = user.password || 'interp2026!';
+  const badgeNumber = user.badgeNumber || user.interpreterBadgeId || null;
+
+  try {
+    const emailResult = await sendPasswordResetEmail({
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      password: passToSend,
+      badgeNumber
+    });
+
+    res.json({
+      success: true,
+      message: `Credentials and password recovery email successfully sent to ${user.email}`,
+      email: user.email,
+      password: passToSend,
+      emailResult
+    });
+  } catch (err) {
+    console.error('Error dispatching password recovery email:', err.message);
+    res.status(500).json({ error: 'Failed to send credentials email' });
+  }
+});
+
+// Public: Forgot Password Self-Service Recovery Request
+app.post('/api/auth/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  if (!email || !email.trim()) {
+    return res.status(400).json({ error: 'Email address is required' });
+  }
+
+  const query = email.toLowerCase().trim();
+  const user = store.users.find(u => u.email && u.email.toLowerCase() === query);
+
+  if (!user) {
+    // Return friendly generic message for security
+    return res.json({ 
+      success: true, 
+      message: 'If an active account exists for this email, your login credentials have been dispatched.' 
+    });
+  }
+
+  const passToSend = user.password || 'interp2026!';
+  const badgeNumber = user.badgeNumber || user.interpreterBadgeId || null;
+
+  try {
+    await sendPasswordResetEmail({
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      password: passToSend,
+      badgeNumber
+    });
+
+    res.json({
+      success: true,
+      message: `Account credentials and password recovery instructions have been emailed to ${user.email}.`
+    });
+  } catch (err) {
+    console.error('Error in auth forgot password dispatch:', err.message);
+    res.json({
+      success: true,
+      message: 'If an active account exists for this email, your login credentials have been dispatched.'
+    });
+  }
+});
+
 // Grant / update minutes for any user
 app.post('/api/admin/users/:id/wallet', (req, res) => {
   const { id } = req.params;
@@ -1542,7 +1626,7 @@ app.post('/api/inquiries', (req, res) => {
     createdAt: existingIdx >= 0 ? store.inquiries[existingIdx].createdAt : new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     messages: Array.isArray(messages) && messages.length > 0 ? messages : [
-      { sender: 'user', text: message.trim(), time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
+      { sender: 'user', text: message.trim(), time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), createdAt: new Date().toISOString() }
     ]
   };
 

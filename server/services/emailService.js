@@ -391,3 +391,92 @@ export async function sendInquiryReplyEmail(inquiry, adminReplyText) {
 
   return sendEmail({ to: email, subject, html, text: adminReplyText });
 }
+
+/**
+ * 6. Send Password Recovery / Login Credentials Email
+ */
+export async function sendPasswordResetEmail({ email, name, role, password, badgeNumber }) {
+  if (!email) return { success: false, reason: 'no_email' };
+
+  const resolvedName = name || 'Valued User';
+  const roleLabel = role === 'admin' ? 'Administrator' : role === 'interpreter' ? 'Certified Interpreter' : 'Client / Payer';
+  const passToDisplay = password || 'interp2026!';
+  const subject = `🔐 Your LinguaBridge Account Credentials & Password Recovery`;
+
+  const html = `
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="utf-8">
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b1120; color: #e2e8f0; margin: 0; padding: 24px; }
+      .container { max-width: 600px; margin: 0 auto; background: #0f172a; border: 1px solid #1e293b; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }
+      .header { background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%); padding: 32px 24px; text-align: center; }
+      .header h1 { color: #ffffff; margin: 0; font-size: 24px; font-weight: 800; }
+      .header p { color: #c7d2fe; margin: 6px 0 0 0; font-size: 14px; }
+      .content { padding: 32px 24px; }
+      .credentials-box { background: rgba(15, 23, 42, 0.9); border: 2px solid #3b82f6; border-radius: 14px; padding: 20px; margin: 20px 0; }
+      .btn { display: inline-block; background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%); color: #ffffff !important; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 800; font-size: 14px; text-align: center; margin: 20px 0 10px 0; }
+      .footer { background: #0b1120; padding: 20px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #1e293b; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>LinguaBridge 3-Way Connect</h1>
+        <p>Official Account Security & Password Recovery</p>
+      </div>
+      <div class="content">
+        <h2 style="color: #ffffff; margin-top: 0; font-size: 19px;">Hello ${resolvedName},</h2>
+        <p style="font-size: 14px; line-height: 1.6; color: #cbd5e1;">
+          Here are your official login credentials to access your <strong>${roleLabel}</strong> account on the LinguaBridge platform:
+        </p>
+
+        <div class="credentials-box">
+          <div style="font-size: 12px; font-weight: 800; color: #60a5fa; text-transform: uppercase; margin-bottom: 12px;">
+            🔑 YOUR ACCOUNT LOGIN CREDENTIALS
+          </div>
+          <table style="width: 100%; font-size: 13px; border-collapse: collapse; color: #cbd5e1;">
+            <tr style="border-bottom: 1px solid #334155;">
+              <td style="padding: 8px 0; color: #94a3b8; width: 140px;">Registered Email:</td>
+              <td style="padding: 8px 0; font-weight: bold; color: #ffffff;"><code style="background: #1e293b; padding: 3px 8px; border-radius: 6px; color: #38bdf8;">${email}</code></td>
+            </tr>
+            <tr style="border-bottom: 1px solid #334155;">
+              <td style="padding: 8px 0; color: #94a3b8;">Account Password:</td>
+              <td style="padding: 8px 0; font-weight: bold; color: #fbbf24;"><code style="background: #1e293b; padding: 3px 8px; border-radius: 6px; color: #fbbf24;">${passToDisplay}</code></td>
+            </tr>
+            ${badgeNumber ? `
+            <tr style="border-bottom: 1px solid #334155;">
+              <td style="padding: 8px 0; color: #94a3b8;">Numeric Badge ID:</td>
+              <td style="padding: 8px 0; font-weight: bold; color: #34d399;">#${badgeNumber}</td>
+            </tr>` : ''}
+            <tr style="border-bottom: 1px solid #334155;">
+              <td style="padding: 8px 0; color: #94a3b8;">Account Role:</td>
+              <td style="padding: 8px 0; color: #c084fc; font-weight: bold;">${roleLabel}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #94a3b8;">Portal Web Access:</td>
+              <td style="padding: 8px 0;"><a href="${PORTAL_URL}" style="color: #38bdf8; text-decoration: underline;">${PORTAL_URL}</a></td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="text-align: center;">
+          <a href="${PORTAL_URL}" class="btn">🚀 Log In to Your Account</a>
+        </div>
+
+        <p style="font-size: 12px; color: #94a3b8; margin-top: 20px; line-height: 1.5;">
+          🔒 <strong>Security Tip:</strong> You can change your password anytime after logging in by going to your profile settings. If you did not request this recovery, please contact system administration immediately.
+        </p>
+      </div>
+      <div class="footer">
+        &copy; ${new Date().getFullYear()} LinguaBridge On-Demand Interpretation • IK Enterprises Operations.<br>
+        Support: <a href="mailto:support@linguabridge.com" style="color: #38bdf8;">support@linguabridge.com</a>
+      </div>
+    </div>
+  </body>
+  </html>
+  `;
+
+  return sendEmail({ to: email, subject, html, text: `Hello ${resolvedName},\nYour LinguaBridge Login Email is: ${email}\nYour Password is: ${passToDisplay}\nPortal: ${PORTAL_URL}` });
+}
