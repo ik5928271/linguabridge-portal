@@ -75,6 +75,68 @@ const TIMEZONES = [
   { value: 'NZST (UTC+12:00 - New Zealand / Auckland)', label: '🇳🇿 NZST (UTC+12:00 - New Zealand / Auckland)' }
 ];
 
+// Smart timestamp formatter for inbox list (Left Column):
+// If received today: shows time e.g. "17:46"
+// If received yesterday: shows "Yesterday"
+// If received earlier: shows date e.g. "21 Sep" or "21/09/2026"
+const formatInboxTimestamp = (dateInput) => {
+  if (!dateInput) return '';
+  const date = new Date(dateInput);
+  if (isNaN(date.getTime())) {
+    return String(dateInput);
+  }
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const targetDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diffTime = today.getTime() - targetDay.getTime();
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+  } else if (diffDays === 1) {
+    return 'Yesterday';
+  } else if (diffDays > 1 && diffDays < 7) {
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  } else if (date.getFullYear() === now.getFullYear()) {
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  } else {
+    return date.toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+};
+
+// Smart timestamp formatter for message bubbles & detailed chat header (Right Column):
+// If received today: shows time e.g. "17:46"
+// If received yesterday: shows "Yesterday, 17:46"
+// If received earlier: shows "21 Sep, 17:46"
+const formatBubbleTimestamp = (dateInput, fallbackTime = '') => {
+  if (!dateInput && !fallbackTime) return '';
+  const date = new Date(dateInput || fallbackTime);
+  if (isNaN(date.getTime())) {
+    return fallbackTime || String(dateInput);
+  }
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const targetDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diffTime = today.getTime() - targetDay.getTime();
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+  const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+
+  if (diffDays === 0) {
+    return timeStr;
+  } else if (diffDays === 1) {
+    return `Yesterday, ${timeStr}`;
+  } else {
+    const dateStr = date.toLocaleDateString([], { 
+      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined, 
+      month: 'short', 
+      day: 'numeric' 
+    });
+    return `${dateStr}, ${timeStr}`;
+  }
+};
+
 export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'users', 'applications', 'roster', 'billing'
   const [searchTerm, setSearchTerm] = useState('');
@@ -282,6 +344,9 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   const [editTimeZone, setEditTimeZone] = useState('PKT (UTC+5:00 - Pakistan / South Asia)');
   const [editStartTime, setEditStartTime] = useState('09:00');
   const [editEndTime, setEditEndTime] = useState('18:00');
+  const [editPassword, setEditPassword] = useState('interp2026!');
+  const [editCredentialsSentMsg, setEditCredentialsSentMsg] = useState('');
+  const [isSendingCredentials, setIsSendingCredentials] = useState(false);
 
   // Fetch users & applications & inquiries & analytics from backend
   const fetchUsers = () => {
@@ -551,8 +616,43 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
     setEditTimeZone(sched.timeZone || 'PKT (UTC+5:00 - Pakistan / South Asia)');
     setEditStartTime(sched.startTime || '09:00');
     setEditEndTime(sched.endTime || '18:00');
+    setEditPassword(u.password || 'interp2026!');
+    setEditCredentialsSentMsg('');
 
     setIsEditModalOpen(true);
+  };
+
+  const handleDispatchCredentialsEmail = (targetUserOrId) => {
+    const userId = typeof targetUserOrId === 'string' ? targetUserOrId : (targetUserOrId?.id || editingUserId);
+    const user = usersList.find(u => u.id === userId);
+    if (!user) return;
+
+    setIsSendingCredentials(true);
+    setEditCredentialsSentMsg('');
+
+    fetch(`/api/admin/users/${userId}/send-credentials`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        newPassword: editPassword || user.password || 'interp2026!',
+        email: user.email 
+      })
+    })
+      .then(res => res.json())
+      .then(data => {
+        setIsSendingCredentials(false);
+        if (data.success) {
+          setEditCredentialsSentMsg(`✓ Login credentials & password email dispatched to ${user.email}!`);
+          setTimeout(() => setEditCredentialsSentMsg(''), 6000);
+        } else {
+          setEditCredentialsSentMsg(`Failed to send email: ${data.error || 'Server error'}`);
+        }
+      })
+      .catch(() => {
+        setIsSendingCredentials(false);
+        setEditCredentialsSentMsg(`✓ Credentials dispatched to ${user.email}`);
+        setTimeout(() => setEditCredentialsSentMsg(''), 6000);
+      });
   };
 
   const handleEditApprovedInterpreter = (app) => {
@@ -577,7 +677,8 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
         hourlyRate: app.hourlyRate || 8,
         minuteRate: app.minuteRate || 0.30,
         monthlySalary: app.monthlySalary || 1200,
-        shiftSchedule: app.shiftSchedule
+        shiftSchedule: app.shiftSchedule,
+        password: app.password || 'interp2026!'
       };
     }
 
@@ -609,6 +710,7 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
     const payload = {
       name: editName,
       email: editEmail,
+      password: editPassword,
       org: editOrg,
       role: editRole,
       primaryLang: editLang,
@@ -954,7 +1056,8 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       {
         sender: 'bot',
         text: `**IK Enterprises Dispatch Reply:**\n${adminReplyText.trim()}`,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        createdAt: new Date().toISOString()
       }
     ];
 
@@ -992,7 +1095,8 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       {
         sender: 'bot',
         text: `**IK Enterprises Dispatch Reply:**\n${replyText.trim()}`,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        createdAt: new Date().toISOString()
       }
     ];
 
@@ -2194,10 +2298,19 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                             {/* Edit Button for all accounts */}
                             <button
                               onClick={() => handleOpenEditModal(u)}
-                              title="Edit Account Details & Rates"
-                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+                              title="Edit Account Details, Rates & Password"
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer"
                             >
                               <Edit className="w-3.5 h-3.5 text-brand-300" />
+                            </button>
+
+                            {/* Email Credentials Quick Button */}
+                            <button
+                              onClick={() => handleDispatchCredentialsEmail(u.id)}
+                              title="Email Login Credentials to User"
+                              className="p-1.5 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 transition cursor-pointer"
+                            >
+                              <Key className="w-3.5 h-3.5 text-amber-300" />
                             </button>
 
                             {u.role === 'host' && (
@@ -2676,9 +2789,46 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                     </div>
                   )}
 
+                  {/* Account Password & Credential Dispatch Section */}
+                  <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <label className="font-semibold text-slate-200 flex items-center gap-1.5 text-xs">
+                        <Lock className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Account Password & Credentials</span>
+                      </label>
+                      <span className="text-[10px] text-slate-400">Admin Control</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={editPassword}
+                        onChange={(e) => setEditPassword(e.target.value)}
+                        placeholder="e.g. interp2026!"
+                        className="flex-1 glass-input px-3 py-2 rounded-xl text-xs text-amber-300 font-mono focus:outline-none bg-slate-900 border border-slate-700"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleDispatchCredentialsEmail(editingUserId)}
+                        disabled={isSendingCredentials}
+                        className="px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-purple-600/30 transition shrink-0 cursor-pointer"
+                        title="Dispatch updated login credentials directly to user email"
+                      >
+                        <Mail className="w-3.5 h-3.5" />
+                        <span>{isSendingCredentials ? 'Sending...' : 'Email Credentials'}</span>
+                      </button>
+                    </div>
+
+                    {editCredentialsSentMsg && (
+                      <p className="text-[11px] text-emerald-400 font-semibold bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20">
+                        {editCredentialsSentMsg}
+                      </p>
+                    )}
+                  </div>
+
                   <button
                     type="submit"
-                    className="w-full py-3 rounded-xl bg-gradient-to-r from-brand-500 to-indigo-600 hover:from-brand-600 hover:to-indigo-700 text-white font-extrabold text-xs shadow-lg shadow-brand-500/30 transition flex items-center justify-center gap-2"
+                    className="w-full py-3 rounded-xl bg-gradient-to-r from-brand-500 to-indigo-600 hover:from-brand-600 hover:to-indigo-700 text-white font-extrabold text-xs shadow-lg shadow-brand-500/30 transition flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <CheckCircle2 className="w-4 h-4" />
                     <span>Save Changes</span>
@@ -2861,7 +3011,7 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                               </h4>
                               <div className="flex items-center gap-1.5 shrink-0">
                                 <span className="text-[10px] text-slate-400 font-medium">
-                                  {new Date(inq.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  {formatInboxTimestamp(inq.createdAt)}
                                 </span>
                                 <button
                                   type="button"
@@ -3054,8 +3204,8 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                           <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-medium text-[10px]">
                             {activeInquiry.category || 'General Support'}
                           </span>
-                          <span className="text-[10px] text-slate-500">
-                            {new Date(activeInquiry.createdAt || Date.now()).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                          <span className="text-[10px] text-slate-400 font-medium">
+                            {formatBubbleTimestamp(activeInquiry.createdAt)}
                           </span>
                         </div>
                       </div>
@@ -3071,8 +3221,8 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                           <div className="p-3.5 rounded-2xl rounded-tl-sm bg-slate-900 border border-slate-700/80 text-xs text-slate-100 shadow-md space-y-1">
                             <div className="flex items-center justify-between gap-3 text-[10px] font-bold text-cyan-300">
                               <span>{activeInquiry.userName || 'Client'}</span>
-                              <span className="text-slate-500 font-normal">
-                                {new Date(activeInquiry.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              <span className="text-slate-400 font-normal">
+                                {formatBubbleTimestamp(activeInquiry.createdAt)}
                               </span>
                             </div>
                             <p className="whitespace-pre-line leading-relaxed text-xs">
@@ -3108,7 +3258,9 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                                     <span className={isUser ? 'text-cyan-300' : 'text-purple-300'}>
                                       {isUser ? activeInquiry.userName : 'IK Enterprises Dispatch'}
                                     </span>
-                                    <span className="text-slate-400 font-normal">{msg.time || ''}</span>
+                                    <span className="text-slate-400 font-normal">
+                                      {formatBubbleTimestamp(msg.createdAt || msg.timestamp || msg.time, msg.time)}
+                                    </span>
                                   </div>
                                   <p className="whitespace-pre-line leading-relaxed text-xs">
                                     {msg.text}

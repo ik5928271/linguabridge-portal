@@ -213,7 +213,8 @@ LinguaBridge enforces industry-standard protocols for high-stakes medical, legal
         id: `msg-confirm-${Date.now()}`,
         sender: 'bot',
         text: `✅ **Thank you, ${ticketName.trim()}!**\n\nYour contact details have been successfully transmitted to the **IK Enterprises Admin Dispatch** team. We will review your inquiry regarding *"${lastUserQuery}"* and reach out to you directly at **${ticketEmail.trim()}**${ticketPhone.trim() ? ` / **${ticketPhone.trim()}**` : ''} with your customized rate proposal!`,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        createdAt: new Date().toISOString()
       };
       setMessages(prev => [...prev, confirmBotMsg]);
     } catch {
@@ -238,7 +239,8 @@ LinguaBridge enforces industry-standard protocols for high-stakes medical, legal
       id: `msg-usr-${Date.now()}`,
       sender: 'user',
       text: userText,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      createdAt: new Date().toISOString()
     };
 
     const updatedMessages = [...messages, userMsg];
@@ -253,7 +255,8 @@ LinguaBridge enforces industry-standard protocols for high-stakes medical, legal
         id: `msg-bot-${Date.now()}`,
         sender: 'bot',
         text: botResponseText,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        createdAt: new Date().toISOString()
       };
 
       const finalMessages = [...updatedMessages, botMsg];

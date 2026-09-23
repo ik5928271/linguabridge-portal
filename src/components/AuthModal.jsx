@@ -48,6 +48,36 @@ export default function AuthModal({
   const [password, setPassword] = useState('');
   const [signUpError, setSignUpError] = useState('');
 
+  // Forgot Password / Credential Recovery State
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSuccessMsg, setForgotSuccessMsg] = useState('');
+  const [forgotErrorMsg, setForgotErrorMsg] = useState('');
+  const [isSendingForgot, setIsSendingForgot] = useState(false);
+
+  const handleForgotPasswordSubmit = (e) => {
+    e.preventDefault();
+    if (!forgotEmail.trim()) return;
+
+    setIsSendingForgot(true);
+    setForgotErrorMsg('');
+    setForgotSuccessMsg('');
+
+    fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: forgotEmail.trim() })
+    })
+      .then(res => res.json())
+      .then(data => {
+        setIsSendingForgot(false);
+        setForgotSuccessMsg(data.message || 'If an account exists for this email, your login credentials have been dispatched!');
+      })
+      .catch(() => {
+        setIsSendingForgot(false);
+        setForgotSuccessMsg('If an account exists for this email, your login credentials have been dispatched!');
+      });
+  };
+
   // Helper to get local accounts
   const getLocalAccounts = () => {
     try {
@@ -287,10 +317,21 @@ export default function AuthModal({
 
               {/* Password */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-300 flex items-center justify-between">
-                  <span>Password</span>
-                  <span className="text-[10px] text-slate-400 font-normal">Default: password123</span>
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-300">Password</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForgotEmail(signInEmail || '');
+                      setForgotSuccessMsg('');
+                      setForgotErrorMsg('');
+                      setMode('forgot');
+                    }}
+                    className="text-[11px] font-bold text-brand-400 hover:text-brand-300 transition cursor-pointer"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
@@ -406,6 +447,77 @@ export default function AuthModal({
                   Apply as Interpreter
                 </button>
               </div>
+            </div>
+
+          </div>
+        ) : mode === 'forgot' ? (
+          /* ========================================================================= */
+          /* 3. FORGOT PASSWORD & ACCOUNT RECOVERY SCREEN */
+          /* ========================================================================= */
+          <div className="p-6 sm:p-8 space-y-6">
+            
+            <div className="text-center space-y-2">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-purple-600 text-white shadow-lg shadow-amber-500/25 mx-auto">
+                <Lock className="w-6 h-6" />
+              </div>
+              <h2 className="text-2xl font-black text-white tracking-tight">
+                Account Credentials Recovery
+              </h2>
+              <p className="text-xs text-slate-300 max-w-sm mx-auto leading-relaxed">
+                Enter your registered email address. We will dispatch your official login credentials and password instructions immediately.
+              </p>
+            </div>
+
+            <form onSubmit={handleForgotPasswordSubmit} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-300">
+                  Registered Email Address
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="email"
+                    required
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    placeholder="name@example.com"
+                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition"
+                  />
+                </div>
+              </div>
+
+              {forgotSuccessMsg && (
+                <div className="p-3 bg-emerald-950/50 border border-emerald-500/40 rounded-xl text-emerald-300 text-xs font-medium leading-relaxed">
+                  {forgotSuccessMsg}
+                </div>
+              )}
+
+              {forgotErrorMsg && (
+                <p className="text-xs text-red-400 font-bold bg-red-950/40 p-2.5 rounded-lg border border-red-800/50">
+                  {forgotErrorMsg}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={isSendingForgot}
+                className="w-full py-3.5 px-4 rounded-xl font-black text-sm bg-gradient-to-r from-brand-600 to-purple-600 hover:from-brand-500 hover:to-purple-500 text-white shadow-lg shadow-brand-500/25 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <Mail className="w-4 h-4" />
+                <span>{isSendingForgot ? 'Dispatching Recovery Email...' : 'Send Login Credentials Email'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMode('signin')}
+                className="w-full py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white bg-slate-900 border border-slate-800 transition cursor-pointer"
+              >
+                ← Back to Sign In
+              </button>
+            </form>
+
+            <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400 text-center leading-relaxed">
+              Need immediate emergency help? Contact our dispatch desk at <strong className="text-white">iksale9817@gmail.com</strong> or WhatsApp <strong className="text-emerald-400">+92 331 0009815</strong>.
             </div>
 
           </div>
