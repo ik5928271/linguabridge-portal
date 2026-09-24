@@ -2359,6 +2359,14 @@ io.on('connection', (socket) => {
 
       // Broadcast to other interpreters that this call is taken
       io.emit('call-claimed', { dispatchId });
+
+      const presence = activePresence.get(socket.id);
+      if (presence) {
+        presence.status = 'on_call';
+        presence.inCall = true;
+        presence.activeRoomId = dispatch.roomId;
+        broadcastPresence();
+      }
     }
   });
 
@@ -2367,10 +2375,30 @@ io.on('connection', (socket) => {
     socket.emit('dispatch-dismissed', { dispatchId });
   });
 
+  // Set explicit call status
+  socket.on('set-interpreter-call-status', ({ inCall, roomId }) => {
+    const presence = activePresence.get(socket.id);
+    if (presence) {
+      presence.inCall = !!inCall;
+      presence.status = inCall ? 'on_call' : 'online';
+      presence.activeRoomId = inCall ? roomId : null;
+      broadcastPresence();
+    }
+  });
+
   // Joining a 3-Party Room
   socket.on('join-room', ({ roomId, role, participantName, language, specialty }) => {
     socket.join(roomId);
     socket.currentRoom = roomId;
+
+    // Update real-time presence to on_call
+    const presence = activePresence.get(socket.id);
+    if (presence) {
+      presence.status = 'on_call';
+      presence.inCall = true;
+      presence.activeRoomId = roomId;
+      broadcastPresence();
+    }
 
     if (!activeRooms[roomId]) {
       activeRooms[roomId] = {
@@ -2489,6 +2517,15 @@ function handleLeaveRoom(socket, roomId) {
     if (activeRooms[roomId].participants.length === 0) {
       delete activeRooms[roomId];
     }
+  }
+
+  // Restore presence to online (not on call)
+  const presence = activePresence.get(socket.id);
+  if (presence) {
+    presence.status = 'online';
+    presence.inCall = false;
+    presence.activeRoomId = null;
+    broadcastPresence();
   }
 }
 
