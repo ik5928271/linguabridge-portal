@@ -325,22 +325,22 @@ LinguaBridge enforces industry-standard protocols for high-stakes medical, legal
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 font-sans">
+    <div className={`fixed bottom-3 right-3 sm:bottom-6 sm:right-6 font-sans ${isOpen ? 'z-50' : 'z-40'}`}>
       
       {/* Floating Widget Launcher Button (When Closed) */}
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="group relative flex items-center gap-2.5 px-4 py-3 rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-brand-600 hover:from-purple-500 hover:to-brand-500 text-white font-black text-xs shadow-2xl shadow-purple-600/40 border border-white/20 transition-all duration-300 transform hover:scale-105 active:scale-95"
+          className="group relative flex items-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-brand-600 hover:from-purple-500 hover:to-brand-500 text-white font-black text-xs shadow-2xl shadow-purple-600/40 border border-white/20 transition-all duration-300 transform hover:scale-105 active:scale-95 cursor-pointer"
           title="Open AI Concierge & Support Box"
         >
           <div className="relative">
-            <Bot className="w-5 h-5 text-amber-300 animate-bounce" />
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full ring-2 ring-slate-900 animate-pulse" />
+            <Bot className="w-4 h-4 sm:w-5 sm:h-5 text-amber-300 animate-bounce" />
+            <span className="absolute -top-1 -right-1 w-2 h-2 sm:w-2.5 sm:h-2.5 bg-emerald-400 rounded-full ring-2 ring-slate-900 animate-pulse" />
           </div>
           <span className="hidden sm:inline font-bold tracking-wide">LinguaBot AI & Inquiries</span>
-          <span className="sm:hidden font-bold">AI Bot</span>
-          <span className="px-1.5 py-0.5 rounded-full bg-white/20 text-[10px] font-extrabold uppercase tracking-wider text-amber-200">
+          <span className="sm:hidden font-bold text-[11px]">AI Bot</span>
+          <span className="px-1.5 py-0.5 rounded-full bg-white/20 text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider text-amber-200">
             24/7 Live
           </span>
         </button>

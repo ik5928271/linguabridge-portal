@@ -31,7 +31,9 @@ import {
   Sun,
   Sunrise,
   Sunset,
-  Moon
+  Moon,
+  Video,
+  AlertCircle
 } from 'lucide-react';
 import { playTelephoneRing, playConnectedChime } from '../services/audioService';
 import { getSocket } from '../services/socket';
@@ -131,6 +133,7 @@ export default function InterpreterDashboard({
       role: 'interpreter',
       userId: profile.id,
       name: profile.name,
+      email: profile.email,
       language: profile.primaryLang,
       badgeNumber: profile.badgeNumber || profile.interpreterBadgeId
     });
@@ -138,13 +141,21 @@ export default function InterpreterDashboard({
     const handleIncomingDispatch = (dispatchData) => {
       if (!dispatchData) return;
       const currentLanguages = profile.languages || [profile.primaryLang];
-      const targetLang = (dispatchData.targetLanguage || '').toLowerCase();
+      const targetLang = (dispatchData.targetLanguage || dispatchData.language || '').toLowerCase().trim();
+      const myBadge = (profile.badgeNumber || profile.interpreterBadgeId || '').toString();
+      const targetBadge = (dispatchData.interpreterBadgeNumber || dispatchData.interpreter?.badgeNumber || dispatchData.interpreter?.interpreterBadgeId || '').toString();
+      const targetInterpId = (dispatchData.interpreterId || dispatchData.interpreter?.id || '').toString();
+      const myInterpId = (profile.id || '').toString();
       
-      const isMatch = !targetLang || 
-        currentLanguages.some(l => l.toLowerCase() === targetLang || targetLang.includes(l.toLowerCase())) ||
-        (profile.primaryLang && profile.primaryLang.toLowerCase() === targetLang);
+      const isDirectMatch = (targetBadge && myBadge && targetBadge === myBadge) ||
+                            (targetInterpId && myInterpId && targetInterpId === myInterpId) ||
+                            (dispatchData.interpreterName && profile.name && dispatchData.interpreterName.toLowerCase().includes(profile.name.toLowerCase()));
 
-      if (isMatch) {
+      const isLangMatch = !targetLang || 
+        currentLanguages.some(l => l.toLowerCase() === targetLang || targetLang.includes(l.toLowerCase()) || l.toLowerCase().includes(targetLang)) ||
+        (profile.primaryLang && (profile.primaryLang.toLowerCase() === targetLang || targetLang.includes(profile.primaryLang.toLowerCase())));
+
+      if (isDirectMatch || isLangMatch) {
         playTelephoneRing();
         setCountdown(30);
         setIncomingCall(dispatchData);
@@ -152,11 +163,15 @@ export default function InterpreterDashboard({
     };
 
     socket.on('incoming-dispatch-call', handleIncomingDispatch);
+    socket.on('incoming-call-alert', handleIncomingDispatch);
+    socket.on('new-appointment-created', handleIncomingDispatch);
 
     return () => {
       socket.off('incoming-dispatch-call', handleIncomingDispatch);
+      socket.off('incoming-call-alert', handleIncomingDispatch);
+      socket.off('new-appointment-created', handleIncomingDispatch);
     };
-  }, [isOnline, profile.id, profile.name, profile.primaryLang, profile.languages, profile.badgeNumber, profile.interpreterBadgeId]);
+  }, [isOnline, profile.id, profile.name, profile.email, profile.primaryLang, profile.languages, profile.badgeNumber, profile.interpreterBadgeId]);
 
   // Dynamic calculations from real call logs
   const userCallLogs = (callLogs || []).filter(log => {
@@ -372,15 +387,22 @@ export default function InterpreterDashboard({
       });
     }
 
-    onAcceptIncomingCall({
-      roomId: callData.roomId || `room-${Date.now().toString(36)}`,
-      role: 'interpreter',
-      participantName: profile.name,
-      language: callData.targetLanguage || profile.primaryLang,
-      specialty: callData.specialty || 'General / Healthcare',
-      patientName: callData.patientName || 'Client / Patient',
-      hostName: callData.hostName || 'Host'
-    });
+    if (onAcceptIncomingCall) {
+      onAcceptIncomingCall({
+        roomId: callData?.roomId || `room-${Date.now().toString(36)}`,
+        role: 'interpreter',
+        participantName: profile.name,
+        interpreter: profile,
+        interpreterName: profile.name,
+        interpreterBadgeNumber: badgeId,
+        language: callData?.targetLanguage || callData?.language || profile.primaryLang,
+        specialty: callData?.specialty || 'General / Healthcare',
+        patientName: callData?.patientName || callData?.clientName || 'Client / Patient',
+        hostName: callData?.hostName || callData?.clientName || 'Host',
+        serviceType: callData?.serviceType || 'video',
+        mode: callData?.mode || 'on-demand'
+      });
+    }
   };
 
   const handleDecline = () => {
@@ -1092,6 +1114,105 @@ export default function InterpreterDashboard({
               </div>
 
             </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* 🔔 HIGH-PRIORITY INCOMING CALL RINGING MODAL */}
+      {incomingCall && (
+        <div className="fixed inset-0 z-[150] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md bg-slate-900/95 border-2 border-emerald-500/60 rounded-3xl p-6 md:p-8 shadow-2xl shadow-emerald-500/20 text-center overflow-hidden">
+            
+            {/* Ambient Animated Ringing Glow */}
+            <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none animate-pulse" />
+            <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-teal-500/20 rounded-full blur-3xl pointer-events-none animate-pulse" />
+
+            {/* Pulsing Animated Icon */}
+            <div className="relative mx-auto mb-5 w-20 h-20 rounded-full bg-emerald-500/20 border-2 border-emerald-500/40 flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full bg-emerald-500/30 animate-ping opacity-75" />
+              <PhoneCall className="w-10 h-10 text-emerald-400 relative z-10 animate-bounce" />
+            </div>
+
+            {/* Header Badge */}
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              Incoming Live Session Call
+            </div>
+
+            <h3 className="text-xl md:text-2xl font-black text-white tracking-tight mb-1">
+              Client Requesting Interpreter
+            </h3>
+            <p className="text-xs text-slate-400 mb-6">
+              You are selected for an instant high-priority interpretation encounter.
+            </p>
+
+            {/* Session Information Card */}
+            <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 text-left space-y-3 mb-6">
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                <span className="text-xs text-slate-400">Client / Caller</span>
+                <span className="text-xs font-bold text-white">
+                  {incomingCall.clientName || incomingCall.patientName || incomingCall.hostName || 'Direct Client'}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                <span className="text-xs text-slate-400">Language Pair</span>
+                <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                  English ⟷ {incomingCall.targetLanguage || incomingCall.language || profile.primaryLang}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                <span className="text-xs text-slate-400">Specialty Domain</span>
+                <span className="text-xs font-medium text-slate-300">
+                  {incomingCall.specialty || 'General / Medical Intake'}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-400">Session Type</span>
+                <span className="text-xs font-bold text-teal-300 flex items-center gap-1.5">
+                  <Video className="w-3.5 h-3.5" />
+                  {incomingCall.serviceType === 'audio' ? 'Audio Only' : 'HD Video + Audio'}
+                </span>
+              </div>
+            </div>
+
+            {/* Countdown Progress */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between text-xs text-slate-400 mb-1.5 font-mono">
+                <span>Auto-decline countdown</span>
+                <span className="text-amber-400 font-bold">{countdown}s</span>
+              </div>
+              <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-emerald-500 to-amber-400 transition-all duration-1000 ease-linear"
+                  style={{ width: `${(countdown / 30) * 100}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={handleDecline}
+                className="w-full py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 hover:text-white text-xs font-bold transition flex items-center justify-center gap-2 border border-slate-700 shadow-md"
+              >
+                <PhoneOff className="w-4 h-4 text-red-400" />
+                <span>Decline</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleAccept}
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 active:scale-95 text-white text-xs font-black shadow-lg shadow-emerald-500/30 transition flex items-center justify-center gap-2"
+              >
+                <PhoneCall className="w-4 h-4 animate-pulse" />
+                <span>Accept & Join</span>
+              </button>
+            </div>
 
           </div>
         </div>

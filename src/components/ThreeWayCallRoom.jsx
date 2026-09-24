@@ -400,7 +400,7 @@ export default function ThreeWayCallRoom({
         </div>
 
         {/* Center: Security Badge */}
-        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[11px] font-semibold border border-emerald-500/20">
+        <div className="hidden md:flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[11px] font-semibold border border-emerald-500/20">
           <ShieldCheck className="w-3.5 h-3.5" />
           <span>Real-Time Encrypted 3-Party Conference</span>
         </div>

@@ -258,85 +258,92 @@ export default function PrepaidWalletModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md overflow-y-auto p-3 sm:p-6 flex justify-center items-start">
-      <div className="max-w-lg w-full bg-slate-900 border border-slate-700 shadow-2xl rounded-3xl p-6 sm:p-8 space-y-6 relative text-white my-6 sm:my-8">
+    <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md overflow-y-auto p-2 sm:p-6 flex justify-center items-start">
+      <div className="max-w-lg w-full bg-slate-900 border border-slate-700 shadow-2xl rounded-3xl p-4 sm:p-7 space-y-5 relative text-white my-3 sm:my-8 pb-8">
         
         {/* Background glow */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div className="flex items-start justify-between border-b border-slate-800 pb-3.5 gap-2">
           <div>
             <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-bold uppercase tracking-wider">
-              <Zap className="w-4 h-4 text-emerald-400" />
+              <Zap className="w-4 h-4 text-emerald-400 shrink-0" />
               <span>Instant Prepaid Wallet Credit</span>
             </div>
-            <h3 className="text-xl font-extrabold text-white mt-0.5">Top-Up Interpretation Minutes</h3>
-            <p className="text-xs text-slate-400">
+            <h3 className="text-lg sm:text-xl font-extrabold text-white mt-0.5">Top-Up Interpretation Minutes</h3>
+            <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">
               Purchased minutes are credited upon admin receipt verification and deducted based on actual talk time.
             </p>
           </div>
 
           <button 
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition cursor-pointer"
+            className="p-2 rounded-xl text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition cursor-pointer shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* 🎁 2026 FOUNDING CLIENT 6-MONTH DISCOUNT PROMOTION BANNER */}
-        <div className={`p-4 rounded-2xl border transition-all duration-300 ${
+        <div className={`p-3.5 sm:p-4 rounded-2xl border transition-all duration-300 space-y-2.5 ${
           isDiscountActive 
-            ? 'bg-gradient-to-r from-amber-500/15 via-emerald-500/15 to-teal-500/15 border-emerald-500/50 shadow-lg shadow-emerald-950/40 ring-1 ring-emerald-500/30' 
+            ? 'bg-gradient-to-br from-amber-500/15 via-emerald-500/10 to-teal-500/15 border-emerald-500/50 shadow-lg shadow-emerald-950/40 ring-1 ring-emerald-500/30' 
             : 'bg-slate-950 border-slate-800'
         }`}>
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold shrink-0 transition ${
+          {/* Top Row: Icon + Title + Discount Tag + Toggle Switch */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center font-bold shrink-0 transition ${
                 isDiscountActive ? 'bg-amber-500/25 text-amber-300 ring-2 ring-amber-400/40' : 'bg-slate-800 text-slate-400'
               }`}>
-                <Gift className="w-5 h-5" />
+                <Gift className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-extrabold text-amber-300 uppercase tracking-wider flex items-center gap-1">
-                    <Sparkles className="w-3.5 h-3.5" /> 2026 Client Promotion
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-xs font-black text-amber-300 uppercase tracking-wider flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5 shrink-0" /> 2026 Promo
                   </span>
-                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950">
-                    Up to 35% OFF • 6 Months
+                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 shrink-0">
+                    Up to 35% OFF
                   </span>
                 </div>
-                <p className="text-xs text-slate-200 mt-0.5 font-medium leading-tight">
-                  Join & pay in 2026 to lock in <strong className="text-emerald-300">15%–35% discount for 6 Months</strong> from join date.
-                </p>
               </div>
             </div>
 
             {/* Toggle Switch */}
-            <button
-              type="button"
-              onClick={handleToggleDiscount}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                claimDiscount ? 'bg-emerald-500' : 'bg-slate-700'
-              }`}
-            >
-              <span
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                  claimDiscount ? 'translate-x-5' : 'translate-x-0'
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={handleToggleDiscount}
+                aria-label="Toggle promotional discount"
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  claimDiscount ? 'bg-emerald-500' : 'bg-slate-700'
                 }`}
-              />
-            </button>
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                    claimDiscount ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
           </div>
 
+          {/* Description Text */}
+          <p className="text-[11px] sm:text-xs text-slate-200 font-medium leading-tight">
+            Join & pay in 2026 to lock in <strong className="text-emerald-300">15%–35% discount for 6 Months</strong> from join date.
+          </p>
+
+          {/* Promo Code & Status Footer */}
           {isDiscountActive && (
-            <div className="mt-3 pt-2.5 border-t border-emerald-500/20 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+            <div className="pt-2 border-t border-emerald-500/20 flex flex-wrap items-center justify-between gap-1.5 text-[10px] sm:text-[11px]">
               <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
-                <Tag className="w-3.5 h-3.5" />
-                <span>Promo Code: <strong className="tracking-wider bg-emerald-950/70 px-2 py-0.5 rounded border border-emerald-500/30">FOUNDING2026</strong></span>
+                <Tag className="w-3.5 h-3.5 shrink-0" />
+                <span>Code: <strong className="tracking-wider bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/30 text-emerald-300 font-mono">FOUNDING2026</strong></span>
               </div>
-              <span className="text-emerald-300 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
-                ✓ 6-Month Locked Promotional Rate
+              <span className="text-emerald-300 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30 text-[9px] sm:text-[10px]">
+                ✓ 6-Month Locked Promo
               </span>
             </div>
           )}

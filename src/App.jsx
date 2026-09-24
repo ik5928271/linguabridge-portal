@@ -465,11 +465,13 @@ export default function App() {
         onStartCall={handleStartCall}
       />
 
-      {/* Global AI Concierge Bot & Client/Interpreter Message Box */}
-      <AIAssistantWidget
-        currentUser={currentUser}
-        currentRole={currentRole}
-      />
+      {/* Global AI Concierge Bot & Client/Interpreter Message Box (hidden during active call room) */}
+      {currentView !== 'room' && (
+        <AIAssistantWidget
+          currentUser={currentUser}
+          currentRole={currentRole}
+        />
+      )}
 
     </div>
   );

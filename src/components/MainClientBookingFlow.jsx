@@ -17,6 +17,8 @@ import {
   ExternalLink,
   ChevronRight,
   ArrowRight,
+  ArrowLeft,
+  Radio,
   Star,
   CreditCard,
   Lock,
@@ -38,7 +40,7 @@ import {
   Percent,
   CalendarCheck
 } from 'lucide-react';
-import { LANGUAGES, ALL_100_LANGUAGES, SPECIALTIES, INITIAL_INTERPRETERS, getInterpretersForLanguage } from '../data/mockData';
+import { LANGUAGES, ALL_100_LANGUAGES, SPECIALTIES, INITIAL_INTERPRETERS } from '../data/mockData';
 import PrepaidWalletModal from './PrepaidWalletModal';
 import { getSocket } from '../services/socket';
 
@@ -164,21 +166,70 @@ export default function MainClientBookingFlow({
     return !!(socketUser?.inCall || socketUser?.status === 'on_call' || interp.inCall || interp.status === 'on_call');
   };
 
-  // Active online interpreters list
-  const onlineInterpreters = realInterpreters.filter(isInterpreterOnline);
+  // Active online interpreters list (From real database users online via socket + any direct socket connections)
+  const onlineInterpreters = React.useMemo(() => {
+    const list = realInterpreters
+      .map(interp => {
+        const socketUser = (onlinePresence.interpreters || []).find(
+          op => (op.userId && (op.userId === interp.id || op.userId === interp.userId)) ||
+                (op.email && interp.email && op.email.toLowerCase() === interp.email.toLowerCase())
+        );
+        const isSocketOnline = !!socketUser;
+        const inCall = !!(socketUser?.inCall || socketUser?.status === 'on_call' || interp.inCall || interp.status === 'on_call');
+        return {
+          ...interp,
+          isLiveSocket: isSocketOnline,
+          inCall,
+          status: inCall ? 'on_call' : (interp.status || 'online'),
+          liveStatus: isSocketOnline ? (inCall ? 'on_call' : 'active_connected') : 'standby_ready'
+        };
+      })
+      .filter(interp => interp.isLiveSocket);
 
-  // Helper to count available vs on-call interpreters for any language in real time
-  const getLanguageInterpreterStats = (langName) => {
-    if (!langName) return { totalOnline: 0, availableCount: 0, onCallCount: 0 };
-    const target = langName.toLowerCase().trim();
-    const matchingInterpreters = onlineInterpreters.filter(i => {
+    // Include any direct socket interpreters from onlinePresence not yet in realInterpreters
+    (onlinePresence.interpreters || []).forEach(op => {
+      if (!list.some(li => li.id === op.userId || (li.email && op.email && li.email.toLowerCase() === op.email.toLowerCase()))) {
+        const inCall = !!(op.inCall || op.status === 'on_call');
+        list.push({
+          id: op.userId || `socket-${op.socketId}`,
+          name: op.name || 'Live Interpreter',
+          email: op.email || '',
+          role: 'interpreter',
+          primaryLang: op.language || 'Spanish',
+          languages: [op.language || 'Spanish', 'English'],
+          specialty: op.specialty || 'General / Healthcare',
+          badgeNumber: op.badgeNumber || '',
+          interpreterBadgeId: op.badgeNumber || '',
+          phone: op.phone || '',
+          isLiveSocket: true,
+          inCall,
+          status: inCall ? 'on_call' : 'online',
+          liveStatus: inCall ? 'on_call' : 'active_connected'
+        });
+      }
+    });
+
+    return list;
+  }, [realInterpreters, onlinePresence]);
+
+  // Helper to get only live online interpreters for any language
+  const getInterpretersForLanguage = (langName) => {
+    if (!langName) return [];
+    const lang = langName.toLowerCase().trim();
+    return onlineInterpreters.filter(i => {
       const pLang = (i.primaryLang || '').toLowerCase().trim();
       const allLangs = Array.isArray(i.languages) 
         ? i.languages.map(l => (typeof l === 'string' ? l : l?.name || '').toLowerCase().trim()) 
         : [];
-      return pLang === target || pLang.includes(target) || target.includes(pLang) ||
-             allLangs.some(l => l === target || l.includes(target) || target.includes(l));
+      return pLang === lang || pLang.includes(lang) || lang.includes(pLang) ||
+             allLangs.some(l => l === lang || l.includes(lang) || lang.includes(l));
     });
+  };
+
+  // Helper to count available vs on-call interpreters for any language in real time
+  const getLanguageInterpreterStats = (langName) => {
+    if (!langName) return { totalOnline: 0, availableCount: 0, onCallCount: 0 };
+    const matchingInterpreters = getInterpretersForLanguage(langName);
 
     const onCallCount = matchingInterpreters.filter(isInterpreterOnCall).length;
     const availableCount = matchingInterpreters.length - onCallCount;
@@ -194,33 +245,22 @@ export default function MainClientBookingFlow({
     return getLanguageInterpreterStats(langName).totalOnline;
   };
 
-  // Filter registered interpreters for selected language
-  const availableInterpreters = realInterpreters.filter(i => {
-    const lang = selectedLanguage.toLowerCase().trim();
-    const pLang = (i.primaryLang || '').toLowerCase().trim();
-    const allLangs = Array.isArray(i.languages) 
-      ? i.languages.map(l => (typeof l === 'string' ? l : l?.name || '').toLowerCase().trim()) 
-      : [];
-    return pLang === lang || pLang.includes(lang) || lang.includes(pLang) ||
-           allLangs.some(l => l === lang || l.includes(lang) || lang.includes(l));
-  });
+  // Filter ONLY live online interpreters for selected language
+  const availableInterpreters = React.useMemo(() => {
+    return getInterpretersForLanguage(selectedLanguage);
+  }, [selectedLanguage, onlineInterpreters]);
 
-  const onlineAvailableInterpreters = availableInterpreters.filter(isInterpreterOnline);
-
-  // Keep selected interpreter in sync (prioritize online interpreter first)
+  // Keep selected interpreter in sync (prioritize ready/standby linguists first, then on-call)
   useEffect(() => {
-    if (onlineAvailableInterpreters.length > 0) {
-      if (!selectedInterpreter || !onlineAvailableInterpreters.some(i => i.id === selectedInterpreter.id)) {
-        setSelectedInterpreter(onlineAvailableInterpreters[0]);
-      }
-    } else if (availableInterpreters.length > 0) {
+    if (availableInterpreters.length > 0) {
       if (!selectedInterpreter || !availableInterpreters.some(i => i.id === selectedInterpreter.id)) {
-        setSelectedInterpreter(availableInterpreters[0]);
+        const readyFirst = availableInterpreters.find(i => !isInterpreterOnCall(i)) || availableInterpreters[0];
+        setSelectedInterpreter(readyFirst);
       }
     } else {
       setSelectedInterpreter(null);
     }
-  }, [selectedLanguage, realInterpreters, onlinePresence]);
+  }, [selectedLanguage, availableInterpreters]);
 
   // Auto-scroll to top smoothly whenever the step changes so user view is never stuck or cut off
   useEffect(() => {
@@ -828,7 +868,9 @@ END:VCALENDAR`;
           <div className="border-b border-slate-800 pb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
             <div>
               <h2 className="text-xl font-bold text-white">Step 2: Choose Certified {selectedLanguage} Interpreter</h2>
-              <p className="text-xs text-slate-400 mt-0.5">Found {availableInterpreters.length} credentialed {selectedLanguage} linguist(s) ready for assignment</p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Found {availableInterpreters.length} live online {selectedLanguage} interpreter(s) ready for assignment
+              </p>
             </div>
 
             <div className="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs">
@@ -861,19 +903,42 @@ END:VCALENDAR`;
 
           {/* Interpreter Cards Grid */}
           {availableInterpreters.length === 0 ? (
-            <div className="p-10 rounded-3xl bg-slate-900/60 border border-slate-800 text-center space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-400 flex items-center justify-center mx-auto">
-                <Users className="w-6 h-6" />
+            <div className="p-10 rounded-3xl bg-slate-900/60 border border-slate-800 text-center space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center mx-auto border border-amber-500/20">
+                <Radio className="w-7 h-7 animate-pulse" />
               </div>
-              <p className="text-sm font-bold text-white">No Certified Interpreters Registered for {selectedLanguage} Yet</p>
-              <p className="text-xs text-slate-400 max-w-md mx-auto">
-                Please create an interpreter in {selectedLanguage} in your Admin Control Center or have them sign up online.
-              </p>
+              <div>
+                <h4 className="text-base font-bold text-white">No Live {selectedLanguage} Interpreters Online Right Now</h4>
+                <p className="text-xs text-slate-400 max-w-md mx-auto mt-1">
+                  All registered {selectedLanguage} linguists are currently on standby or offline. As soon as a verified interpreter connects to their portal, they will appear here live in real-time.
+                </p>
+              </div>
+              <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(1)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition flex items-center gap-1.5 border border-slate-700"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Choose Another Language</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    fetchInterpreters();
+                    fetchOnlinePresence();
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold transition shadow-lg shadow-brand-500/30"
+                >
+                  Refresh Live Status
+                </button>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {availableInterpreters.map((interp) => {
                 const badgeNum = interp.badgeNumber || interp.interpreterBadgeId || interp.id?.replace(/\D/g, '') || '84920';
+                const onCall = isInterpreterOnCall(interp);
                 return (
                   <div
                     key={interp.id}
@@ -881,11 +946,17 @@ END:VCALENDAR`;
                     className={`p-5 rounded-2xl border transition-all cursor-pointer space-y-3 relative ${
                       selectedInterpreter?.id === interp.id
                         ? 'bg-brand-600/15 border-brand-500 ring-2 ring-brand-500/50 shadow-xl'
-                        : 'bg-slate-900/70 border-slate-800 hover:border-slate-700'
+                        : onCall 
+                          ? 'bg-slate-900/70 border-amber-500/30 hover:border-amber-500/60'
+                          : 'bg-slate-900/70 border-slate-800 hover:border-slate-700'
                     }`}
                   >
                     <div className="flex items-start gap-3.5">
-                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 font-black text-white flex flex-col items-center justify-center text-xs shrink-0 shadow-lg shadow-emerald-500/20 ring-2 ring-emerald-500/30">
+                      <div className={`w-14 h-14 rounded-2xl font-black text-white flex flex-col items-center justify-center text-xs shrink-0 shadow-lg ring-2 ${
+                        onCall
+                          ? 'bg-gradient-to-tr from-amber-600 to-rose-600 shadow-amber-500/20 ring-amber-500/30'
+                          : 'bg-gradient-to-tr from-emerald-600 to-teal-500 shadow-emerald-500/20 ring-emerald-500/30'
+                      }`}>
                         <Award className="w-5 h-5 mb-0.5 text-white" />
                         <span className="text-[9px] font-mono font-bold leading-tight">#{badgeNum}</span>
                       </div>
@@ -894,7 +965,11 @@ END:VCALENDAR`;
                           <h4 className="text-sm font-extrabold text-white truncate">
                             Interpreter #{badgeNum}
                           </h4>
-                          <span className="text-[10px] font-bold text-brand-300 bg-brand-500/15 px-2 py-0.5 rounded-full border border-brand-500/30 shrink-0">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${
+                            onCall 
+                              ? 'text-amber-300 bg-amber-500/15 border-amber-500/30' 
+                              : 'text-brand-300 bg-brand-500/15 border-brand-500/30'
+                          }`}>
                             ID: #{badgeNum}
                           </span>
                         </div>
@@ -902,20 +977,18 @@ END:VCALENDAR`;
                           {(interp.languages || [interp.primaryLang || selectedLanguage, 'English']).join(' ⟷ ')}
                         </p>
                         <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-400">
-                          {isInterpreterOnCall(interp) ? (
-                            <span className="flex items-center gap-1 text-amber-400 font-extrabold bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/30">
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span>
+                          {onCall ? (
+                            <span className="flex items-center gap-1.5 text-amber-400 font-extrabold bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/30 animate-pulse">
+                              <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                              </span>
                               <span>On Call (In Session)</span>
                             </span>
-                          ) : isInterpreterOnline(interp) ? (
-                            <span className="flex items-center gap-1 text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                              <span>● Online & Ready</span>
-                            </span>
                           ) : (
-                            <span className="flex items-center gap-1 text-slate-400 font-medium">
-                              <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
-                              <span>Standby Pool</span>
+                            <span className="flex items-center gap-1.5 text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                              <span>● Live & Ready</span>
                             </span>
                           )}
                           <span>•</span>
@@ -1301,22 +1374,22 @@ END:VCALENDAR`;
           )}
 
           {/* 🎁 2026 FOUNDING CLIENT 6-MONTH DISCOUNT PROMOTION BANNER */}
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-emerald-500/15 to-teal-500/15 border border-emerald-500/40 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/25 text-amber-300 ring-2 ring-amber-400/40 flex items-center justify-center shrink-0">
-                <Gift className="w-5 h-5" />
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-br from-amber-500/15 via-emerald-500/10 to-teal-500/15 border border-emerald-500/40 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-500/25 text-amber-300 ring-2 ring-amber-400/40 flex items-center justify-center shrink-0">
+                <Gift className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-xs font-black text-amber-300 uppercase tracking-wider flex items-center gap-1">
-                    <Sparkles className="w-3.5 h-3.5" /> 2026 Client Promotion
+                    <Sparkles className="w-3.5 h-3.5 shrink-0" /> 2026 Promo
                   </span>
-                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950">
-                    Up to 35% OFF • 6 Months
+                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 shrink-0">
+                    Up to 35% OFF • 6 Mo
                   </span>
                 </div>
-                <p className="text-xs text-slate-200 mt-0.5 font-medium">
-                  Lock in <strong className="text-emerald-300">15%–35% discount for 6 Months</strong> from join date on all prepaid & custom minute packages.
+                <p className="text-[11px] sm:text-xs text-slate-200 mt-0.5 font-medium leading-tight">
+                  Lock in <strong className="text-emerald-300">15%–35% discount for 6 Months</strong> from join date on all prepaid minute packs.
                 </p>
               </div>
             </div>
@@ -1330,7 +1403,7 @@ END:VCALENDAR`;
                 }
                 setIsWalletModalOpen(true);
               }}
-              className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/30 flex items-center gap-1.5 transition shrink-0 cursor-pointer"
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-1.5 transition shrink-0 cursor-pointer"
             >
               <Tag className="w-3.5 h-3.5 text-slate-950" />
               <span>Claim Promo (Up to 35% OFF)</span>
@@ -1338,11 +1411,11 @@ END:VCALENDAR`;
           </div>
 
           {/* Prepaid Balance Breakdown */}
-          <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
-            <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800">
+          <div className="p-4 sm:p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs pb-2 border-b border-slate-800 gap-2">
               <span className="text-slate-400">Available Prepaid Balance:</span>
-              <div className="flex items-center gap-3">
-                <span className="font-black text-emerald-400">{wallet?.minutesRemaining || 0} Minutes</span>
+              <div className="flex items-center justify-between sm:justify-end gap-3">
+                <span className="font-black text-emerald-400 text-sm">{wallet?.minutesRemaining || 0} Minutes</span>
                 <button
                   type="button"
                   onClick={() => {
@@ -1371,10 +1444,10 @@ END:VCALENDAR`;
             </div>
 
             {!hasSufficientPrepaid && (
-              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
                 <div className="flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-                  <span>Insufficient minutes ({wallet?.minutesRemaining || 0} min available). Claim up to 35% promo discount to top up.</span>
+                  <span>Insufficient balance ({wallet?.minutesRemaining || 0} min available). Claim up to 35% promo to top up.</span>
                 </div>
                 <button
                   type="button"
@@ -1385,7 +1458,7 @@ END:VCALENDAR`;
                     }
                     setIsWalletModalOpen(true);
                   }}
-                  className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] shadow-lg shadow-emerald-600/30 shrink-0 cursor-pointer"
+                  className="w-full sm:w-auto px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] shadow-lg shadow-emerald-600/30 shrink-0 cursor-pointer text-center"
                 >
                   Top-Up (Up to 35% OFF)
                 </button>
@@ -1395,43 +1468,43 @@ END:VCALENDAR`;
 
           {/* Session Details Recap */}
           <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800 space-y-2 text-xs">
-            <div className="flex justify-between">
+            <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5">
               <span className="text-slate-400">Timing & Date:</span>
               <span className="font-bold text-emerald-400">
                 {bookingType === 'scheduled' ? `📅 ${bookingDate} at ${bookingTime} (${timezone})` : '⚡ Instant On-Demand'}
               </span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5">
               <span className="text-slate-400">Language Pair:</span>
               <span className="font-bold text-white">English ⟷ {selectedLanguage} ({selectedSpecialty})</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5">
               <span className="text-slate-400">Certified Interpreter:</span>
               <span className="font-semibold text-emerald-400">
                 Interpreter #{selectedInterpreter?.badgeNumber || selectedInterpreter?.interpreterBadgeId || selectedInterpreter?.id?.replace(/\D/g, '') || '84920'}
               </span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5">
               <span className="text-slate-400">Guest Recipient:</span>
               <span className="font-semibold text-amber-300">{guestName || 'Invited Guest'} (Free 1-Click Guest Link)</span>
             </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="pt-4 border-t border-slate-800 flex justify-between items-center">
+          <div className="pt-4 border-t border-slate-800 flex flex-col-reverse sm:flex-row justify-between items-stretch sm:items-center gap-3">
             <button
               type="button"
               onClick={() => setCurrentStep(3)}
-              className="px-5 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold cursor-pointer hover:bg-slate-700"
+              className="px-5 py-3 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold cursor-pointer hover:bg-slate-700 text-center"
             >
-              Back
+              ← Back
             </button>
 
             {!currentUser ? (
               <button
                 type="button"
                 onClick={() => onOpenAuth && onOpenAuth('signin', 'host')}
-                className="px-8 py-3.5 rounded-xl text-white font-extrabold text-sm shadow-xl flex items-center gap-2 transition bg-gradient-to-r from-brand-600 via-indigo-600 to-teal-600 hover:from-brand-500 hover:to-teal-500 shadow-brand-500/25 transform hover:-translate-y-0.5 cursor-pointer"
+                className="w-full sm:w-auto px-8 py-3.5 rounded-xl text-white font-extrabold text-sm shadow-xl flex items-center justify-center gap-2 transition bg-gradient-to-r from-brand-600 via-indigo-600 to-teal-600 hover:from-brand-500 hover:to-teal-500 shadow-brand-500/25 cursor-pointer"
               >
                 <Lock className="w-4 h-4" />
                 <span>Sign In / Sign Up to Complete Booking</span>
@@ -1441,10 +1514,10 @@ END:VCALENDAR`;
                 type="button"
                 disabled={clientBillingType === 'prepaid' && !hasSufficientPrepaid}
                 onClick={handleConfirmAndPay}
-                className={`px-8 py-3.5 rounded-xl text-white font-extrabold text-sm shadow-xl flex items-center gap-2 transition ${
+                className={`w-full sm:w-auto px-8 py-3.5 rounded-xl text-white font-extrabold text-sm shadow-xl flex items-center justify-center gap-2 transition ${
                   clientBillingType === 'prepaid' && !hasSufficientPrepaid
                     ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-500/25 transform hover:-translate-y-0.5 cursor-pointer'
+                    : 'bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-500/25 cursor-pointer'
                 }`}
               >
                 {isProcessingPayment ? (
