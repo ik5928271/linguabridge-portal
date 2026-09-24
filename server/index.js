@@ -2251,6 +2251,28 @@ function broadcastPresence() {
   });
 }
 
+function broadcastActiveRooms() {
+  const roomsList = Object.values(activeRooms).map(r => ({
+    roomId: r.roomId,
+    startedAt: r.startedAt,
+    targetLanguage: r.targetLanguage || 'Spanish',
+    specialty: r.specialty || 'General',
+    clientName: r.clientName || (r.participants.find(p => p.role === 'host' || p.role === 'client')?.name) || 'Client',
+    clientOrg: r.clientOrg || '',
+    patientName: r.patientName || (r.participants.find(p => p.role === 'guest')?.name) || 'Guest',
+    interpreterName: r.interpreterName || (r.participants.find(p => p.role === 'interpreter')?.name) || null,
+    participantsCount: (r.participants || []).length,
+    participants: r.participants || [],
+    hasClient: (r.participants || []).some(p => p.role === 'host' || p.role === 'client'),
+    hasInterpreter: (r.participants || []).some(p => p.role === 'interpreter'),
+    hasGuest: (r.participants || []).some(p => p.role === 'guest'),
+    status: (r.participants || []).some(p => p.role === 'interpreter') 
+      ? 'active_encounter' 
+      : ((r.participants || []).some(p => p.role === 'host' || p.role === 'client') ? 'waiting_interpreter' : 'open')
+  }));
+  io.emit('active-rooms-updated', roomsList);
+}
+
 // Online presence inspection endpoint for Admin
 app.get('/api/admin/online-presence', (req, res) => {
   const onlineList = Array.from(activePresence.values());
@@ -2261,6 +2283,34 @@ app.get('/api/admin/online-presence', (req, res) => {
     clients: onlineList.filter(u => u.role === 'host' || u.role === 'client'),
     admins: onlineList.filter(u => u.role === 'admin')
   });
+});
+
+// Active live rooms endpoint for Admin & Dashboard
+app.get('/api/admin/active-rooms', (req, res) => {
+  const roomsList = Object.values(activeRooms).map(r => ({
+    roomId: r.roomId,
+    startedAt: r.startedAt,
+    targetLanguage: r.targetLanguage || 'Spanish',
+    specialty: r.specialty || 'General',
+    clientName: r.clientName || (r.participants.find(p => p.role === 'host' || p.role === 'client')?.name) || 'Client',
+    clientOrg: r.clientOrg || '',
+    patientName: r.patientName || (r.participants.find(p => p.role === 'guest')?.name) || 'Guest',
+    interpreterName: r.interpreterName || (r.participants.find(p => p.role === 'interpreter')?.name) || null,
+    participantsCount: (r.participants || []).length,
+    participants: r.participants || [],
+    hasClient: (r.participants || []).some(p => p.role === 'host' || p.role === 'client'),
+    hasInterpreter: (r.participants || []).some(p => p.role === 'interpreter'),
+    hasGuest: (r.participants || []).some(p => p.role === 'guest'),
+    status: (r.participants || []).some(p => p.role === 'interpreter') 
+      ? 'active_encounter' 
+      : ((r.participants || []).some(p => p.role === 'host' || p.role === 'client') ? 'waiting_interpreter' : 'open')
+  }));
+  res.json(roomsList);
+});
+
+// Active pending dispatches endpoint
+app.get('/api/admin/active-dispatches', (req, res) => {
+  res.json(Object.values(activeDispatches));
 });
 
 // ==========================================
@@ -2297,6 +2347,9 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     activePresence.delete(socket.id);
     broadcastPresence();
+    if (socket.currentRoom) {
+      handleLeaveRoom(socket, socket.currentRoom);
+    }
   });
 
   // Re-broadcast appointment creation event to all parties (Client, Interpreter, Admin)
@@ -2306,6 +2359,7 @@ io.on('connection', (socket) => {
       dispatchId,
       roomId: appointmentData.roomId,
       guestPin: appointmentData.guestPin,
+      guestLink: appointmentData.guestLink,
       hostSocketId: socket.id,
       hostName: appointmentData.mainClientName || 'Main Client',
       hostOrg: appointmentData.mainClientOrg || 'Client Organization',
@@ -2319,15 +2373,26 @@ io.on('connection', (socket) => {
       bookingType: appointmentData.bookingType || 'instant',
       date: appointmentData.date,
       time: appointmentData.time,
+      totalCost: appointmentData.totalCost,
       createdAt: Date.now(),
       status: 'searching'
     };
 
     activeDispatches[dispatchId] = dispatchRecord;
 
+    // Save to server store if not already saved
+    if (appointmentData.id && !store.appointments.some(a => a.id === appointmentData.id)) {
+      store.appointments.unshift(appointmentData);
+      saveStore();
+    }
+
     io.emit('new-appointment-created', appointmentData);
     io.emit('incoming-call-alert', dispatchRecord);
     io.emit('incoming-dispatch-call', dispatchRecord);
+    io.emit('admin-booking-notification', {
+      appointment: appointmentData,
+      dispatch: dispatchRecord
+    });
   });
 
   // Host initiates On-Demand Dispatch Request
@@ -2349,6 +2414,7 @@ io.on('connection', (socket) => {
       patientName: dispatchData.patientName || dispatchData.guestName || 'Non-English Client',
       interpreterId: dispatchData.interpreter?.id,
       interpreterName: dispatchData.interpreter?.name,
+      interpreterBadgeNumber: dispatchData.interpreter?.badgeNumber || dispatchData.interpreter?.interpreterBadgeId,
       createdAt: Date.now(),
       status: 'searching'
     };
@@ -2358,9 +2424,10 @@ io.on('connection', (socket) => {
     // Acknowledge to host
     socket.emit('dispatch-created', dispatchRecord);
 
-    // Broadcast incoming call notification to all online interpreters
+    // Broadcast incoming call notification to all online interpreters and admins
     io.emit('incoming-call-alert', dispatchRecord);
     io.emit('incoming-dispatch-call', dispatchRecord);
+    io.emit('admin-booking-notification', { dispatch: dispatchRecord });
   });
 
   // Interpreter Accepts Call
@@ -2416,7 +2483,7 @@ io.on('connection', (socket) => {
   });
 
   // Joining a 3-Party Room
-  socket.on('join-room', ({ roomId, role, participantName, language, specialty }) => {
+  socket.on('join-room', ({ roomId, role, participantName, language, specialty, clientName, clientOrg, patientName, interpreterName }) => {
     socket.join(roomId);
     socket.currentRoom = roomId;
 
@@ -2433,8 +2500,20 @@ io.on('connection', (socket) => {
       activeRooms[roomId] = {
         roomId,
         startedAt: Date.now(),
+        targetLanguage: language || 'Spanish',
+        specialty: specialty || 'General',
+        clientName: clientName || (role === 'host' ? participantName : 'Client'),
+        clientOrg: clientOrg || '',
+        patientName: patientName || (role === 'guest' ? participantName : 'Guest'),
+        interpreterName: interpreterName || (role === 'interpreter' ? participantName : null),
         participants: []
       };
+    } else {
+      if (language) activeRooms[roomId].targetLanguage = language;
+      if (specialty) activeRooms[roomId].specialty = specialty;
+      if (role === 'host' || role === 'client') activeRooms[roomId].clientName = participantName;
+      if (role === 'interpreter') activeRooms[roomId].interpreterName = participantName;
+      if (role === 'guest') activeRooms[roomId].patientName = participantName;
     }
 
     const participant = {
@@ -2459,6 +2538,27 @@ io.on('connection', (socket) => {
     });
 
     socket.to(roomId).emit('participant-joined', participant);
+
+    // Broadcast updated live active rooms across the platform (Admin + Interpreters)
+    broadcastActiveRooms();
+
+    // If client joined and no interpreter is in the room yet, broadcast active call alert to matching interpreters!
+    if ((role === 'host' || role === 'client') && !activeRooms[roomId].participants.some(p => p.role === 'interpreter')) {
+      const liveAlert = {
+        dispatchId: `live-${roomId}`,
+        roomId,
+        targetLanguage: language || activeRooms[roomId].targetLanguage,
+        specialty: specialty || activeRooms[roomId].specialty,
+        clientName: participantName,
+        clientOrg: clientOrg || '',
+        patientName: activeRooms[roomId].patientName,
+        createdAt: Date.now(),
+        status: 'waiting_interpreter',
+        isLiveRoomWaiting: true
+      };
+      io.emit('client-waiting-in-room', liveAlert);
+      io.emit('incoming-call-alert', liveAlert);
+    }
   });
 
   // WebRTC Signaling Relay
@@ -2529,12 +2629,6 @@ io.on('connection', (socket) => {
   socket.on('leave-room', ({ roomId }) => {
     handleLeaveRoom(socket, roomId);
   });
-
-  socket.on('disconnect', () => {
-    if (socket.currentRoom) {
-      handleLeaveRoom(socket, socket.currentRoom);
-    }
-  });
 });
 
 function handleLeaveRoom(socket, roomId) {
@@ -2546,6 +2640,7 @@ function handleLeaveRoom(socket, roomId) {
     if (activeRooms[roomId].participants.length === 0) {
       delete activeRooms[roomId];
     }
+    broadcastActiveRooms();
   }
 
   // Restore presence to online (not on call)
