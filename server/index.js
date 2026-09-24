@@ -2301,26 +2301,54 @@ io.on('connection', (socket) => {
 
   // Re-broadcast appointment creation event to all parties (Client, Interpreter, Admin)
   socket.on('new-appointment-created', (appointmentData) => {
+    const dispatchId = `disp-${Date.now()}`;
+    const dispatchRecord = {
+      dispatchId,
+      roomId: appointmentData.roomId,
+      guestPin: appointmentData.guestPin,
+      hostSocketId: socket.id,
+      hostName: appointmentData.mainClientName || 'Main Client',
+      hostOrg: appointmentData.mainClientOrg || 'Client Organization',
+      targetLanguage: appointmentData.language || 'Spanish',
+      specialty: appointmentData.specialty || 'General',
+      callType: appointmentData.callType || 'audio',
+      patientName: appointmentData.guestName || 'Non-English Client',
+      interpreterId: appointmentData.interpreter?.id,
+      interpreterName: appointmentData.interpreter?.name,
+      interpreterBadgeNumber: appointmentData.interpreter?.badgeNumber || appointmentData.interpreter?.interpreterBadgeId,
+      bookingType: appointmentData.bookingType || 'instant',
+      date: appointmentData.date,
+      time: appointmentData.time,
+      createdAt: Date.now(),
+      status: 'searching'
+    };
+
+    activeDispatches[dispatchId] = dispatchRecord;
+
     io.emit('new-appointment-created', appointmentData);
+    io.emit('incoming-call-alert', dispatchRecord);
+    io.emit('incoming-dispatch-call', dispatchRecord);
   });
 
   // Host initiates On-Demand Dispatch Request
   socket.on('request-interpreter-dispatch', (dispatchData) => {
     const dispatchId = `disp-${Date.now()}`;
-    const roomId = `room-${Date.now().toString(36)}`;
-    const guestPin = Math.floor(1000 + Math.random() * 9000).toString();
+    const roomId = dispatchData.roomId || `room-${Date.now().toString(36)}`;
+    const guestPin = dispatchData.guestPin || Math.floor(1000 + Math.random() * 9000).toString();
 
     const dispatchRecord = {
       dispatchId,
       roomId,
       guestPin,
       hostSocketId: socket.id,
-      hostName: dispatchData.hostName || 'English Host',
-      hostOrg: dispatchData.hostOrg || 'General Organization',
-      targetLanguage: dispatchData.targetLanguage || 'Spanish',
+      hostName: dispatchData.hostName || dispatchData.mainClientName || 'English Host',
+      hostOrg: dispatchData.hostOrg || dispatchData.mainClientOrg || 'General Organization',
+      targetLanguage: dispatchData.targetLanguage || dispatchData.language || 'Spanish',
       specialty: dispatchData.specialty || 'General',
       callType: dispatchData.callType || 'audio',
-      patientName: dispatchData.patientName || 'Non-English Client',
+      patientName: dispatchData.patientName || dispatchData.guestName || 'Non-English Client',
+      interpreterId: dispatchData.interpreter?.id,
+      interpreterName: dispatchData.interpreter?.name,
       createdAt: Date.now(),
       status: 'searching'
     };
@@ -2332,6 +2360,7 @@ io.on('connection', (socket) => {
 
     // Broadcast incoming call notification to all online interpreters
     io.emit('incoming-call-alert', dispatchRecord);
+    io.emit('incoming-dispatch-call', dispatchRecord);
   });
 
   // Interpreter Accepts Call
