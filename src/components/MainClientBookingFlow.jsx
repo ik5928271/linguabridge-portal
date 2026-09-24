@@ -154,8 +154,45 @@ export default function MainClientBookingFlow({
     return isSocketOnline;
   };
 
+  // Helper to determine if an interpreter is currently busy on a live call
+  const isInterpreterOnCall = (interp) => {
+    if (!interp) return false;
+    const socketUser = (onlinePresence.interpreters || []).find(
+      op => (op.userId && (op.userId === interp.id || op.userId === interp.userId)) ||
+            (op.email && interp.email && op.email.toLowerCase() === interp.email.toLowerCase())
+    );
+    return !!(socketUser?.inCall || socketUser?.status === 'on_call' || interp.inCall || interp.status === 'on_call');
+  };
+
   // Active online interpreters list
   const onlineInterpreters = realInterpreters.filter(isInterpreterOnline);
+
+  // Helper to count available vs on-call interpreters for any language in real time
+  const getLanguageInterpreterStats = (langName) => {
+    if (!langName) return { totalOnline: 0, availableCount: 0, onCallCount: 0 };
+    const target = langName.toLowerCase().trim();
+    const matchingInterpreters = onlineInterpreters.filter(i => {
+      const pLang = (i.primaryLang || '').toLowerCase().trim();
+      const allLangs = Array.isArray(i.languages) 
+        ? i.languages.map(l => (typeof l === 'string' ? l : l?.name || '').toLowerCase().trim()) 
+        : [];
+      return pLang === target || pLang.includes(target) || target.includes(pLang) ||
+             allLangs.some(l => l === target || l.includes(target) || target.includes(l));
+    });
+
+    const onCallCount = matchingInterpreters.filter(isInterpreterOnCall).length;
+    const availableCount = matchingInterpreters.length - onCallCount;
+
+    return {
+      totalOnline: matchingInterpreters.length,
+      availableCount,
+      onCallCount
+    };
+  };
+
+  const getInterpreterCountForLang = (langName) => {
+    return getLanguageInterpreterStats(langName).totalOnline;
+  };
 
   // Filter registered interpreters for selected language
   const availableInterpreters = realInterpreters.filter(i => {
@@ -169,20 +206,6 @@ export default function MainClientBookingFlow({
   });
 
   const onlineAvailableInterpreters = availableInterpreters.filter(isInterpreterOnline);
-
-  // Helper to count ONLY ONLINE interpreters for any language in real time
-  const getInterpreterCountForLang = (langName) => {
-    if (!langName) return 0;
-    const target = langName.toLowerCase().trim();
-    return onlineInterpreters.filter(i => {
-      const pLang = (i.primaryLang || '').toLowerCase().trim();
-      const allLangs = Array.isArray(i.languages) 
-        ? i.languages.map(l => (typeof l === 'string' ? l : l?.name || '').toLowerCase().trim()) 
-        : [];
-      return pLang === target || pLang.includes(target) || target.includes(pLang) ||
-             allLangs.some(l => l === target || l.includes(target) || target.includes(l));
-    }).length;
-  };
 
   // Keep selected interpreter in sync (prioritize online interpreter first)
   useEffect(() => {
@@ -609,7 +632,7 @@ END:VCALENDAR`;
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {LANGUAGES.map((lang) => {
                 const isSelected = selectedLanguage === lang.name;
-                const count = getInterpreterCountForLang(lang.name);
+                const stats = getLanguageInterpreterStats(lang.name);
                 return (
                   <button
                     key={lang.code}
@@ -643,12 +666,23 @@ END:VCALENDAR`;
                       )}
                     </div>
 
-                    {/* Interpreter Availability Status */}
+                    {/* Interpreter Availability & On Call Status */}
                     <div className="w-full pt-2 border-t border-slate-800/60 flex items-center justify-between text-[10px]">
-                      {count > 0 ? (
+                      {stats.availableCount > 0 ? (
                         <span className="flex items-center gap-1.5 text-emerald-400 font-bold truncate">
                           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                          <span>{count} {count === 1 ? 'Online Interpreter' : 'Online Interpreters'}</span>
+                          <span>{stats.availableCount} {stats.availableCount === 1 ? 'Online Interpreter' : 'Online Interpreters'}</span>
+                          {stats.onCallCount > 0 && (
+                            <span className="text-amber-400 font-bold ml-1 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span>
+                              <span>({stats.onCallCount} On Call)</span>
+                            </span>
+                          )}
+                        </span>
+                      ) : stats.onCallCount > 0 ? (
+                        <span className="flex items-center gap-1.5 text-amber-400 font-bold truncate">
+                          <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+                          <span>{stats.onCallCount} {stats.onCallCount === 1 ? 'Interpreter On Call' : 'Interpreters On Call'}</span>
                         </span>
                       ) : (
                         <span className="flex items-center gap-1.5 text-amber-400/90 font-medium truncate">
@@ -664,7 +698,7 @@ END:VCALENDAR`;
               {/* 18th Box: 100+ Global Languages Selector */}
               {(() => {
                 const isCustomLangSelected = !LANGUAGES.some(l => l.name === selectedLanguage);
-                const customCount = isCustomLangSelected ? getInterpreterCountForLang(selectedLanguage) : 0;
+                const customStats = isCustomLangSelected ? getLanguageInterpreterStats(selectedLanguage) : { totalOnline: 0, availableCount: 0, onCallCount: 0 };
                 return (
                   <button
                     type="button"
@@ -691,10 +725,18 @@ END:VCALENDAR`;
 
                     <div className="w-full pt-2 border-t border-purple-500/30 flex items-center justify-between text-[10px]">
                       {isCustomLangSelected ? (
-                        customCount > 0 ? (
+                        customStats.availableCount > 0 ? (
                           <span className="flex items-center gap-1.5 text-emerald-400 font-bold truncate">
                             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                            <span>{customCount} {customCount === 1 ? 'Online Interpreter' : 'Online Interpreters'}</span>
+                            <span>{customStats.availableCount} {customStats.availableCount === 1 ? 'Online Interpreter' : 'Online Interpreters'}</span>
+                            {customStats.onCallCount > 0 && (
+                              <span className="text-amber-400 font-bold ml-1">({customStats.onCallCount} On Call)</span>
+                            )}
+                          </span>
+                        ) : customStats.onCallCount > 0 ? (
+                          <span className="flex items-center gap-1.5 text-amber-400 font-bold truncate">
+                            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+                            <span>{customStats.onCallCount} {customStats.onCallCount === 1 ? 'Interpreter On Call' : 'Interpreters On Call'}</span>
                           </span>
                         ) : (
                           <span className="flex items-center gap-1.5 text-amber-400/90 font-medium truncate">
@@ -860,9 +902,22 @@ END:VCALENDAR`;
                           {(interp.languages || [interp.primaryLang || selectedLanguage, 'English']).join(' ⟷ ')}
                         </p>
                         <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-400">
-                          <span className="flex items-center gap-1 text-emerald-400 font-bold">
-                            ● Online & Ready
-                          </span>
+                          {isInterpreterOnCall(interp) ? (
+                            <span className="flex items-center gap-1 text-amber-400 font-extrabold bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/30">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span>
+                              <span>On Call (In Session)</span>
+                            </span>
+                          ) : isInterpreterOnline(interp) ? (
+                            <span className="flex items-center gap-1 text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                              <span>● Online & Ready</span>
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-slate-400 font-medium">
+                              <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+                              <span>Standby Pool</span>
+                            </span>
+                          )}
                           <span>•</span>
                           <span className="truncate">{interp.specialty || interp.specialties?.[0] || 'General / Healthcare'}</span>
                         </div>
@@ -1695,7 +1750,7 @@ END:VCALENDAR`;
                   (l.nativeName && l.nativeName.toLowerCase().includes(lang100Search.toLowerCase()))
                 ).map((lang) => {
                   const isSel = selectedLanguage === lang.name;
-                  const count = getInterpreterCountForLang(lang.name);
+                  const stats = getLanguageInterpreterStats(lang.name);
                   return (
                     <button
                       key={lang.code}
@@ -1729,10 +1784,18 @@ END:VCALENDAR`;
                         )}
                       </div>
                       <div className="w-full pt-1 border-t border-slate-800/60 text-[9.5px]">
-                        {count > 0 ? (
+                        {stats.availableCount > 0 ? (
                           <span className="text-emerald-400 font-bold flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                            <span>{count} Online</span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span>{stats.availableCount} Online</span>
+                            {stats.onCallCount > 0 && (
+                              <span className="text-amber-400 font-bold">({stats.onCallCount} On Call)</span>
+                            )}
+                          </span>
+                        ) : stats.onCallCount > 0 ? (
+                          <span className="text-amber-400 font-bold flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span>
+                            <span>{stats.onCallCount} On Call</span>
                           </span>
                         ) : (
                           <span className="text-amber-400/90 font-medium flex items-center gap-1">

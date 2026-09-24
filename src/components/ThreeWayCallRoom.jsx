@@ -258,6 +258,10 @@ export default function ThreeWayCallRoom({
     }
 
     return () => {
+      const socket = getSocket();
+      if (socket) {
+        socket.emit('leave-room', { roomId });
+      }
       if (mediaStreamRef.current) {
         mediaStreamRef.current.getTracks().forEach(t => t.stop());
       }

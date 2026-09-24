@@ -1247,33 +1247,88 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
     return matchesSearch;
   });
 
-  // Live Active Interpreters and Clients Computed Lists
+  // All Enrolled/Registered Interpreters & Clients on Platform (Active Roster)
   const registeredInterpreters = usersList.filter(u => u.role === 'interpreter');
-  const registeredClients = usersList.filter(u => u.role === 'host' || u.role === 'client');
+  const registeredInterpretersCount = registeredInterpreters.length;
 
-  const liveInterpretersList = registeredInterpreters.map(interp => {
-    const isSocketOnline = (onlinePresence.interpreters || []).some(
-      op => op.userId === interp.id || (op.email && op.email.toLowerCase() === interp.email?.toLowerCase())
-    );
-    return {
-      ...interp,
-      isLiveSocket: isSocketOnline,
-      liveStatus: isSocketOnline ? 'active_connected' : 'standby_ready'
-    };
+  const registeredClients = usersList.filter(u => u.role === 'host' || u.role === 'client');
+  const registeredClientsCount = registeredClients.length;
+
+  // Real-time LIVE Online Interpreters (Strictly filtered by active socket presence)
+  const liveInterpretersList = registeredInterpreters
+    .map(interp => {
+      const socketUser = (onlinePresence.interpreters || []).find(
+        op => (op.userId && (op.userId === interp.id || op.userId === interp.userId)) ||
+              (op.email && interp.email && op.email.toLowerCase() === interp.email.toLowerCase())
+      );
+      const isSocketOnline = !!socketUser;
+      const inCall = !!(socketUser?.inCall || socketUser?.status === 'on_call' || interp.inCall || interp.status === 'on_call');
+      return {
+        ...interp,
+        isLiveSocket: isSocketOnline,
+        inCall,
+        status: inCall ? 'on_call' : (interp.status || 'online'),
+        liveStatus: isSocketOnline ? (inCall ? 'on_call' : 'active_connected') : 'standby_ready'
+      };
+    })
+    .filter(interp => interp.isLiveSocket);
+
+  // Include any direct socket interpreters from onlinePresence not yet in usersList
+  (onlinePresence.interpreters || []).forEach(op => {
+    if (!liveInterpretersList.some(li => li.id === op.userId || (li.email && op.email && li.email.toLowerCase() === op.email.toLowerCase()))) {
+      const inCall = !!(op.inCall || op.status === 'on_call');
+      liveInterpretersList.push({
+        id: op.userId || `socket-${op.socketId}`,
+        name: op.name || 'Live Interpreter',
+        email: op.email || '',
+        role: 'interpreter',
+        primaryLang: op.language || 'Spanish',
+        specialty: op.specialty || 'General / Healthcare',
+        badgeNumber: op.badgeNumber || '',
+        interpreterBadgeId: op.badgeNumber || '',
+        phone: op.phone || '',
+        isLiveSocket: true,
+        inCall,
+        status: inCall ? 'on_call' : 'online',
+        liveStatus: inCall ? 'on_call' : 'active_connected'
+      });
+    }
   });
 
-  const liveClientsList = registeredClients.map(client => {
-    const isSocketOnline = (onlinePresence.clients || []).some(
-      op => op.userId === client.id || (op.email && op.email.toLowerCase() === client.email?.toLowerCase())
-    );
-    return {
-      ...client,
-      isLiveSocket: isSocketOnline,
-      liveStatus: isSocketOnline ? 'active_connected' : 'account_ready'
-    };
+  // Real-time LIVE Online Clients (Strictly filtered by active socket presence)
+  const liveClientsList = registeredClients
+    .map(client => {
+      const isSocketOnline = (onlinePresence.clients || []).some(
+        op => (op.userId && (op.userId === client.id || op.userId === client.userId)) ||
+              (op.email && client.email && op.email.toLowerCase() === client.email.toLowerCase())
+      );
+      return {
+        ...client,
+        isLiveSocket: isSocketOnline,
+        liveStatus: isSocketOnline ? 'active_connected' : 'account_ready'
+      };
+    })
+    .filter(client => client.isLiveSocket);
+
+  // Include any direct socket clients from onlinePresence not yet in usersList
+  (onlinePresence.clients || []).forEach(op => {
+    if (!liveClientsList.some(lc => lc.id === op.userId || (lc.email && op.email && lc.email.toLowerCase() === op.email.toLowerCase()))) {
+      liveClientsList.push({
+        id: op.userId || `socket-${op.socketId}`,
+        name: op.name || 'Live Client',
+        email: op.email || '',
+        role: 'host',
+        org: op.org || 'Client Account',
+        phone: op.phone || '',
+        isLiveSocket: true,
+        liveStatus: 'active_connected'
+      });
+    }
   });
 
   const liveInterpretersCount = liveInterpretersList.length;
+  const liveInterpretersOnCallCount = liveInterpretersList.filter(i => i.inCall || i.status === 'on_call' || i.liveStatus === 'on_call').length;
+  const liveInterpretersAvailableCount = liveInterpretersCount - liveInterpretersOnCallCount;
   const liveClientsCount = liveClientsList.length;
 
   // Helper to download applicant document / CV
@@ -1523,6 +1578,9 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
           >
             <Headphones className="w-3.5 h-3.5" />
             <span>Active Interpreters</span>
+            <span className="px-1.5 py-0.2 rounded-full bg-purple-500/30 text-purple-200 text-[10px] font-bold border border-purple-400/30">
+              {registeredInterpretersCount}
+            </span>
           </button>
           <button
             onClick={() => {
@@ -4290,8 +4348,14 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                   <span>Live Online Interpreters</span>
                   <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                    <span>{liveInterpretersCount} Available Now</span>
+                    <span>{liveInterpretersAvailableCount} Available Now</span>
                   </span>
+                  {liveInterpretersOnCallCount > 0 && (
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+                      <span>{liveInterpretersOnCallCount} On Call</span>
+                    </span>
+                  )}
                 </h3>
                 <p className="text-xs text-slate-400">
                   Real-time view of verified linguists currently online and on standby for live 3-way video & audio calls
@@ -4330,7 +4394,12 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
             <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold text-slate-400">Online & Standby Roster</p>
-                <p className="text-2xl font-black text-emerald-400 mt-1">{liveInterpretersCount} Linguists</p>
+                <p className="text-2xl font-black text-emerald-400 mt-1">
+                  {liveInterpretersCount} Linguists
+                  {liveInterpretersOnCallCount > 0 && (
+                    <span className="text-xs font-semibold text-amber-400 ml-2">({liveInterpretersOnCallCount} On Call)</span>
+                  )}
+                </p>
               </div>
               <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
                 <Headphones className="w-5 h-5" />
@@ -4400,140 +4469,179 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
           </div>
 
           {/* Live Interpreters Card Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {liveInterpretersList
-              .filter(i => {
-                const matchSearch = 
-                  (i.name && i.name.toLowerCase().includes(liveInterpSearch.toLowerCase())) ||
-                  (i.email && i.email.toLowerCase().includes(liveInterpSearch.toLowerCase())) ||
-                  (i.primaryLang && i.primaryLang.toLowerCase().includes(liveInterpSearch.toLowerCase())) ||
-                  (i.badgeNumber && String(i.badgeNumber).includes(liveInterpSearch));
-                const matchLang = liveInterpLangFilter === 'all' || (i.primaryLang || 'Spanish') === liveInterpLangFilter;
-                return matchSearch && matchLang;
-              })
-              .map((i) => {
-                const phone = i.phone || i.contactPhone || '';
-                const cleanPhone = phone.replace(/[^0-9]/g, '');
-                const rate = i.hourlyRate !== undefined ? i.hourlyRate : (i.interpreterProfile?.hourlyRate !== undefined ? i.interpreterProfile.hourlyRate : 5);
-                const isSocketLive = i.isLiveSocket;
+          {liveInterpretersList.length === 0 ? (
+            <div className="p-12 text-center rounded-3xl bg-slate-900/60 border border-slate-800 space-y-3">
+              <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto">
+                <Radio className="w-8 h-8 opacity-60" />
+              </div>
+              <h4 className="text-base font-bold text-white">No Interpreters Connected via WebRTC Right Now</h4>
+              <p className="text-xs text-slate-400 max-w-md mx-auto">
+                All {registeredInterpretersCount} registered interpreters are currently on standby/offline. When an interpreter signs in to their portal, they will appear here live with active WebRTC status.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {liveInterpretersList
+                .filter(i => {
+                  const matchSearch = 
+                    (i.name && i.name.toLowerCase().includes(liveInterpSearch.toLowerCase())) ||
+                    (i.email && i.email.toLowerCase().includes(liveInterpSearch.toLowerCase())) ||
+                    (i.primaryLang && i.primaryLang.toLowerCase().includes(liveInterpSearch.toLowerCase())) ||
+                    (i.badgeNumber && String(i.badgeNumber).includes(liveInterpSearch));
+                  const matchLang = liveInterpLangFilter === 'all' || (i.primaryLang || 'Spanish') === liveInterpLangFilter;
+                  return matchSearch && matchLang;
+                })
+                .map((i) => {
+                  const phone = i.phone || i.contactPhone || '';
+                  const cleanPhone = phone.replace(/[^0-9]/g, '');
+                  const rate = i.hourlyRate !== undefined ? i.hourlyRate : (i.interpreterProfile?.hourlyRate !== undefined ? i.interpreterProfile.hourlyRate : 5);
+                  const isSocketLive = i.isLiveSocket;
+                  const isOnCall = !!(i.inCall || i.status === 'on_call' || i.liveStatus === 'on_call');
 
-                return (
-                  <div 
-                    key={i.id} 
-                    className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3.5 hover:border-emerald-500/50 hover:shadow-xl hover:shadow-emerald-950/20 transition group relative overflow-hidden"
-                  >
-                    {/* Live Glowing Status Indicator Top Right */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-3">
-                        <div className="relative">
-                          <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-600 text-white font-black text-base flex items-center justify-center shadow-md">
-                            {i.name?.charAt(0) || 'I'}
+                  return (
+                    <div 
+                      key={i.id} 
+                      className={`p-4 rounded-2xl bg-slate-900/90 border space-y-3.5 transition group relative overflow-hidden ${
+                        isOnCall 
+                          ? 'border-amber-500/50 shadow-xl shadow-amber-950/20' 
+                          : 'border-slate-800 hover:border-emerald-500/50 hover:shadow-xl hover:shadow-emerald-950/20'
+                      }`}
+                    >
+                      {/* Live Glowing Status Indicator Top Right */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <div className="relative">
+                            <div className={`w-12 h-12 rounded-xl text-white font-black text-base flex items-center justify-center shadow-md ${
+                              isOnCall 
+                                ? 'bg-gradient-to-tr from-amber-600 to-rose-600' 
+                                : 'bg-gradient-to-tr from-emerald-600 to-teal-600'
+                            }`}>
+                              {i.name?.charAt(0) || 'I'}
+                            </div>
+                            <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-slate-950 border-2 border-slate-900 flex items-center justify-center">
+                              {isOnCall ? (
+                                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping"></span>
+                              ) : (
+                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                              )}
+                            </span>
                           </div>
-                          <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-slate-950 border-2 border-slate-900 flex items-center justify-center">
-                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                          </span>
-                        </div>
 
-                        <div className="overflow-hidden">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <h4 className="text-xs font-bold text-white truncate">{i.name}</h4>
-                            {(i.badgeNumber || i.interpreterBadgeId) && (
-                              <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shrink-0">
-                                ID: #{i.badgeNumber || i.interpreterBadgeId}
+                          <div className="overflow-hidden">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <h4 className="text-xs font-bold text-white truncate">{i.name}</h4>
+                              {(i.badgeNumber || i.interpreterBadgeId) && (
+                                <span className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded border shrink-0 ${
+                                  isOnCall 
+                                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
+                                    : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                }`}>
+                                  ID: #{i.badgeNumber || i.interpreterBadgeId}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] font-semibold text-brand-300">
+                              {i.primaryLang || 'Spanish'} ⟷ English
+                            </p>
+                            {isOnCall ? (
+                              <span className="text-[10px] font-bold text-amber-400 flex items-center gap-1.5 animate-pulse">
+                                <span className="relative flex h-2 w-2">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                                </span>
+                                <span>● On Call (In 3-Way Session)</span>
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                <span>{isSocketLive ? '● Live Active WebRTC' : '● Online & Standby Ready'}</span>
                               </span>
                             )}
                           </div>
-                          <p className="text-[11px] font-semibold text-brand-300">
-                            {i.primaryLang || 'Spanish'} ⟷ English
-                          </p>
-                          <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                            <span>{isSocketLive ? '● Live Active WebRTC' : '● Online & Standby Ready'}</span>
+                        </div>
+
+                        <button
+                          onClick={() => handleOpenEditModal(i)}
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                          title="Edit Interpreter Profile & Rate"
+                        >
+                          <Edit className="w-3.5 h-3.5 text-brand-300" />
+                        </button>
+                      </div>
+
+                      {/* Metadata Box */}
+                      <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-[11px] text-slate-300 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400">Specialty Domain:</span>
+                          <span className="font-semibold text-slate-200 truncate max-w-[150px]">{i.specialty || 'Medical / Healthcare'}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400">Compensation:</span>
+                          <span className="font-bold text-emerald-400">
+                            {i.employmentType === 'salary_base' 
+                              ? `$${i.monthlySalary || 1200}/mo Fixed Salary` 
+                              : i.employmentType === 'per_minute' 
+                              ? `$${(i.minuteRate || 0.30).toFixed(2)} / min Talk Time` 
+                              : `$${rate || 5}/hr Scheduled Shift`}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400">Shift Availability:</span>
+                          <span className="font-medium text-slate-300">
+                            {formatShiftSchedule(i.shiftSchedule)}
                           </span>
                         </div>
                       </div>
 
-                      <button
-                        onClick={() => handleOpenEditModal(i)}
-                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
-                        title="Edit Interpreter Profile & Rate"
-                      >
-                        <Edit className="w-3.5 h-3.5 text-brand-300" />
-                      </button>
-                    </div>
+                      {/* Quick Direct Actions Bar */}
+                      <div className="flex items-center gap-1.5 pt-1">
+                        {phone ? (
+                          <a
+                            href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(`Hello ${i.name}, this is IK Enterprises Dispatch. We have live calls available for your language pair (${i.primaryLang || 'Spanish'}).`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 py-1.5 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[11px] flex items-center justify-center gap-1 transition shadow-md shadow-emerald-600/20"
+                            title="Open WhatsApp chat with linguist"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                            <span>WhatsApp</span>
+                          </a>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleDispatchCredentialsEmail(i.id)}
+                            className="flex-1 py-1.5 px-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-extrabold text-[11px] flex items-center justify-center gap-1 transition shadow-md shadow-purple-600/20"
+                            title="Email credentials to interpreter"
+                          >
+                            <Mail className="w-3.5 h-3.5" />
+                            <span>Email</span>
+                          </button>
+                        )}
 
-                    {/* Metadata Box */}
-                    <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-[11px] text-slate-300 space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400">Specialty Domain:</span>
-                        <span className="font-semibold text-slate-200 truncate max-w-[150px]">{i.specialty || 'Medical / Healthcare'}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400">Compensation:</span>
-                        <span className="font-bold text-emerald-400">
-                          {i.employmentType === 'salary_base' 
-                            ? `$${i.monthlySalary || 1200}/mo Fixed Salary` 
-                            : i.employmentType === 'per_minute' 
-                            ? `$${(i.minuteRate || 0.30).toFixed(2)} / min Talk Time` 
-                            : `$${rate || 5}/hr Scheduled Shift`}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400">Shift Availability:</span>
-                        <span className="font-medium text-slate-300">
-                          {formatShiftSchedule(i.shiftSchedule)}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Quick Direct Actions Bar */}
-                    <div className="flex items-center gap-1.5 pt-1">
-                      {phone ? (
                         <a
-                          href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(`Hello ${i.name}, this is IK Enterprises Dispatch. We have live calls available for your language pair (${i.primaryLang || 'Spanish'}).`)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1 py-1.5 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[11px] flex items-center justify-center gap-1 transition shadow-md shadow-emerald-600/20"
-                          title="Open WhatsApp chat with linguist"
-                        >
-                          <MessageCircle className="w-3.5 h-3.5" />
-                          <span>WhatsApp</span>
-                        </a>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleDispatchCredentialsEmail(i.id)}
-                          className="flex-1 py-1.5 px-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-extrabold text-[11px] flex items-center justify-center gap-1 transition shadow-md shadow-purple-600/20"
-                          title="Email credentials to interpreter"
+                          href={`mailto:${i.email}?subject=${encodeURIComponent(`IK Enterprises Dispatch - Live Call Ready`)}`}
+                          className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                          title="Send Direct Email"
                         >
                           <Mail className="w-3.5 h-3.5" />
-                          <span>Email</span>
+                        </a>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            alert(`Dispatched live test ping to Interpreter #${i.badgeNumber || i.name} (${i.primaryLang || 'Spanish'}).`);
+                          }}
+                          className="p-2 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 transition cursor-pointer"
+                          title="Dispatch Test WebRTC Ring"
+                        >
+                          <PhoneCall className="w-3.5 h-3.5" />
                         </button>
-                      )}
-
-                      <a
-                        href={`mailto:${i.email}?subject=${encodeURIComponent(`IK Enterprises Dispatch - Live Call Ready`)}`}
-                        className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
-                        title="Send Direct Email"
-                      >
-                        <Mail className="w-3.5 h-3.5" />
-                      </a>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          alert(`Dispatched live test ping to Interpreter #${i.badgeNumber || i.name} (${i.primaryLang || 'Spanish'}).`);
-                        }}
-                        className="p-2 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 transition cursor-pointer"
-                        title="Dispatch Test WebRTC Ring"
-                      >
-                        <PhoneCall className="w-3.5 h-3.5" />
-                      </button>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-          </div>
+                  );
+                })}
+            </div>
+          )}
         </div>
       )}
 
@@ -4664,126 +4772,138 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
           </div>
 
           {/* Live Clients Card Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {liveClientsList
-              .filter(c => {
-                const matchSearch = 
-                  (c.name && c.name.toLowerCase().includes(liveClientSearch.toLowerCase())) ||
-                  (c.org && c.org.toLowerCase().includes(liveClientSearch.toLowerCase())) ||
-                  (c.email && c.email.toLowerCase().includes(liveClientSearch.toLowerCase()));
-                const matchBilling = liveClientBillingFilter === 'all' || 
-                  (liveClientBillingFilter === 'postpaid_hospital' ? c.wallet?.billingType === 'postpaid_hospital' : c.wallet?.billingType !== 'postpaid_hospital');
-                return matchSearch && matchBilling;
-              })
-              .map((c) => {
-                const isHospital = c.wallet?.billingType === 'postpaid_hospital';
-                const phone = c.phone || c.contactPhone || '';
-                const cleanPhone = phone.replace(/[^0-9]/g, '');
+          {liveClientsList.length === 0 ? (
+            <div className="p-12 text-center rounded-3xl bg-slate-900/60 border border-slate-800 space-y-3">
+              <div className="w-16 h-16 rounded-2xl bg-blue-500/10 text-blue-400 flex items-center justify-center mx-auto">
+                <Activity className="w-8 h-8 opacity-60" />
+              </div>
+              <h4 className="text-base font-bold text-white">No Clients Currently Online</h4>
+              <p className="text-xs text-slate-400 max-w-md mx-auto">
+                All {registeredClientsCount} registered client accounts are currently offline. When a client signs in or opens their booking flow, they will appear here live with active status.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {liveClientsList
+                .filter(c => {
+                  const matchSearch = 
+                    (c.name && c.name.toLowerCase().includes(liveClientSearch.toLowerCase())) ||
+                    (c.org && c.org.toLowerCase().includes(liveClientSearch.toLowerCase())) ||
+                    (c.email && c.email.toLowerCase().includes(liveClientSearch.toLowerCase()));
+                  const matchBilling = liveClientBillingFilter === 'all' || 
+                    (liveClientBillingFilter === 'postpaid_hospital' ? c.wallet?.billingType === 'postpaid_hospital' : c.wallet?.billingType !== 'postpaid_hospital');
+                  return matchSearch && matchBilling;
+                })
+                .map((c) => {
+                  const isHospital = c.wallet?.billingType === 'postpaid_hospital';
+                  const phone = c.phone || c.contactPhone || '';
+                  const cleanPhone = phone.replace(/[^0-9]/g, '');
 
-                return (
-                  <div 
-                    key={c.id} 
-                    className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3.5 hover:border-blue-500/50 hover:shadow-xl hover:shadow-blue-950/20 transition group relative overflow-hidden"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-3">
-                        <div className="relative">
-                          <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black text-base flex items-center justify-center shadow-md">
-                            {c.name?.charAt(0) || 'C'}
+                  return (
+                    <div 
+                      key={c.id} 
+                      className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3.5 hover:border-blue-500/50 hover:shadow-xl hover:shadow-blue-950/20 transition group relative overflow-hidden"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <div className="relative">
+                            <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black text-base flex items-center justify-center shadow-md">
+                              {c.name?.charAt(0) || 'C'}
+                            </div>
+                            <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-slate-950 border-2 border-slate-900 flex items-center justify-center">
+                              <span className="w-2.5 h-2.5 rounded-full bg-blue-400 animate-pulse"></span>
+                            </span>
                           </div>
-                          <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-slate-950 border-2 border-slate-900 flex items-center justify-center">
-                            <span className="w-2.5 h-2.5 rounded-full bg-blue-400 animate-pulse"></span>
-                          </span>
+
+                          <div className="overflow-hidden">
+                            <h4 className="text-xs font-bold text-white truncate">{c.name}</h4>
+                            <p className="text-[11px] font-semibold text-slate-300 truncate">
+                              {c.org || 'Healthcare Client'}
+                            </p>
+                            <span className="text-[10px] font-bold text-blue-400 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+                              <span>● Live Active Client</span>
+                            </span>
+                          </div>
                         </div>
 
-                        <div className="overflow-hidden">
-                          <h4 className="text-xs font-bold text-white truncate">{c.name}</h4>
-                          <p className="text-[11px] font-semibold text-slate-300 truncate">
-                            {c.org || 'Healthcare Client'}
-                          </p>
-                          <span className="text-[10px] font-bold text-blue-400 flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
-                            <span>● Live Active Client</span>
-                          </span>
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => handleOpenEditModal(c)}
-                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
-                        title="Edit Client Account & Billing"
-                      >
-                        <Edit className="w-3.5 h-3.5 text-brand-300" />
-                      </button>
-                    </div>
-
-                    {/* Metadata & Wallet Box */}
-                    <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-[11px] text-slate-300 space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400">Billing Plan:</span>
-                        <span className={`font-bold ${isHospital ? 'text-purple-300' : 'text-blue-300'}`}>
-                          {isHospital ? '🏢 Hospital Net-30' : '⚡ Standard Prepaid'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400">Minute Balance:</span>
-                        <span className="font-extrabold text-emerald-400">
-                          {isHospital ? 'Unlimited (Net 30)' : `${c.wallet?.minutesRemaining || 0} Minutes`}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400">Total Lifetime Paid:</span>
-                        <span className="font-mono font-bold text-white">
-                          ${(c.wallet?.totalPaid || 0).toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Quick Direct Actions Bar */}
-                    <div className="flex items-center gap-1.5 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => handleOpenEditModal(c)}
-                        className="flex-1 py-1.5 px-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-[11px] flex items-center justify-center gap-1 transition shadow-md shadow-blue-600/20 cursor-pointer"
-                        title="Manage Minutes & Account"
-                      >
-                        <Zap className="w-3.5 h-3.5 text-amber-300" />
-                        <span>Manage / Top-up</span>
-                      </button>
-
-                      {phone && (
-                        <a
-                          href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(`Hello ${c.name}, this is IK Enterprises Dispatch regarding your interpretation account.`)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-2 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 transition"
-                          title="Open WhatsApp"
+                        <button
+                          onClick={() => handleOpenEditModal(c)}
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                          title="Edit Client Account & Billing"
                         >
-                          <MessageCircle className="w-3.5 h-3.5" />
+                          <Edit className="w-3.5 h-3.5 text-brand-300" />
+                        </button>
+                      </div>
+
+                      {/* Metadata & Wallet Box */}
+                      <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-[11px] text-slate-300 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400">Billing Plan:</span>
+                          <span className={`font-bold ${isHospital ? 'text-purple-300' : 'text-blue-300'}`}>
+                            {isHospital ? '🏢 Hospital Net-30' : '⚡ Standard Prepaid'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400">Minute Balance:</span>
+                          <span className="font-extrabold text-emerald-400">
+                            {isHospital ? 'Unlimited (Net 30)' : `${c.wallet?.minutesRemaining || 0} Minutes`}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400">Total Lifetime Paid:</span>
+                          <span className="font-mono font-bold text-white">
+                            ${(c.wallet?.totalPaid || 0).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Quick Direct Actions Bar */}
+                      <div className="flex items-center gap-1.5 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditModal(c)}
+                          className="flex-1 py-1.5 px-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-[11px] flex items-center justify-center gap-1 transition shadow-md shadow-blue-600/20 cursor-pointer"
+                          title="Manage Minutes & Account"
+                        >
+                          <Zap className="w-3.5 h-3.5 text-amber-300" />
+                          <span>Manage / Top-up</span>
+                        </button>
+
+                        {phone && (
+                          <a
+                            href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(`Hello ${c.name}, this is IK Enterprises Dispatch regarding your interpretation account.`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 transition"
+                            title="Open WhatsApp"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+
+                        <a
+                          href={`mailto:${c.email}?subject=${encodeURIComponent(`IK Enterprises Dispatch - Client Account Support`)}`}
+                          className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                          title="Send Direct Email"
+                        >
+                          <Mail className="w-3.5 h-3.5" />
                         </a>
-                      )}
 
-                      <a
-                        href={`mailto:${c.email}?subject=${encodeURIComponent(`IK Enterprises Dispatch - Client Account Support`)}`}
-                        className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
-                        title="Send Direct Email"
-                      >
-                        <Mail className="w-3.5 h-3.5" />
-                      </a>
-
-                      <button
-                        type="button"
-                        onClick={() => handleDispatchCredentialsEmail(c.id)}
-                        className="p-2 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 border border-purple-500/40 transition cursor-pointer"
-                        title="Email login credentials"
-                      >
-                        <Key className="w-3.5 h-3.5" />
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDispatchCredentialsEmail(c.id)}
+                          className="p-2 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 border border-purple-500/40 transition cursor-pointer"
+                          title="Email login credentials"
+                        >
+                          <Key className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-          </div>
+                  );
+                })}
+            </div>
+          )}
         </div>
       )}
 
