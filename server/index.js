@@ -2237,18 +2237,66 @@ app.get('/api/glossary', (req, res) => {
 });
 
 // ==========================================
+// Active Live Online Presence Tracking
+const activePresence = new Map();
+
+function broadcastPresence() {
+  const onlineList = Array.from(activePresence.values());
+  io.emit('online-presence-updated', {
+    total: onlineList.length,
+    users: onlineList,
+    interpreters: onlineList.filter(u => u.role === 'interpreter'),
+    clients: onlineList.filter(u => u.role === 'host' || u.role === 'client'),
+    admins: onlineList.filter(u => u.role === 'admin')
+  });
+}
+
+// Online presence inspection endpoint for Admin
+app.get('/api/admin/online-presence', (req, res) => {
+  const onlineList = Array.from(activePresence.values());
+  res.json({
+    total: onlineList.length,
+    users: onlineList,
+    interpreters: onlineList.filter(u => u.role === 'interpreter'),
+    clients: onlineList.filter(u => u.role === 'host' || u.role === 'client'),
+    admins: onlineList.filter(u => u.role === 'admin')
+  });
+});
+
+// ==========================================
 // SOCKET.IO REAL-TIME SIGNALING & ROOMS
 // ==========================================
 
 io.on('connection', (socket) => {
   console.log(`[Socket Connected] ID: ${socket.id}`);
 
-  // Register user info on socket
-  socket.on('register-user', ({ role, userId, name, language }) => {
+  // Register user info on socket & add to active presence
+  socket.on('register-user', ({ role = 'guest', userId, name, email, language, org, specialty, badgeNumber, phone }) => {
     socket.userRole = role;
     socket.userId = userId;
     socket.userName = name;
     socket.userLang = language;
+    
+    activePresence.set(socket.id, {
+      socketId: socket.id,
+      userId: userId || `usr-${socket.id.substring(0, 6)}`,
+      role: (role || 'guest').toLowerCase(),
+      name: name || 'Online User',
+      email: email || '',
+      language: language || 'English',
+      org: org || '',
+      specialty: specialty || 'General',
+      badgeNumber: badgeNumber || '',
+      phone: phone || '',
+      connectedAt: new Date().toISOString(),
+      status: 'online'
+    });
+    broadcastPresence();
+  });
+
+  socket.on('disconnect', () => {
+    activePresence.delete(socket.id);
+    broadcastPresence();
   });
 
   // Re-broadcast appointment creation event to all parties (Client, Interpreter, Admin)
