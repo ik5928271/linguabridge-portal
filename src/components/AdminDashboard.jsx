@@ -139,6 +139,23 @@ const formatBubbleTimestamp = (dateInput, fallbackTime = '') => {
   }
 };
 
+// Safe Shift Schedule Formatter to prevent React error #31 with nested schedule objects
+const formatShiftSchedule = (sched) => {
+  if (!sched) return 'Shift A (09:00 - 18:00 PKT)';
+  if (typeof sched === 'string') return sched;
+  if (typeof sched === 'object') {
+    if (sched.scheduleLabel) return String(sched.scheduleLabel);
+    if (sched.shiftType === 'open_unlimited') return 'Open & Flexible (Unlimited On-Demand 24/7)';
+    if (sched.dailyHours || sched.startTime || sched.endTime) {
+      const hours = sched.dailyHours ? `${sched.dailyHours}h Daily` : '';
+      const times = (sched.startTime && sched.endTime) ? `(${sched.startTime} - ${sched.endTime})` : '';
+      const tz = sched.timeZone ? ` ${sched.timeZone.split(' ')[0] || sched.timeZone}` : '';
+      return `${hours} ${times}${tz}`.trim() || 'Scheduled Shift';
+    }
+  }
+  return 'Shift A (09:00 - 18:00 PKT)';
+};
+
 export default function AdminDashboard({ callLogs = [], appointments = [] }) {
   const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'users', 'applications', 'roster', 'billing'
   const [searchTerm, setSearchTerm] = useState('');
@@ -4464,7 +4481,7 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                       <div className="flex items-center justify-between">
                         <span className="text-slate-400">Shift Availability:</span>
                         <span className="font-medium text-slate-300">
-                          {i.shiftSchedule || 'Shift A (09:00 - 18:00 PKT)'}
+                          {formatShiftSchedule(i.shiftSchedule)}
                         </span>
                       </div>
                     </div>
@@ -5331,7 +5348,7 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                   <p className="text-white">🔑 Temporary Password: <span className="font-bold text-amber-400">{emailDispatchModal.temporaryPassword}</span></p>
                   <p className="text-white">📋 Contract Model: <span className="font-bold text-purple-300">{emailDispatchModal.employmentType || 'Hourly Rate (Scheduled Shifts)'}</span></p>
                   <p className="text-white">💵 Approved Terms: <span className="font-bold text-emerald-400">{emailDispatchModal.compensationTerms || emailDispatchModal.hourlyRate}</span></p>
-                  <p className="text-white">⏰ Shift Timing: <span className="font-bold text-amber-300">{emailDispatchModal.shiftSchedule || 'Flexible On-Demand (24/7)'}</span></p>
+                  <p className="text-white">⏰ Shift Timing: <span className="font-bold text-amber-300">{formatShiftSchedule(emailDispatchModal.shiftSchedule)}</span></p>
                   {emailDispatchModal.timeZone && (
                     <p className="text-white">🌐 Time Zone: <span className="font-bold text-slate-300">{emailDispatchModal.timeZone}</span></p>
                   )}
