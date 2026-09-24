@@ -15,6 +15,7 @@ import InterpreterApplicationModal from './components/InterpreterApplicationModa
 import AppointmentNotificationManager from './components/AppointmentNotificationManager';
 import AIAssistantWidget from './components/AIAssistantWidget';
 import { getSocket } from './services/socket';
+import { LANGUAGES } from './data/mockData';
 
 export default function App() {
   // Theme state ('dark' or 'light')
@@ -161,7 +162,7 @@ export default function App() {
       })
     }).catch(() => {});
 
-    // Listen for real-time payment approvals from Admin
+    // Listen for real-time socket events
     const socket = getSocket();
     if (socket) {
       socket.on('payment-receipt-approved', (data) => {
@@ -180,6 +181,12 @@ export default function App() {
             } catch {}
             return updated;
           });
+        }
+      });
+
+      socket.on('new-appointment-created', (newApt) => {
+        if (newApt && newApt.id) {
+          setAppointments(prev => [newApt, ...prev.filter(a => a.id !== newApt.id)]);
         }
       });
     }
@@ -400,7 +407,7 @@ export default function App() {
         {currentView === 'guest' && (
           <GuestJoinView
             initialRoomId={activeSession.roomId}
-            initialLang="es"
+            initialLang={new URLSearchParams(window.location.search).get('lang') || (activeSession.targetLanguage ? (LANGUAGES.find(l => l.name.toLowerCase() === activeSession.targetLanguage.toLowerCase())?.code || 'en') : 'en')}
             initialName={activeSession.patientName}
             onJoinRoom={handleStartCall}
           />
@@ -410,6 +417,8 @@ export default function App() {
           <AdminDashboard
             callLogs={callLogs}
             appointments={appointments}
+            onStartCall={handleStartCall}
+            currentUser={currentUser}
           />
         )}
 

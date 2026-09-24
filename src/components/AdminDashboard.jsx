@@ -49,9 +49,11 @@ import {
   Zap,
   Wifi,
   Lock,
-  Radio
+  Radio,
+  ArrowRight
 } from 'lucide-react';
 import { getSocket } from '../services/socket';
+import { playTelephoneRing, playMessageTone, playConnectedChime } from '../services/audioService';
 import ALL_SEED_APPLICATIONS from '../data/all_seed_applications.json';
 import ALL_SEED_INQUIRIES from '../data/all_seed_inquiries.json';
 import { SHIFT_WINDOWS, SPECIALTY_DOMAINS, HARDWARE_STANDARDS, LANGUAGES } from '../data/mockData';
@@ -156,11 +158,23 @@ const formatShiftSchedule = (sched) => {
   return 'Shift A (09:00 - 18:00 PKT)';
 };
 
-export default function AdminDashboard({ callLogs = [], appointments = [] }) {
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'users', 'applications', 'roster', 'billing'
+export default function AdminDashboard({ 
+  callLogs = [], 
+  appointments = [], 
+  onStartCall, 
+  currentUser 
+}) {
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'live_calls', 'users', 'applications', 'roster', 'billing'
   const [searchTerm, setSearchTerm] = useState('');
   const [userRoleFilter, setUserRoleFilter] = useState('all');
   const [employmentFilter, setEmploymentFilter] = useState('all'); // 'all', 'salary_base', 'hourly', 'per_minute'
+
+  // Real-time Client Bookings & Live Encounters State
+  const [adminAppointments, setAdminAppointments] = useState(() => Array.isArray(appointments) ? appointments : []);
+  const [activeLiveRooms, setActiveLiveRooms] = useState([]);
+  const [liveAlertToast, setLiveAlertToast] = useState(null);
+  const [liveCallsSearch, setLiveCallsSearch] = useState('');
+  const [liveCallsFilter, setLiveCallsFilter] = useState('all'); // 'all', 'waiting', 'active', 'scheduled'
 
   // Dynamic user list with instant pre-loaded roster
   const [usersList, setUsersList] = useState([
@@ -461,6 +475,28 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       .catch(() => {});
   };
 
+  const fetchAppointments = () => {
+    fetch('/api/appointments')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setAdminAppointments(data);
+        }
+      })
+      .catch(() => {});
+  };
+
+  const fetchActiveRooms = () => {
+    fetch('/api/admin/active-rooms')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setActiveLiveRooms(data);
+        }
+      })
+      .catch(() => {});
+  };
+
   useEffect(() => {
     fetchUsers();
     fetchApplications();
@@ -468,9 +504,13 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
     fetchReceipts();
     fetchAnalytics();
     fetchOnlinePresence();
+    fetchAppointments();
+    fetchActiveRooms();
 
     const socket = getSocket();
     let handleNewInquiry, handleUpdatedInquiry, handleDeletedInquiry, handleNewApp, handleNewReceipt, handlePresenceUpdate;
+    let handleNewAppointment, handleAdminBookingNotification, handleActiveRoomsUpdate, handleClientWaiting, handleClientRoomActivity;
+
     if (socket) {
       handleNewInquiry = (inq) => {
         if (inq && inq.id) {
@@ -503,12 +543,82 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
         }
       };
 
+      handleNewAppointment = (newApt) => {
+        if (newApt && newApt.id) {
+          setAdminAppointments(prev => [newApt, ...prev.filter(a => a.id !== newApt.id)]);
+          playMessageTone();
+          setLiveAlertToast({
+            id: `toast-${Date.now()}`,
+            type: 'booking',
+            title: 'New Client Booking Confirmed',
+            message: `${newApt.mainClientName || 'Client'} booked ${newApt.interpreter?.name || newApt.interpreterName || 'Certified Interpreter'} for ${newApt.language || 'Interpretation'}.`,
+            roomId: newApt.roomId,
+            targetLanguage: newApt.language,
+            clientName: newApt.mainClientName,
+            time: newApt.time || 'Immediate'
+          });
+          setTimeout(() => setLiveAlertToast(null), 12000);
+        }
+      };
+
+      handleAdminBookingNotification = (data) => {
+        playTelephoneRing();
+        const apt = data?.appointment || data?.dispatch || {};
+        if (apt && apt.id) {
+          setAdminAppointments(prev => [apt, ...prev.filter(a => a.id !== apt.id)]);
+        }
+        setLiveAlertToast({
+          id: `toast-${Date.now()}`,
+          type: 'live_dispatch',
+          title: '🚨 Live Session Booking Alert',
+          message: `${apt.mainClientName || apt.hostName || 'Client'} initiated encounter for ${apt.language || apt.targetLanguage || 'Live Language'} (${apt.specialty || 'General'}).`,
+          roomId: apt.roomId,
+          targetLanguage: apt.language || apt.targetLanguage,
+          clientName: apt.mainClientName || apt.hostName,
+          time: 'Now Live'
+        });
+        setTimeout(() => setLiveAlertToast(null), 15000);
+        fetchActiveRooms();
+      };
+
+      handleActiveRoomsUpdate = (rooms) => {
+        if (Array.isArray(rooms)) {
+          setActiveLiveRooms(rooms);
+        }
+      };
+
+      handleClientWaiting = (liveData) => {
+        playTelephoneRing();
+        setLiveAlertToast({
+          id: `toast-${Date.now()}`,
+          type: 'client_waiting',
+          title: '⚠️ Client Waiting in Live Room',
+          message: `${liveData.clientName || 'Client'} is currently inside Room #${liveData.roomId} waiting for a ${liveData.targetLanguage} interpreter.`,
+          roomId: liveData.roomId,
+          targetLanguage: liveData.targetLanguage,
+          clientName: liveData.clientName,
+          time: 'Waiting Now'
+        });
+        setTimeout(() => setLiveAlertToast(null), 15000);
+        fetchActiveRooms();
+      };
+
+      handleClientRoomActivity = () => {
+        fetchActiveRooms();
+      };
+
       socket.on('new-inquiry', handleNewInquiry);
       socket.on('inquiry-updated', handleUpdatedInquiry);
       socket.on('inquiry-deleted', handleDeletedInquiry);
       socket.on('new-interpreter-application', handleNewApp);
       socket.on('new-payment-receipt', handleNewReceipt);
       socket.on('online-presence-updated', handlePresenceUpdate);
+      socket.on('new-appointment-created', handleNewAppointment);
+      socket.on('admin-booking-notification', handleAdminBookingNotification);
+      socket.on('active-rooms-updated', handleActiveRoomsUpdate);
+      socket.on('client-waiting-in-room', handleClientWaiting);
+      socket.on('incoming-call-alert', handleAdminBookingNotification);
+      socket.on('client-room-activity', handleClientRoomActivity);
     }
 
     const timer = setInterval(() => {
@@ -518,7 +628,9 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
       fetchReceipts();
       fetchAnalytics();
       fetchOnlinePresence();
-    }, 6000);
+      fetchAppointments();
+      fetchActiveRooms();
+    }, 5000);
 
     return () => {
       clearInterval(timer);
@@ -529,6 +641,12 @@ export default function AdminDashboard({ callLogs = [], appointments = [] }) {
         if (handleNewApp) socket.off('new-interpreter-application', handleNewApp);
         if (handleNewReceipt) socket.off('new-payment-receipt', handleNewReceipt);
         if (handlePresenceUpdate) socket.off('online-presence-updated', handlePresenceUpdate);
+        if (handleNewAppointment) socket.off('new-appointment-created', handleNewAppointment);
+        if (handleAdminBookingNotification) socket.off('admin-booking-notification', handleAdminBookingNotification);
+        if (handleActiveRoomsUpdate) socket.off('active-rooms-updated', handleActiveRoomsUpdate);
+        if (handleClientWaiting) socket.off('client-waiting-in-room', handleClientWaiting);
+        if (handleAdminBookingNotification) socket.off('incoming-call-alert', handleAdminBookingNotification);
+        if (handleClientRoomActivity) socket.off('client-room-activity', handleClientRoomActivity);
       }
     };
   }, []);
@@ -1475,6 +1593,74 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
       
+      {/* 🚨 REAL-TIME CLIENT BOOKING & LIVE CALL NOTIFICATION BANNER */}
+      {liveAlertToast && (
+        <div className="fixed top-20 right-4 sm:right-8 z-50 max-w-md w-full animate-bounce">
+          <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/95 border-2 border-emerald-500 shadow-2xl shadow-emerald-500/30 text-white space-y-3 backdrop-blur-md">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/40 shrink-0">
+                  <PhoneCall className="w-5 h-5 animate-pulse" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-white flex items-center gap-1.5">
+                    <span>{liveAlertToast.title}</span>
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                  </h4>
+                  <p className="text-[11px] text-slate-300 font-medium mt-0.5">
+                    {liveAlertToast.message}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLiveAlertToast(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-xs">
+              <span className="font-mono text-emerald-400 text-[11px]">
+                Room #{liveAlertToast.roomId || 'live'}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('live_calls');
+                    setLiveAlertToast(null);
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold"
+                >
+                  View Live Panel
+                </button>
+                {onStartCall && liveAlertToast.roomId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onStartCall({
+                        roomId: liveAlertToast.roomId,
+                        role: 'admin',
+                        participantName: 'IK Operations Admin',
+                        targetLanguage: liveAlertToast.targetLanguage || 'Spanish',
+                        specialty: 'Platform Management',
+                        patientName: liveAlertToast.clientName || 'Client'
+                      });
+                      setLiveAlertToast(null);
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-md flex items-center gap-1"
+                  >
+                    <span>⚡ Enter Room</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header Banner with Owner Profile */}
       <div className="glass-panel p-6 rounded-3xl border border-purple-500/30 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
@@ -1503,6 +1689,27 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
             }`}
           >
             Live Monitor
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('live_calls');
+              fetchActiveRooms();
+              fetchAppointments();
+            }}
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+              activeTab === 'live_calls' ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-lg shadow-red-600/30' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <PhoneCall className="w-3.5 h-3.5 text-red-400 animate-pulse" />
+            <span>Live Calls & Bookings</span>
+            {activeLiveRooms.length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-red-500 text-white text-[10px] font-black animate-ping">
+                {activeLiveRooms.length}
+              </span>
+            )}
+            <span className="px-1.5 py-0.2 rounded-full bg-slate-800 text-purple-300 text-[10px] font-bold">
+              {adminAppointments.length}
+            </span>
           </button>
           <button
             onClick={() => {
@@ -1676,6 +1883,293 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
           </span>
         </div>
       </div>
+
+      {/* ========================================================== */}
+      {/* TAB: 🔴 LIVE CALLS & CLIENT BOOKINGS (REAL-TIME SESSIONS) */}
+      {/* ========================================================== */}
+      {activeTab === 'live_calls' && (
+        <div className="space-y-6">
+          
+          {/* Header Banner */}
+          <div className="glass-panel p-6 rounded-3xl border border-red-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 flex items-center justify-center shrink-0">
+                <PhoneCall className="w-6 h-6 animate-pulse" />
+              </div>
+              <div>
+                <h3 className="text-lg font-extrabold text-white flex items-center gap-2">
+                  <span>Live 3-Way Conference Rooms & Client Bookings</span>
+                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/40 flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-red-400 animate-ping"></span>
+                    <span>{activeLiveRooms.length} Live Encounters Active</span>
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Full administrative oversight of active WebRTC 3-way conference rooms, waiting clients, and confirmed booking records
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  fetchActiveRooms();
+                  fetchAppointments();
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Refresh Live Sessions</span>
+              </button>
+            </div>
+          </div>
+
+          {/* 1. LIVE ACTIVE 3-WAY ENCOUNTERS TABLE */}
+          <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
+                <h4 className="text-sm font-extrabold text-white uppercase tracking-wider">
+                  Live Active Encounters ({activeLiveRooms.length})
+                </h4>
+              </div>
+              <span className="text-xs text-slate-400 font-mono">
+                Auto-updated via Real-Time WebSockets
+              </span>
+            </div>
+
+            {activeLiveRooms.length === 0 ? (
+              <div className="p-8 text-center rounded-2xl bg-slate-900/40 border border-slate-800/80 space-y-2">
+                <div className="w-12 h-12 rounded-xl bg-slate-800/80 text-slate-500 flex items-center justify-center mx-auto">
+                  <Activity className="w-6 h-6" />
+                </div>
+                <p className="text-sm font-bold text-white">No Active Calls In Progress Right Now</p>
+                <p className="text-xs text-slate-400 max-w-md mx-auto">
+                  Whenever a client books or enters a 3-party room, the encounter will appear here live with duration, participant status, and 1-click admin join.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {activeLiveRooms.map(room => (
+                  <div 
+                    key={room.roomId}
+                    className="p-5 rounded-2xl bg-slate-900/90 border-2 border-emerald-500/60 shadow-lg space-y-3"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1 ${
+                            room.status === 'active_encounter'
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                              : 'bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse'
+                          }`}>
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                            <span>{room.status === 'active_encounter' ? '🔴 Live 3-Party Call' : '🟡 Client Waiting for Interpreter'}</span>
+                          </span>
+                          <span className="text-xs font-mono font-bold text-slate-300">
+                            Room #{room.roomId}
+                          </span>
+                        </div>
+                        <h4 className="text-sm font-black text-white mt-1">
+                          {room.clientName || 'Client'} ⟷ {room.interpreterName || 'Waiting for Linguist'}
+                        </h4>
+                      </div>
+
+                      <span className="px-2.5 py-1 rounded-xl bg-brand-500/10 text-brand-300 font-bold text-xs border border-brand-500/20">
+                        {room.targetLanguage || 'Language'}
+                      </span>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-xs space-y-1.5">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Client / Payer:</span>
+                        <span className="font-bold text-white">{room.clientName} ({room.clientOrg || 'Individual'})</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Assigned Interpreter:</span>
+                        <span className="font-bold text-emerald-400">{room.interpreterName || 'Awaiting Connection'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Non-English Guest:</span>
+                        <span className="font-medium text-amber-300">{room.patientName || 'Guest'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Domain / Specialty:</span>
+                        <span className="text-slate-300">{room.specialty || 'General'}</span>
+                      </div>
+                      <div className="flex justify-between pt-1 border-t border-slate-800/80">
+                        <span className="text-slate-400">Connected In Room:</span>
+                        <span className="font-bold text-slate-200">
+                          {room.participantsCount} Parties ({room.participants.map(p => p.name).join(', ')})
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      {onStartCall && (
+                        <button
+                          type="button"
+                          onClick={() => onStartCall({
+                            roomId: room.roomId,
+                            role: 'host',
+                            participantName: 'IK Platform Admin',
+                            targetLanguage: room.targetLanguage,
+                            specialty: room.specialty,
+                            patientName: room.patientName,
+                            hostName: room.clientName
+                          })}
+                          className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs shadow-md flex items-center justify-center gap-1.5 transition cursor-pointer"
+                        >
+                          <PhoneCall className="w-3.5 h-3.5" />
+                          <span>👁️ Enter Room (Monitor / Participate)</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 2. CLIENT BOOKINGS & APPOINTMENTS RECORD LOG */}
+          <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+              <div>
+                <h4 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-purple-400" />
+                  <span>Client Bookings & Scheduled Sessions Roster ({adminAppointments.length})</span>
+                </h4>
+                <p className="text-xs text-slate-400">
+                  Comprehensive audit of all client session bookings, assigned interpreters, language pairs, and room links
+                </p>
+              </div>
+
+              <div className="relative w-full sm:w-72">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={liveCallsSearch}
+                  onChange={(e) => setLiveCallsSearch(e.target.value)}
+                  placeholder="Search client, interpreter, language..."
+                  className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition"
+                />
+              </div>
+            </div>
+
+            {adminAppointments.length === 0 ? (
+              <div className="p-8 text-center rounded-2xl bg-slate-900/40 border border-slate-800 text-slate-400 text-xs">
+                No client bookings registered in system yet.
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-2xl border border-slate-800">
+                <table className="w-full text-left text-xs text-slate-300">
+                  <thead className="bg-slate-900/90 text-[10px] uppercase font-bold text-slate-400 border-b border-slate-800">
+                    <tr>
+                      <th className="px-4 py-3">Date / Time</th>
+                      <th className="px-4 py-3">Client / Payer</th>
+                      <th className="px-4 py-3">Language Pair</th>
+                      <th className="px-4 py-3">Assigned Interpreter</th>
+                      <th className="px-4 py-3">Modality & Billing</th>
+                      <th className="px-4 py-3">Room / PIN</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 bg-slate-950/40">
+                    {adminAppointments
+                      .filter(apt => {
+                        const q = liveCallsSearch.toLowerCase();
+                        return (
+                          !q ||
+                          (apt.mainClientName && apt.mainClientName.toLowerCase().includes(q)) ||
+                          (apt.language && apt.language.toLowerCase().includes(q)) ||
+                          (apt.interpreter?.name && apt.interpreter.name.toLowerCase().includes(q)) ||
+                          (apt.interpreterName && apt.interpreterName.toLowerCase().includes(q)) ||
+                          (apt.roomId && apt.roomId.toLowerCase().includes(q))
+                        );
+                      })
+                      .map((apt) => (
+                        <tr key={apt.id || apt.roomId} className="hover:bg-slate-900/50 transition">
+                          <td className="px-4 py-3 font-mono">
+                            <span className="font-bold text-white block">{apt.date || 'Today'}</span>
+                            <span className="text-[10px] text-slate-400">{apt.time || 'On-Demand'}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="font-bold text-white block">{apt.mainClientName || 'Client'}</span>
+                            <span className="text-[10px] text-slate-400">{apt.mainClientOrg || 'Individual Account'}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="px-2 py-0.5 rounded bg-brand-500/10 text-brand-300 font-bold border border-brand-500/20 text-[11px]">
+                              {apt.language || 'Spanish'}
+                            </span>
+                            <span className="text-[10px] text-slate-400 block mt-0.5">{apt.specialty || 'General'}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="font-bold text-emerald-400 block">
+                              {apt.interpreter?.name || apt.interpreterName || 'Certified Linguist Pool'}
+                            </span>
+                            {(apt.interpreter?.badgeNumber || apt.interpreterBadgeNumber) && (
+                              <span className="text-[9px] font-mono text-slate-400">
+                                ID: #{apt.interpreter?.badgeNumber || apt.interpreterBadgeNumber}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-[11px] font-semibold text-slate-200 block capitalize">
+                              {apt.callType || 'audio'} • {apt.durationMinutes || 30} mins
+                            </span>
+                            <span className="text-[10px] text-emerald-400 font-mono font-bold">
+                              {apt.totalCost || 'Prepaid Mins'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 font-mono text-[11px]">
+                            <span className="text-slate-300 font-bold block">{apt.roomId}</span>
+                            <span className="text-[10px] text-slate-500">PIN: {apt.guestPin || 'Auto'}</span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              {onStartCall && (
+                                <button
+                                  type="button"
+                                  onClick={() => onStartCall({
+                                    roomId: apt.roomId,
+                                    role: 'host',
+                                    participantName: 'IK Platform Admin',
+                                    targetLanguage: apt.language,
+                                    specialty: apt.specialty,
+                                    patientName: apt.guestName,
+                                    hostName: apt.mainClientName
+                                  })}
+                                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition cursor-pointer"
+                                >
+                                  Enter Room
+                                </button>
+                              )}
+                              {apt.guestLink && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(apt.guestLink);
+                                    alert('Guest link copied to clipboard!');
+                                  }}
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                                  title="Copy Guest Link"
+                                >
+                                  <Copy className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+        </div>
+      )}
 
       {/* ========================================================== */}
       {/* TAB: 📄 INTERPRETER APPLICATIONS & VERIFICATION QUEUE */}
@@ -4205,15 +4699,95 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
               </div>
 
               {/* Dynamic Live Sessions List */}
-              <div className="p-8 rounded-2xl bg-slate-900/60 border border-slate-800 text-center space-y-3">
-                <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-400 flex items-center justify-center mx-auto">
-                  <Activity className="w-6 h-6 animate-pulse" />
+              {activeLiveRooms.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-xs text-slate-400 pb-1">
+                    <span className="font-bold text-white flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
+                      <span>{activeLiveRooms.length} Active Call Session{activeLiveRooms.length > 1 ? 's' : ''} in Progress</span>
+                    </span>
+                    <button
+                      onClick={() => setActiveTab('live_calls')}
+                      className="text-brand-400 hover:text-brand-300 font-bold hover:underline"
+                    >
+                      Open Full Live Radar →
+                    </button>
+                  </div>
+                  <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
+                    {activeLiveRooms.map((room) => {
+                      const client = room.participants?.find(p => p.role === 'client' || p.role === 'host');
+                      const interp = room.participants?.find(p => p.role === 'interpreter');
+                      return (
+                        <div
+                          key={room.roomId}
+                          className="p-4 rounded-2xl bg-slate-900/90 border border-emerald-500/30 hover:border-emerald-500/60 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg"
+                        >
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-mono font-bold text-white bg-slate-800 px-2 py-0.5 rounded-md border border-slate-700">
+                                Room #{room.roomId}
+                              </span>
+                              <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                room.status === 'in_call'
+                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 animate-pulse'
+                                  : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                              }`}>
+                                {room.status === 'in_call' ? '🟢 In Live Call' : '⏳ Client Waiting'}
+                              </span>
+                              <span className="text-xs font-bold text-brand-300">
+                                🌐 {room.targetLanguage || 'General'}
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-300">
+                              <span>
+                                <strong>Client:</strong> {client?.name || room.clientName || 'Connecting Client'}
+                              </span>
+                              <span>
+                                <strong>Interpreter:</strong> {interp ? interp.name : <span className="text-amber-400 italic">Waiting to Connect</span>}
+                              </span>
+                              <span className="text-slate-400 text-[11px]">
+                                Participants: <strong>{room.participantCount || 1}</strong>
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              if (typeof onStartCall === 'function') {
+                                onStartCall({
+                                  id: room.roomId,
+                                  language: room.targetLanguage || 'General',
+                                  clientName: client?.name || room.clientName || 'Client'
+                                });
+                              }
+                            }}
+                            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold flex items-center justify-center gap-2 shadow-md shadow-emerald-600/30 transition cursor-pointer self-start sm:self-center shrink-0"
+                          >
+                            <PhoneCall className="w-3.5 h-3.5" />
+                            <span>Monitor / Join Room</span>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-                <p className="text-sm font-bold text-white">0 Active Calls in Progress</p>
-                <p className="text-xs text-slate-400 max-w-md mx-auto">
-                  When a client initiates a live On-Demand or Scheduled 3-party session, the real-time audio/video bridge will appear here live.
-                </p>
-              </div>
+              ) : (
+                <div className="p-8 rounded-2xl bg-slate-900/60 border border-slate-800 text-center space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-400 flex items-center justify-center mx-auto">
+                    <Activity className="w-6 h-6" />
+                  </div>
+                  <p className="text-sm font-bold text-white">0 Active Calls in Progress Right Now</p>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto">
+                    When a client initiates a live On-Demand or Scheduled 3-party session, the real-time audio/video bridge will appear here live with 1-click room monitoring.
+                  </p>
+                  <button
+                    onClick={() => setActiveTab('live_calls')}
+                    className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition"
+                  >
+                    <span>View Live Radar & Bookings Log ({adminAppointments.length})</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
 
             </div>
 

@@ -106,25 +106,24 @@ export default function InterpreterDashboard({
   const [incomingCall, setIncomingCall] = useState(null);
   const [countdown, setCountdown] = useState(30);
   const [testAudioActive, setTestAudioActive] = useState(false);
+  const [activeLiveRooms, setActiveLiveRooms] = useState([]);
 
-  // Edit Profile Modal State
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editName, setEditName] = useState('');
-  const [editPhone, setEditPhone] = useState('');
-  const [editPrimaryLang, setEditPrimaryLang] = useState('');
-  const [editLanguages, setEditLanguages] = useState([]);
-  const [editSpecialties, setEditSpecialties] = useState([]);
-  const [editShiftWindows, setEditShiftWindows] = useState([]);
-  const [editEmergencyOnCall, setEditEmergencyOnCall] = useState(true);
-  const [editHardwareAudit, setEditHardwareAudit] = useState({ headsetVerified: true, internetVerified: true, privateOfficeSetting: true });
-  const [newLangInput, setNewLangInput] = useState('');
-  const [editBio, setEditBio] = useState('');
-  const [editAvatar, setEditAvatar] = useState('');
-  const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
+  // Fetch active live rooms and dispatches
+  const fetchActiveRooms = () => {
+    fetch('/api/admin/active-rooms')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setActiveLiveRooms(data);
+        }
+      })
+      .catch(() => {});
+  };
 
   // Connect to Socket for Real-Time Incoming Call Dispatches
   useEffect(() => {
+    fetchActiveRooms();
+
     const socket = getSocket();
     if (!socket || !isOnline) return;
 
@@ -162,16 +161,45 @@ export default function InterpreterDashboard({
       }
     };
 
+    const handleActiveRoomsUpdate = (rooms) => {
+      if (Array.isArray(rooms)) {
+        setActiveLiveRooms(rooms);
+      }
+    };
+
     socket.on('incoming-dispatch-call', handleIncomingDispatch);
     socket.on('incoming-call-alert', handleIncomingDispatch);
     socket.on('new-appointment-created', handleIncomingDispatch);
+    socket.on('client-waiting-in-room', handleIncomingDispatch);
+    socket.on('active-rooms-updated', handleActiveRoomsUpdate);
+
+    const interval = setInterval(fetchActiveRooms, 5000);
 
     return () => {
+      clearInterval(interval);
       socket.off('incoming-dispatch-call', handleIncomingDispatch);
       socket.off('incoming-call-alert', handleIncomingDispatch);
       socket.off('new-appointment-created', handleIncomingDispatch);
+      socket.off('client-waiting-in-room', handleIncomingDispatch);
+      socket.off('active-rooms-updated', handleActiveRoomsUpdate);
     };
   }, [isOnline, profile.id, profile.name, profile.email, profile.primaryLang, profile.languages, profile.badgeNumber, profile.interpreterBadgeId]);
+
+  // Edit Profile Modal State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editPrimaryLang, setEditPrimaryLang] = useState('');
+  const [editLanguages, setEditLanguages] = useState([]);
+  const [editSpecialties, setEditSpecialties] = useState([]);
+  const [editShiftWindows, setEditShiftWindows] = useState([]);
+  const [editEmergencyOnCall, setEditEmergencyOnCall] = useState(true);
+  const [editHardwareAudit, setEditHardwareAudit] = useState({ headsetVerified: true, internetVerified: true, privateOfficeSetting: true });
+  const [newLangInput, setNewLangInput] = useState('');
+  const [editBio, setEditBio] = useState('');
+  const [editAvatar, setEditAvatar] = useState('');
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   // Dynamic calculations from real call logs
   const userCallLogs = (callLogs || []).filter(log => {
@@ -210,13 +238,21 @@ export default function InterpreterDashboard({
     ? profile.totalCalls 
     : userCallLogs.length;
 
-  // Real user appointments
+  // Real user appointments (direct matches, badge matches, or language matching appointments)
   const myAppointments = (appointments || []).filter(apt => {
     if (!apt) return false;
-    const matchId = profile.id && (apt.interpreterId === profile.id || apt.assignedInterpreterId === profile.id);
+    const myBadge = (profile.badgeNumber || profile.interpreterBadgeId || '').toString();
+    const aptBadge = (apt.interpreterBadgeNumber || apt.interpreter?.badgeNumber || apt.interpreter?.interpreterBadgeId || '').toString();
+    const matchBadge = myBadge && aptBadge && myBadge === aptBadge;
+    const matchId = profile.id && (apt.interpreterId === profile.id || apt.assignedInterpreterId === profile.id || apt.interpreter?.id === profile.id);
     const matchEmail = profile.email && apt.interpreterEmail && apt.interpreterEmail.toLowerCase() === profile.email.toLowerCase();
-    const matchName = profile.name && apt.interpreterName && apt.interpreterName.toLowerCase().includes(profile.name.toLowerCase());
-    return matchId || matchEmail || matchName;
+    const matchName = profile.name && (
+      (apt.interpreterName && apt.interpreterName.toLowerCase().includes(profile.name.toLowerCase())) ||
+      (apt.interpreter?.name && apt.interpreter.name.toLowerCase().includes(profile.name.toLowerCase()))
+    );
+    const currentLanguages = profile.languages || [profile.primaryLang];
+    const matchLang = apt.language && currentLanguages.some(l => l.toLowerCase() === apt.language.toLowerCase());
+    return matchBadge || matchId || matchEmail || matchName || matchLang;
   });
 
   const openEditModal = () => {
@@ -527,6 +563,60 @@ export default function InterpreterDashboard({
 
       </div>
 
+      {/* 🔴 LIVE WAITING CALLS & ACTIVE ROOMS BANNER */}
+      {activeLiveRooms.filter(r => r.hasClient && !r.hasInterpreter).length > 0 && (
+        <div className="space-y-3 animate-pulse">
+          {activeLiveRooms.filter(r => r.hasClient && !r.hasInterpreter).map(room => (
+            <div 
+              key={room.roomId}
+              className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-950/80 via-slate-900 to-slate-900 border-2 border-emerald-500/70 shadow-xl shadow-emerald-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/40 shrink-0">
+                  <PhoneCall className="w-6 h-6 animate-bounce" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                    <span className="text-xs font-black uppercase tracking-wider text-emerald-400">
+                      Client Live in Room & Waiting for Interpreter
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30">
+                      Room: {room.roomId}
+                    </span>
+                  </div>
+                  <h3 className="text-sm sm:text-base font-extrabold text-white mt-0.5">
+                    {room.clientName} is waiting for <span className="text-emerald-300">{room.targetLanguage}</span> ({room.specialty})
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Click "Answer & Connect" to enter the live 3-way conference room immediately.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => onAcceptIncomingCall({
+                  roomId: room.roomId,
+                  role: 'interpreter',
+                  participantName: profile.name,
+                  interpreter: profile,
+                  interpreterName: profile.name,
+                  interpreterBadgeNumber: badgeId,
+                  language: room.targetLanguage || profile.primaryLang,
+                  specialty: room.specialty || 'General',
+                  patientName: room.patientName || 'Client / Patient',
+                  hostName: room.clientName || 'Host'
+                })}
+                className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-xs shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2 transition transform active:scale-95 shrink-0 cursor-pointer"
+              >
+                <PhoneCall className="w-4 h-4 animate-pulse" />
+                <span>⚡ Answer & Join Call Now</span>
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* 3 Real Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         <div className="glass-panel p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
@@ -769,75 +859,6 @@ export default function InterpreterDashboard({
         </div>
 
       </div>
-
-      {/* Incoming Call Ringing Modal Alert */}
-      {incomingCall && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="max-w-md w-full glass-panel p-8 rounded-3xl border-2 border-emerald-500/80 shadow-2xl space-y-6 relative overflow-hidden animate-call-ring">
-            
-            {/* Pulsing indicator */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-emerald-400 animate-ping" />
-                <span className="text-xs font-bold uppercase tracking-widest text-emerald-400">
-                  Incoming On-Demand Call
-                </span>
-              </div>
-              <div className="px-3 py-1 rounded-full bg-red-500/20 text-red-400 text-xs font-extrabold border border-red-500/30">
-                0:{countdown < 10 ? `0${countdown}` : countdown}
-              </div>
-            </div>
-
-            <div className="text-center space-y-2">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 text-white flex items-center justify-center mx-auto shadow-xl ring-8 ring-emerald-500/20">
-                <PhoneCall className="w-10 h-10 animate-bounce" />
-              </div>
-              <h3 className="text-2xl font-black text-white">{incomingCall.targetLanguage || profile.primaryLang}</h3>
-              <p className="text-sm font-semibold text-emerald-400">{incomingCall.specialty || 'General Interpretation'}</p>
-            </div>
-
-            {/* Requester Details Card */}
-            <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2 text-xs">
-              <div className="flex justify-between">
-                <span className="text-slate-400">Host / Requester:</span>
-                <span className="font-bold text-white">{incomingCall.hostName || 'Client Host'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Organization:</span>
-                <span className="font-semibold text-slate-300">{incomingCall.hostOrg || 'Enterprise Client'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Patient / Client:</span>
-                <span className="font-semibold text-amber-300">{incomingCall.patientName || 'Guest'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Call Modality:</span>
-                <span className="font-semibold text-brand-400 capitalize">{incomingCall.callType || 'audio'} Call</span>
-              </div>
-            </div>
-
-            {/* Accept / Decline Action Buttons */}
-            <div className="grid grid-cols-2 gap-4 pt-2">
-              <button
-                onClick={handleDecline}
-                className="py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs flex items-center justify-center gap-2 border border-slate-700 transition cursor-pointer"
-              >
-                <PhoneOff className="w-4 h-4 text-red-400" />
-                <span>Decline</span>
-              </button>
-
-              <button
-                onClick={handleAccept}
-                className="py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-extrabold text-sm shadow-xl shadow-emerald-500/30 flex items-center justify-center gap-2 transition transform hover:-translate-y-0.5 cursor-pointer"
-              >
-                <PhoneCall className="w-4 h-4 animate-pulse" />
-                <span>Accept Call</span>
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
 
       {/* Edit Profile & Credentials Modal */}
       {isEditModalOpen && (

@@ -1,5 +1,6 @@
-// Supported Core Languages (Sorted Alphabetically A-Z)
+// Supported Core Languages (Sorted Alphabetically A-Z with English)
 export const LANGUAGES = [
+  { code: 'en', name: 'English', nativeName: 'English (US / UK)', flag: '🇺🇸', popular: true },
   { code: 'asl', name: 'American Sign Language (ASL)', nativeName: 'ASL (Video Only)', flag: '🤟', popular: false },
   { code: 'ar', name: 'Arabic', nativeName: 'العربية', flag: '🇸🇦', popular: true },
   { code: 'fa', name: 'Farsi / Dari', nativeName: 'فارسی / دری', flag: '🇦🇫', popular: true },

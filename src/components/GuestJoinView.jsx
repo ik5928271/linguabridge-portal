@@ -18,11 +18,11 @@ import { LANGUAGES, GUEST_TRANSLATIONS } from '../data/mockData';
 export default function GuestJoinView({ 
   onJoinRoom, 
   initialRoomId = 'room-default', 
-  initialLang = 'es', 
+  initialLang = 'en', 
   initialName = '' 
 }) {
-  const [selectedLangCode, setSelectedLangCode] = useState(initialLang || 'es');
-  const [guestName, setGuestName] = useState(initialName || 'Carlos Hernandez');
+  const [selectedLangCode, setSelectedLangCode] = useState(initialLang || 'en');
+  const [guestName, setGuestName] = useState(initialName || 'Client');
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [isVideoMuted, setIsVideoMuted] = useState(false);
   const [audioLevel, setAudioLevel] = useState(45);
@@ -72,7 +72,7 @@ export default function GuestJoinView({
       roomId: initialRoomId || 'room-guest-session',
       role: 'guest',
       participantName: `${guestName} (${LANGUAGES.find(l => l.code === selectedLangCode)?.name || 'Client'})`,
-      language: LANGUAGES.find(l => l.code === selectedLangCode)?.name || 'Spanish',
+      language: LANGUAGES.find(l => l.code === selectedLangCode)?.name || 'English',
       isMuted: isMicMuted,
       isVideoOff: isVideoMuted
     });
@@ -98,11 +98,11 @@ export default function GuestJoinView({
               <select
                 value={selectedLangCode}
                 onChange={(e) => setSelectedLangCode(e.target.value)}
-                className="glass-input px-2.5 py-1 rounded-lg text-xs font-bold text-amber-300 focus:outline-none bg-slate-900 cursor-pointer"
+                className="glass-input px-2.5 py-1.5 rounded-lg text-xs font-bold text-amber-300 focus:outline-none bg-slate-900 border border-slate-700 cursor-pointer shadow-inner"
               >
                 {LANGUAGES.map((lang) => (
                   <option key={lang.code} value={lang.code} className="bg-slate-900 text-slate-200">
-                    {lang.name} — {lang.nativeName}
+                    {lang.flag} {lang.name} — {lang.nativeName}
                   </option>
                 ))}
               </select>
