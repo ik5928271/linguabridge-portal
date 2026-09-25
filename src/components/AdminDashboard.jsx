@@ -143,6 +143,12 @@ const formatBubbleTimestamp = (dateInput, fallbackTime = '') => {
   }
 };
 
+// Helper to normalize language names
+const normalizeLang = (str) => {
+  if (!str) return '';
+  return String(str).toLowerCase().replace(/\s*\([^)]*\)/g, '').replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+};
+
 // Helper to extract all languages spoken by an applicant/interpreter
 const getApplicantLanguages = (app) => {
   if (!app) return [];
@@ -165,21 +171,29 @@ const getApplicantLanguages = (app) => {
   } else if (typeof app.languages === 'string') {
     app.languages.split(/[,/•;]+/).forEach(s => list.push(s.trim()));
   }
-  return list.filter(Boolean);
+  return list.map(s => s.trim()).filter(Boolean);
 };
 
 // Robust language matching helper to match clean language names against target language filter
 const doesAppMatchLanguage = (app, targetLang) => {
   if (!app || !targetLang || targetLang.toLowerCase() === 'all') return true;
-  const cleanTarget = targetLang.toLowerCase().replace(/\s*\([^)]*\)/g, '').trim();
+  const cleanTarget = normalizeLang(targetLang);
   if (!cleanTarget) return true;
 
+  const targetWords = cleanTarget.split(' ').filter(w => w.length >= 3);
   const spokenLangs = getApplicantLanguages(app);
+
   return spokenLangs.some(lang => {
-    const cleanSpoken = lang.toLowerCase().replace(/\s*\([^)]*\)/g, '').trim();
-    return cleanSpoken === cleanTarget || 
-           cleanSpoken.includes(cleanTarget) || 
-           cleanTarget.includes(cleanSpoken);
+    const cleanSpoken = normalizeLang(lang);
+    if (!cleanSpoken) return false;
+    if (cleanSpoken === cleanTarget) return true;
+
+    // Substring match with word boundary check
+    if (cleanSpoken.includes(cleanTarget) || cleanTarget.includes(cleanSpoken)) {
+      const spokenWords = cleanSpoken.split(' ').filter(w => w.length >= 3);
+      return spokenWords.some(sw => targetWords.includes(sw));
+    }
+    return false;
   });
 };
 
@@ -404,6 +418,8 @@ export default function AdminDashboard({
   const [rejectReason, setRejectReason] = useState('');
   const [emailDispatchModal, setEmailDispatchModal] = useState(null);
   const [docPreviewModal, setDocPreviewModal] = useState(null);
+  const [reviewLanguages, setReviewLanguages] = useState([]);
+  const [newReviewLangToAdd, setNewReviewLangToAdd] = useState('');
 
   // Inquiries & Support Messages Box State
   const [inquiriesList, setInquiriesList] = useState(() => {
@@ -489,6 +505,8 @@ export default function AdminDashboard({
   const [editPassword, setEditPassword] = useState('interp2026!');
   const [editCredentialsSentMsg, setEditCredentialsSentMsg] = useState('');
   const [isSendingCredentials, setIsSendingCredentials] = useState(false);
+  const [editLanguages, setEditLanguages] = useState([]);
+  const [newLangToAdd, setNewLangToAdd] = useState('');
 
   // Fetch users & applications & inquiries & analytics from backend
   const fetchUsers = () => {
@@ -866,6 +884,11 @@ export default function AdminDashboard({
     setEditRole(u.role || 'host');
     setEditLang(u.primaryLang || 'Spanish');
     setEditSpecialty(u.specialty || 'General');
+
+    const langs = getApplicantLanguages(u);
+    setEditLanguages(langs.length > 0 ? langs : [u.primaryLang || 'Spanish']);
+    setNewLangToAdd('');
+
     const empType = u.employmentType || (u.interpreterProfile?.employmentType || 'hourly');
     setEditEmploymentType(empType);
     setEditHourlyRate(u.hourlyRate !== undefined ? u.hourlyRate : (u.interpreterProfile?.hourlyRate !== undefined ? u.interpreterProfile.hourlyRate : 8));
@@ -937,6 +960,7 @@ export default function AdminDashboard({
         badgeNumber: app.badgeNumber || app.interpreterBadgeId,
         interpreterBadgeId: app.badgeNumber || app.interpreterBadgeId,
         primaryLang: app.primaryLang || 'Spanish',
+        languages: app.languages || (app.primaryLang ? [app.primaryLang] : ['Spanish']),
         specialty: app.specialties?.[0] || 'Medical / Healthcare',
         employmentType: app.employmentType || 'hourly',
         hourlyRate: app.hourlyRate || 8,
@@ -972,13 +996,17 @@ export default function AdminDashboard({
       scheduleLabel
     };
 
+    const resolvedLanguages = editLanguages.length > 0 ? editLanguages : [editLang || 'Spanish'];
+    const resolvedPrimaryLang = resolvedLanguages[0] || editLang || 'Spanish';
+
     const payload = {
       name: editName,
       email: editEmail,
       password: editPassword,
       org: editOrg,
       role: editRole,
-      primaryLang: editLang,
+      primaryLang: resolvedPrimaryLang,
+      languages: resolvedLanguages,
       specialty: editSpecialty,
       employmentType: editEmploymentType,
       hourlyRate: parseInt(editHourlyRate) || 8,
@@ -1004,7 +1032,8 @@ export default function AdminDashboard({
             ...a,
             name: editName,
             email: editEmail,
-            primaryLang: editLang,
+            primaryLang: resolvedPrimaryLang,
+            languages: resolvedLanguages,
             specialty: editSpecialty,
             employmentType: editEmploymentType,
             hourlyRate: parseInt(editHourlyRate) || 8,
@@ -1023,7 +1052,8 @@ export default function AdminDashboard({
           ...a,
           name: editName,
           email: editEmail,
-          primaryLang: editLang,
+          primaryLang: resolvedPrimaryLang,
+          languages: resolvedLanguages,
           specialty: editSpecialty,
           employmentType: editEmploymentType,
           hourlyRate: parseInt(editHourlyRate) || 8,
@@ -1082,6 +1112,10 @@ export default function AdminDashboard({
     setReviewPassword(`interp${Math.floor(100 + Math.random() * 900)}!`);
     setReviewNotes('Approved by IK Enterprises Administration');
 
+    const appLangs = getApplicantLanguages(app);
+    setReviewLanguages(appLangs.length > 0 ? appLangs : [app.primaryLang || 'Spanish']);
+    setNewReviewLangToAdd('');
+
     // Setup shift timing & timezone
     const existingSched = app.shiftSchedule || {};
     const defaultShift = resolvedType === 'salary_base' ? 'fixed_9h' 
@@ -1115,6 +1149,9 @@ export default function AdminDashboard({
       scheduleLabel
     };
 
+    const resolvedReviewLanguages = reviewLanguages.length > 0 ? reviewLanguages : [selectedAppForReview.primaryLang || 'Spanish'];
+    const resolvedPrimary = resolvedReviewLanguages[0];
+
     fetch(`/api/admin/interpreter-applications/${selectedAppForReview.id}/approve`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1125,7 +1162,9 @@ export default function AdminDashboard({
         approvedMonthlySalary: parseInt(reviewApprovedMonthlySalary) || 1200,
         initialPassword: reviewPassword,
         adminNotes: reviewNotes,
-        shiftSchedule: shiftSchedulePayload
+        shiftSchedule: shiftSchedulePayload,
+        languages: resolvedReviewLanguages,
+        primaryLang: resolvedPrimary
       })
     })
       .then(res => res.json())
@@ -5699,9 +5738,73 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                   <span className="text-slate-400">Email:</span>
                   <span className="font-mono text-purple-300">{selectedAppForReview.email}</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Languages:</span>
-                  <span className="font-semibold text-brand-300">{(selectedAppForReview.languages || [selectedAppForReview.primaryLang]).join(', ')}</span>
+                <div className="space-y-1.5 pt-1.5 border-t border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 font-semibold flex items-center gap-1">
+                      <Globe className="w-3.5 h-3.5 text-blue-400" />
+                      <span>Approved Languages ({reviewLanguages.length}):</span>
+                    </span>
+                    <span className="text-[10px] text-slate-500">Click ✕ to remove unverified language</span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5 items-center min-h-[30px] p-1.5 rounded-xl bg-slate-900 border border-slate-800/80">
+                    {reviewLanguages.length === 0 ? (
+                      <span className="text-red-400 text-[11px] italic">No language selected. Please add at least one language.</span>
+                    ) : (
+                      reviewLanguages.map((lang, idx) => {
+                        const match = LANGUAGES.find(l => l.name.toLowerCase() === lang.toLowerCase());
+                        const isPrimary = idx === 0;
+                        return (
+                          <span 
+                            key={idx} 
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition ${
+                              isPrimary ? 'bg-blue-600/30 text-blue-200 border-blue-500/50' : 'bg-slate-800 text-slate-200 border-slate-700'
+                            }`}
+                          >
+                            <span>{match ? match.flag : '🌐'}</span>
+                            <span>{lang}</span>
+                            {isPrimary && <span className="text-[8px] uppercase px-1 rounded bg-blue-500/30 text-blue-300">Primary</span>}
+                            <button
+                              type="button"
+                              onClick={() => setReviewLanguages(prev => prev.filter((_, i) => i !== idx))}
+                              className="w-3.5 h-3.5 rounded-full bg-red-500/20 hover:bg-red-500 text-red-300 hover:text-white flex items-center justify-center transition ml-0.5"
+                              title={`Delete ${lang}`}
+                            >
+                              <X className="w-2.5 h-2.5" />
+                            </button>
+                          </span>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Add Language dropdown */}
+                  <div className="flex items-center gap-1.5 pt-0.5">
+                    <select
+                      value={newReviewLangToAdd}
+                      onChange={(e) => setNewReviewLangToAdd(e.target.value)}
+                      className="flex-1 px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="">-- Add another verified language --</option>
+                      {LANGUAGES.filter(l => !reviewLanguages.some(rl => rl.toLowerCase() === l.name.toLowerCase())).map((l, i) => (
+                        <option key={i} value={l.name}>{l.flag} {l.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      disabled={!newReviewLangToAdd}
+                      onClick={() => {
+                        if (newReviewLangToAdd && !reviewLanguages.includes(newReviewLangToAdd)) {
+                          setReviewLanguages(prev => [...prev, newReviewLangToAdd]);
+                          setNewReviewLangToAdd('');
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-bold text-xs flex items-center gap-1 transition shrink-0"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Add</span>
+                    </button>
+                  </div>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-400">Submitted CV:</span>
@@ -6483,6 +6586,693 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================== */}
+      {/* MODAL 4: EDIT PROFILE, RATES & SHIFT SCHEDULE MODAL */}
+      {/* ========================================================== */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="max-w-xl w-full bg-slate-900 border border-blue-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5 relative text-white my-8 max-h-[90vh] overflow-y-auto">
+            
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
+                  <Edit className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white">Edit Profile, Rates & Schedule</h3>
+                  <p className="text-xs text-slate-400">Update account terms and settings for <span className="text-blue-300 font-bold">{editName || editEmail}</span></p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setIsEditModalOpen(false)} 
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {editCredentialsSentMsg && (
+              <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-2 animate-fadeIn">
+                <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{editCredentialsSentMsg}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveEdit} className="space-y-4 text-xs">
+              {/* Basic Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-300">Full Name:</label>
+                  <input
+                    type="text"
+                    required
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-300">Email Address:</label>
+                  <input
+                    type="email"
+                    required
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Password & Organization */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-300">Login Password:</label>
+                  <div className="relative">
+                    <Key className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
+                    <input
+                      type="text"
+                      required
+                      value={editPassword}
+                      onChange={(e) => setEditPassword(e.target.value)}
+                      className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-300">Organization / Pool:</label>
+                  <input
+                    type="text"
+                    value={editOrg}
+                    onChange={(e) => setEditOrg(e.target.value)}
+                    placeholder="e.g. Certified Linguist Pool"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Selected & Verified Languages with Delete & Add Controls */}
+              <div className="space-y-2 p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
+                <div className="flex items-center justify-between">
+                  <label className="font-semibold text-slate-200 flex items-center gap-1.5 text-xs">
+                    <Globe className="w-4 h-4 text-blue-400" />
+                    <span>Approved / Spoken Languages ({editLanguages.length}):</span>
+                  </label>
+                  <span className="text-[10px] text-slate-400">Click ✕ to delete any language</span>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5 min-h-[36px] p-2 rounded-xl bg-slate-900 border border-slate-800/80 items-center">
+                  {editLanguages.length === 0 ? (
+                    <span className="text-red-400 text-xs italic">No languages selected. Add at least one below.</span>
+                  ) : (
+                    editLanguages.map((lang, idx) => {
+                      const match = LANGUAGES.find(l => l.name.toLowerCase() === lang.toLowerCase());
+                      const isPrimary = idx === 0;
+                      return (
+                        <span 
+                          key={idx} 
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition ${
+                            isPrimary ? 'bg-blue-600/30 text-blue-200 border-blue-500/50' : 'bg-slate-800 text-slate-200 border-slate-700'
+                          }`}
+                        >
+                          <span>{match ? match.flag : '🌐'}</span>
+                          <span>{lang}</span>
+                          {isPrimary && <span className="text-[9px] uppercase px-1 rounded bg-blue-500/30 text-blue-300 font-extrabold">Primary</span>}
+                          <button
+                            type="button"
+                            onClick={() => setEditLanguages(prev => prev.filter((_, i) => i !== idx))}
+                            className="w-4 h-4 rounded-full bg-red-500/20 hover:bg-red-500 text-red-300 hover:text-white flex items-center justify-center transition ml-1"
+                            title={`Delete ${lang}`}
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                        </span>
+                      );
+                    })
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <select
+                    value={newLangToAdd}
+                    onChange={(e) => setNewLangToAdd(e.target.value)}
+                    className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="">-- Choose language to add --</option>
+                    {LANGUAGES.filter(l => !editLanguages.some(el => el.toLowerCase() === l.name.toLowerCase())).map((l, i) => (
+                      <option key={i} value={l.name}>{l.flag} {l.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={!newLangToAdd}
+                    onClick={() => {
+                      if (newLangToAdd && !editLanguages.includes(newLangToAdd)) {
+                        setEditLanguages(prev => [...prev, newLangToAdd]);
+                        setNewLangToAdd('');
+                      }
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-bold text-xs flex items-center gap-1 transition shrink-0"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Language</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Specialty Domain */}
+              <div className="space-y-1">
+                <label className="font-semibold text-slate-300">Specialty Domain:</label>
+                <select
+                  value={editSpecialty}
+                  onChange={(e) => setEditSpecialty(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-blue-500"
+                >
+                  {SPECIALTY_DOMAINS.map((d, i) => (
+                    <option key={i} value={d.name}>{d.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Compensation Model Selector */}
+              <div className="space-y-2 pt-2 border-t border-slate-800">
+                <label className="font-semibold text-slate-300">Compensation Model & Pay Rate:</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditEmploymentType('hourly')}
+                    className={`p-2.5 rounded-xl border text-center transition ${
+                      editEmploymentType === 'hourly'
+                        ? 'bg-blue-600/30 border-blue-500 text-white font-bold ring-1 ring-blue-500'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-[11px] font-bold">💼 Hourly Shift</p>
+                    <p className="text-[9px] text-slate-400 mt-0.5">Scheduled Queue</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditEmploymentType('per_minute')}
+                    className={`p-2.5 rounded-xl border text-center transition ${
+                      editEmploymentType === 'per_minute'
+                        ? 'bg-emerald-600/30 border-emerald-500 text-white font-bold ring-1 ring-emerald-500'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-[11px] font-bold">⏱️ Per-Minute</p>
+                    <p className="text-[9px] text-slate-400 mt-0.5">Live Talk</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditEmploymentType('salary_base')}
+                    className={`p-2.5 rounded-xl border text-center transition ${
+                      editEmploymentType === 'salary_base'
+                        ? 'bg-purple-600/30 border-purple-500 text-white font-bold ring-1 ring-purple-500'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-[11px] font-bold">🏢 Monthly Salary</p>
+                    <p className="text-[9px] text-slate-400 mt-0.5">Fixed Base</p>
+                  </button>
+                </div>
+              </div>
+
+              {/* Dynamic Rate Setting based on Model */}
+              {editEmploymentType === 'hourly' && (
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-300">Hourly Shift Rate ($/hr):</label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-2.5 font-bold text-blue-400">$</span>
+                    <input
+                      type="number"
+                      min="5"
+                      max="300"
+                      required
+                      value={editHourlyRate}
+                      onChange={(e) => setEditHourlyRate(e.target.value)}
+                      className="w-full pl-8 pr-12 py-2.5 rounded-xl bg-slate-950 border border-blue-500/50 text-xs text-white font-bold focus:outline-none focus:border-blue-500"
+                    />
+                    <span className="absolute right-3.5 top-2.5 text-xs text-slate-400">/ hr</span>
+                  </div>
+                </div>
+              )}
+
+              {editEmploymentType === 'per_minute' && (
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-300">Live Talk Rate ($/min):</label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-2.5 font-bold text-emerald-400">$</span>
+                    <input
+                      type="number"
+                      step="0.05"
+                      min="0.10"
+                      max="5.00"
+                      required
+                      value={editMinuteRate}
+                      onChange={(e) => setEditMinuteRate(parseFloat(e.target.value) || 0)}
+                      className="w-full pl-8 pr-12 py-2.5 rounded-xl bg-slate-950 border border-emerald-500/50 text-xs text-white font-bold focus:outline-none focus:border-emerald-500"
+                    />
+                    <span className="absolute right-3.5 top-2.5 text-xs text-slate-400">/ min</span>
+                  </div>
+                </div>
+              )}
+
+              {editEmploymentType === 'salary_base' && (
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-300">Monthly Fixed Salary ($/mo):</label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-2.5 font-bold text-purple-400">$</span>
+                    <input
+                      type="number"
+                      min="300"
+                      max="15000"
+                      step="50"
+                      required
+                      value={editMonthlySalary}
+                      onChange={(e) => setEditMonthlySalary(e.target.value)}
+                      className="w-full pl-8 pr-12 py-2.5 rounded-xl bg-slate-950 border border-purple-500/50 text-xs text-white font-bold focus:outline-none focus:border-purple-500"
+                    />
+                    <span className="absolute right-3.5 top-2.5 text-xs text-slate-400">/ mo</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Working Schedule & Daily Shift Timing */}
+              <div className="space-y-3 pt-2.5 border-t border-slate-800">
+                <div className="flex items-center justify-between">
+                  <label className="font-semibold text-slate-200 flex items-center gap-1.5 text-xs">
+                    <Clock className="w-4 h-4 text-amber-400" />
+                    <span>Interpreter Shift Timing & Working Hours:</span>
+                  </label>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    editShiftType === 'open_unlimited'
+                      ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                      : 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                  }`}>
+                    {editShiftType === 'open_unlimited' ? '⚡ Open 24/7 Unlimited' : `⏰ ${editDailyHours}h / Day`}
+                  </span>
+                </div>
+
+                {/* Shift Timing Mode Selector */}
+                <div className="grid grid-cols-2 sm:grid-cols-6 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditShiftType('fixed_12h');
+                      setEditDailyHours(12);
+                      setEditStartTime('09:00');
+                      setEditEndTime('21:00');
+                    }}
+                    className={`p-2 rounded-xl border text-center transition ${
+                      editShiftType === 'fixed_12h'
+                        ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-[11px] font-bold">12 Hours</p>
+                    <p className="text-[9px] text-slate-400">Long Shift</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditShiftType('fixed_9h');
+                      setEditDailyHours(9);
+                      setEditStartTime('09:00');
+                      setEditEndTime('18:00');
+                    }}
+                    className={`p-2 rounded-xl border text-center transition ${
+                      editShiftType === 'fixed_9h'
+                        ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-[11px] font-bold">9 Hours</p>
+                    <p className="text-[9px] text-slate-400">Standard</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditShiftType('fixed_6h');
+                      setEditDailyHours(6);
+                      setEditStartTime('09:00');
+                      setEditEndTime('15:00');
+                    }}
+                    className={`p-2 rounded-xl border text-center transition ${
+                      editShiftType === 'fixed_6h'
+                        ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-[11px] font-bold">6 Hours</p>
+                    <p className="text-[9px] text-slate-400">Half Shift</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditShiftType('fixed_3h');
+                      setEditDailyHours(3);
+                      setEditStartTime('09:00');
+                      setEditEndTime('12:00');
+                    }}
+                    className={`p-2 rounded-xl border text-center transition ${
+                      editShiftType === 'fixed_3h'
+                        ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-[11px] font-bold">3 Hours</p>
+                    <p className="text-[9px] text-slate-400">Part-Time</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditShiftType('custom');
+                    }}
+                    className={`p-2 rounded-xl border text-center transition ${
+                      editShiftType === 'custom'
+                        ? 'bg-blue-500/20 border-blue-500 text-blue-300 font-bold'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-[11px] font-bold">Custom</p>
+                    <p className="text-[9px] text-slate-400">Flexible</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditShiftType('open_unlimited');
+                      setEditDailyHours('Unlimited');
+                    }}
+                    className={`p-2 rounded-xl border text-center transition ${
+                      editShiftType === 'open_unlimited'
+                        ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-bold'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-[11px] font-bold">Open 24/7</p>
+                    <p className="text-[9px] text-emerald-400">Unlimited</p>
+                  </button>
+                </div>
+
+                {/* Timezone Selector */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block">Duty Working Timezone:</label>
+                  <select
+                    value={editTimeZone}
+                    onChange={(e) => setEditTimeZone(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-amber-500 font-medium"
+                  >
+                    {TIMEZONES.map((tz, idx) => (
+                      <option key={idx} value={tz.value}>{tz.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Shift Hours / Window Details (When not unlimited) */}
+                {editShiftType !== 'open_unlimited' && (
+                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80 space-y-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-center">
+                      {editShiftType === 'custom' && (
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Daily Hours:</label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="24"
+                            value={editDailyHours}
+                            onChange={(e) => setEditDailyHours(parseInt(e.target.value) || 1)}
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white font-bold focus:outline-none focus:border-amber-500"
+                          />
+                        </div>
+                      )}
+
+                      <div className={editShiftType === 'custom' ? '' : 'sm:col-span-1.5'}>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Shift Start Time:</label>
+                        <input
+                          type="time"
+                          value={editStartTime}
+                          onChange={(e) => setEditStartTime(e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white font-mono focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+
+                      <div className={editShiftType === 'custom' ? '' : 'sm:col-span-1.5'}>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Shift End Time:</label>
+                        <input
+                          type="time"
+                          value={editEndTime}
+                          onChange={(e) => setEditEndTime(e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white font-mono focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-3 flex items-center justify-between gap-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => handleDispatchCredentialsEmail(editingUserId)}
+                  disabled={isSendingCredentials}
+                  className="px-4 py-2.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 font-bold text-xs flex items-center gap-1.5 transition disabled:opacity-50"
+                  title="Send login credentials email"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{isSendingCredentials ? 'Sending...' : 'Dispatch Credentials Email'}</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditModalOpen(false)}
+                    className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs shadow-lg shadow-blue-600/30 transition"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================== */}
+      {/* MODAL 5: CREATE / REGISTER ACCOUNT MODAL */}
+      {/* ========================================================== */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="max-w-lg w-full bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5 relative text-white my-8 max-h-[90vh] overflow-y-auto">
+            
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                  <UserPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white">Create New Account</h3>
+                  <p className="text-xs text-slate-400">Register new Admin, Interpreter, or Client Account</p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setIsCreateModalOpen(false)} 
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateAccount} className="space-y-4 text-xs">
+              {/* Role Selector */}
+              <div className="space-y-1">
+                <label className="font-semibold text-slate-300">Account Role:</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewAccountRole('host')}
+                    className={`p-2.5 rounded-xl border text-center transition ${
+                      newAccountRole === 'host'
+                        ? 'bg-blue-600/30 border-blue-500 text-white font-bold ring-1 ring-blue-500'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-[11px] font-bold">🏢 Client Host</p>
+                    <p className="text-[9px] text-slate-400 mt-0.5">Hospital / Firm</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setNewAccountRole('interpreter')}
+                    className={`p-2.5 rounded-xl border text-center transition ${
+                      newAccountRole === 'interpreter'
+                        ? 'bg-emerald-600/30 border-emerald-500 text-white font-bold ring-1 ring-emerald-500'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-[11px] font-bold">🌐 Interpreter</p>
+                    <p className="text-[9px] text-slate-400 mt-0.5">Certified Pool</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setNewAccountRole('admin')}
+                    className={`p-2.5 rounded-xl border text-center transition ${
+                      newAccountRole === 'admin'
+                        ? 'bg-purple-600/30 border-purple-500 text-white font-bold ring-1 ring-purple-500'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-[11px] font-bold">🛡️ Administrator</p>
+                    <p className="text-[9px] text-slate-400 mt-0.5">Full Control</p>
+                  </button>
+                </div>
+              </div>
+
+              {/* Name & Email */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-300">Full Name:</label>
+                  <input
+                    type="text"
+                    required
+                    value={formName}
+                    onChange={(e) => setFormName(e.target.value)}
+                    placeholder="e.g. Dr. Sarah Jenkins"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-300">Email Address:</label>
+                  <input
+                    type="email"
+                    required
+                    value={formEmail}
+                    onChange={(e) => setFormEmail(e.target.value)}
+                    placeholder="user@example.com"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              {/* Password & Organization */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-300">Initial Password:</label>
+                  <input
+                    type="text"
+                    required
+                    value={formPassword}
+                    onChange={(e) => setFormPassword(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-300">Organization / Hospital:</label>
+                  <input
+                    type="text"
+                    value={formOrg}
+                    onChange={(e) => setFormOrg(e.target.value)}
+                    placeholder="e.g. MetroHealth System"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              {newAccountRole === 'interpreter' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-300">Language:</label>
+                    <select
+                      value={formLang}
+                      onChange={(e) => setFormLang(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    >
+                      {LANGUAGES.map((l, i) => (
+                        <option key={i} value={l.name}>{l.flag} {l.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-300">Specialty:</label>
+                    <select
+                      value={formSpecialty}
+                      onChange={(e) => setFormSpecialty(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    >
+                      {SPECIALTY_DOMAINS.map((d, i) => (
+                        <option key={i} value={d.name}>{d.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {newAccountRole === 'host' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-300">Initial Minutes Balance:</label>
+                    <input
+                      type="number"
+                      value={formInitialMinutes}
+                      onChange={(e) => setFormInitialMinutes(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-300">Billing Type:</label>
+                    <select
+                      value={formBillingType}
+                      onChange={(e) => setFormBillingType(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="prepaid">Prepaid Wallet</option>
+                      <option value="postpaid_hospital">Postpaid Hospital (Net 30)</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-3 flex items-center justify-end gap-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-lg shadow-emerald-600/30 transition"
+                >
+                  Create Account
+                </button>
+              </div>
+            </form>
+
           </div>
         </div>
       )}
