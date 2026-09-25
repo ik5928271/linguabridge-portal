@@ -50,7 +50,8 @@ import {
   Wifi,
   Lock,
   Radio,
-  ArrowRight
+  ArrowRight,
+  Calendar
 } from 'lucide-react';
 import { getSocket } from '../services/socket';
 import { playTelephoneRing, playMessageTone, playConnectedChime } from '../services/audioService';
@@ -139,6 +140,46 @@ const formatBubbleTimestamp = (dateInput, fallbackTime = '') => {
     });
     return `${dateStr}, ${timeStr}`;
   }
+};
+
+// Helper to extract all languages spoken by an applicant/interpreter
+const getApplicantLanguages = (app) => {
+  if (!app) return [];
+  const list = [];
+  if (app.primaryLang) {
+    if (typeof app.primaryLang === 'string') {
+      app.primaryLang.split(/[,/•;]+/).forEach(s => list.push(s.trim()));
+    } else {
+      list.push(String(app.primaryLang));
+    }
+  }
+  if (Array.isArray(app.languages)) {
+    app.languages.forEach(l => {
+      if (typeof l === 'string') {
+        l.split(/[,/•;]+/).forEach(s => list.push(s.trim()));
+      } else if (l) {
+        list.push(String(l));
+      }
+    });
+  } else if (typeof app.languages === 'string') {
+    app.languages.split(/[,/•;]+/).forEach(s => list.push(s.trim()));
+  }
+  return list.filter(Boolean);
+};
+
+// Robust language matching helper to match clean language names against target language filter
+const doesAppMatchLanguage = (app, targetLang) => {
+  if (!app || !targetLang || targetLang.toLowerCase() === 'all') return true;
+  const cleanTarget = targetLang.toLowerCase().replace(/\s*\([^)]*\)/g, '').trim();
+  if (!cleanTarget) return true;
+
+  const spokenLangs = getApplicantLanguages(app);
+  return spokenLangs.some(lang => {
+    const cleanSpoken = lang.toLowerCase().replace(/\s*\([^)]*\)/g, '').trim();
+    return cleanSpoken === cleanTarget || 
+           cleanSpoken.includes(cleanTarget) || 
+           cleanTarget.includes(cleanSpoken);
+  });
 };
 
 // Safe Shift Schedule Formatter to prevent React error #31 with nested schedule objects
@@ -271,7 +312,7 @@ export default function AdminDashboard({
     }
   ]);
 
-  // Interpreter Applications & Verification Queue state (All 41 live applications loaded instantly with 0ms delay)
+  // Interpreter Applications & Verification Queue state (Strict single applicant deduplication)
   const [applications, setApplications] = useState(() => {
     let list = Array.isArray(ALL_SEED_APPLICATIONS) && ALL_SEED_APPLICATIONS.length > 0 
       ? [...ALL_SEED_APPLICATIONS] 
@@ -280,14 +321,28 @@ export default function AdminDashboard({
       const localSaved = JSON.parse(localStorage.getItem('linguabridge_submitted_applications') || '[]');
       if (Array.isArray(localSaved) && localSaved.length > 0) {
         localSaved.forEach(localApp => {
-          if (localApp.email && localApp.email.toLowerCase() === 'ik5928271@gmail.com') return;
-          if (!list.some(d => d.email && d.email.toLowerCase() === localApp.email?.toLowerCase())) {
+          if (localApp.email && localApp.email.toLowerCase().trim() === 'ik5928271@gmail.com') return;
+          const cleanEmail = (localApp.email || '').toLowerCase().trim();
+          if (cleanEmail && !list.some(d => (d.email || '').toLowerCase().trim() === cleanEmail)) {
             list.unshift(localApp);
           }
         });
       }
     } catch {}
-    return list;
+
+    const dedupedMap = new Map();
+    list.forEach(app => {
+      const key = (app.email || '').toLowerCase().trim() || (app.name || '').toLowerCase().trim() || app.id || Math.random().toString();
+      if (!dedupedMap.has(key)) {
+        dedupedMap.set(key, app);
+      } else {
+        const existing = dedupedMap.get(key);
+        if (app.status === 'approved' && existing.status !== 'approved') {
+          dedupedMap.set(key, app);
+        }
+      }
+    });
+    return Array.from(dedupedMap.values());
   });
 
   const [appFilter, setAppFilter] = useState('all'); // 'all', 'pending', 'approved', 'rejected'
@@ -413,8 +468,20 @@ export default function AdminDashboard({
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
-          const cleanList = data.filter(a => !(a.email && a.email.toLowerCase() === 'ik5928271@gmail.com'));
-          setApplications(cleanList);
+          const cleanList = data.filter(a => !(a.email && a.email.toLowerCase().trim() === 'ik5928271@gmail.com'));
+          const dedupedMap = new Map();
+          cleanList.forEach(app => {
+            const key = (app.email || '').toLowerCase().trim() || (app.name || '').toLowerCase().trim() || app.id || Math.random().toString();
+            if (!dedupedMap.has(key)) {
+              dedupedMap.set(key, app);
+            } else {
+              const existing = dedupedMap.get(key);
+              if (app.status === 'approved' && existing.status !== 'approved') {
+                dedupedMap.set(key, app);
+              }
+            }
+          });
+          setApplications(Array.from(dedupedMap.values()));
         }
       })
       .catch(() => {});
@@ -1039,6 +1106,14 @@ export default function AdminDashboard({
       .then(data => {
         if (data.success) {
           setIsApproveModalOpen(false);
+          if (selectedAppForReview?.email) {
+            const cleanTargetEmail = selectedAppForReview.email.toLowerCase().trim();
+            setApplications(prev => prev.map(a => 
+              (a.email && a.email.toLowerCase().trim() === cleanTargetEmail)
+                ? { ...a, status: 'approved', badgeNumber: data.application?.badgeNumber || a.badgeNumber }
+                : a
+            ));
+          }
           fetchApplications();
           fetchUsers();
           if (data.emailDispatch) {
@@ -1087,23 +1162,39 @@ export default function AdminDashboard({
       .catch(() => {});
   };
 
-  // Resolved Applications synchronized with live provisioned accounts in usersList
+  // Resolved Applications synchronized with live provisioned accounts in usersList & strictly deduplicated
   const resolvedApplications = React.useMemo(() => {
-    return applications.map(app => {
+    const dedupedMap = new Map();
+
+    applications.forEach(app => {
+      const cleanEmail = (app.email || '').toLowerCase().trim();
       const existingUser = usersList.find(u => 
         u.role === 'interpreter' && 
-        ((u.email && app.email && u.email.toLowerCase() === app.email.toLowerCase()) ||
+        ((u.email && cleanEmail && u.email.toLowerCase().trim() === cleanEmail) ||
          (u.badgeNumber && app.badgeNumber && u.badgeNumber.toString() === app.badgeNumber.toString()))
       );
       const isApproved = Boolean(existingUser || app.status === 'approved');
       const badgeNumber = (existingUser && (existingUser.badgeNumber || existingUser.interpreterBadgeId)) || app.badgeNumber || app.interpreterBadgeId;
-      return {
+
+      const item = {
         ...app,
         status: isApproved ? 'approved' : (app.status || 'pending'),
         badgeNumber,
         interpreterBadgeId: badgeNumber
       };
+
+      const key = cleanEmail || (app.name || '').toLowerCase().trim() || app.id || Math.random().toString();
+      if (!dedupedMap.has(key)) {
+        dedupedMap.set(key, item);
+      } else {
+        const existing = dedupedMap.get(key);
+        if (item.status === 'approved' && existing.status !== 'approved') {
+          dedupedMap.set(key, item);
+        }
+      }
     });
+
+    return Array.from(dedupedMap.values());
   }, [applications, usersList]);
 
   const pendingApplicationsCount = resolvedApplications.filter(a => a.status === 'pending').length;
@@ -1143,17 +1234,16 @@ export default function AdminDashboard({
   const applicationLanguages = React.useMemo(() => {
     const counts = {};
     currentTabApplications.forEach(app => {
-      const langs = new Set();
-      if (app.primaryLang && app.primaryLang !== 'English') {
-        langs.add(app.primaryLang);
-      }
-      if (Array.isArray(app.languages)) {
-        app.languages.forEach(l => {
-          if (l && l !== 'English') langs.add(l);
-        });
-      }
-      langs.forEach(lang => {
-        counts[lang] = (counts[lang] || 0) + 1;
+      const langs = getApplicantLanguages(app);
+      const uniqueLangsForApp = new Set(
+        langs
+          .map(l => l.replace(/\s*\([^)]*\)/g, '').trim())
+          .filter(l => l && l.toLowerCase() !== 'english')
+      );
+      uniqueLangsForApp.forEach(lang => {
+        const matchedObj = LANGUAGES.find(l => l.name.toLowerCase() === lang.toLowerCase());
+        const canonicalName = matchedObj ? matchedObj.name : (lang.charAt(0).toUpperCase() + lang.slice(1));
+        counts[canonicalName] = (counts[canonicalName] || 0) + 1;
       });
     });
 
@@ -1169,36 +1259,25 @@ export default function AdminDashboard({
       });
   }, [currentTabApplications]);
 
-  const filteredApplications = resolvedApplications.filter(app => {
-    const q = searchTerm.toLowerCase().trim();
-    const matchesSearch = 
-      (app.name && app.name.toLowerCase().includes(q)) ||
-      (app.email && app.email.toLowerCase().includes(q)) ||
-      (app.badgeNumber && app.badgeNumber.toString().includes(q)) ||
-      (app.interpreterBadgeId && app.interpreterBadgeId.toString().includes(q)) ||
-      (app.primaryLang && app.primaryLang.toLowerCase().includes(q)) ||
-      (Array.isArray(app.languages) && app.languages.some(l => l.toLowerCase().includes(q))) ||
-      (Array.isArray(app.specialties) && app.specialties.some(s => s.toLowerCase().includes(q)));
-    
-    const matchesStatus = appFilter === 'all' || app.status === appFilter;
+  const filteredApplications = React.useMemo(() => {
+    return currentTabApplications.filter(app => {
+      const q = searchTerm.toLowerCase().trim();
+      const matchesSearch = !q || (
+        (app.name && app.name.toLowerCase().includes(q)) ||
+        (app.email && app.email.toLowerCase().includes(q)) ||
+        (app.badgeNumber && app.badgeNumber.toString().includes(q)) ||
+        (app.interpreterBadgeId && app.interpreterBadgeId.toString().includes(q)) ||
+        (app.primaryLang && app.primaryLang.toLowerCase().includes(q)) ||
+        (Array.isArray(app.languages) && app.languages.some(l => (typeof l === 'string' ? l.toLowerCase().includes(q) : false))) ||
+        (Array.isArray(app.specialties) && app.specialties.some(s => (typeof s === 'string' ? s.toLowerCase().includes(q) : false))) ||
+        (app.bio && app.bio.toLowerCase().includes(q))
+      );
 
-    let matchesShift = true;
-    if (shiftFilter === 'on_call') {
-      matchesShift = Boolean(app.emergencyOnCall);
-    } else if (shiftFilter !== 'all') {
-      matchesShift = Array.isArray(app.shiftWindows) && app.shiftWindows.includes(shiftFilter);
-    }
+      const matchesLang = doesAppMatchLanguage(app, langFilter);
 
-    let matchesLang = true;
-    if (langFilter !== 'all') {
-      const targetLang = langFilter.toLowerCase();
-      matchesLang = 
-        (app.primaryLang && app.primaryLang.toLowerCase() === targetLang) ||
-        (Array.isArray(app.languages) && app.languages.some(l => l.toLowerCase() === targetLang));
-    }
-
-    return matchesSearch && matchesStatus && matchesShift && matchesLang;
-  });
+      return matchesSearch && matchesLang;
+    });
+  }, [currentTabApplications, searchTerm, langFilter]);
 
   // Inquiries Actions
   const handleToggleInquiryStatus = (id, currentStatus) => {
