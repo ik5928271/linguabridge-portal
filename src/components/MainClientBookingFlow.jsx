@@ -44,6 +44,35 @@ import { LANGUAGES, ALL_100_LANGUAGES, SPECIALTIES, INITIAL_INTERPRETERS } from 
 import PrepaidWalletModal from './PrepaidWalletModal';
 import { getSocket } from '../services/socket';
 
+// Helper to sanitize interpreter bios so internal contractor pay rates ($X/min, $X/hr, etc.) are never shown to clients
+const sanitizeClientSafeBio = (rawBio, badgeNum, lang) => {
+  if (!rawBio || typeof rawBio !== 'string') {
+    return `Certified professional ${lang || ''} linguist (Badge #${badgeNum || 'Verified'}) bridging live encounters with highest accuracy.`;
+  }
+  let clean = rawBio
+    // Remove "under $X/min (Live Talk)", "under $8/hr", "under $1200/mo", "under $0.20/min", etc.
+    .replace(/\s*under\s+[\$£€]?[0-9.]+(?:-[0-9.]+)?(?:\s*\/\s*(?:min|minute|hr|hour|mo|month))?(?:\s*\([^)]*\))?/gi, '')
+    // Remove standalone rate patterns like "$0.20/min", "$8/hr", "$1200/mo", "£15/hr"
+    .replace(/[\$£€]\s*[0-9.]+(?:-[0-9.]+)?(?:\s*\/\s*(?:min|minute|hr|hour|mo|month))(?:\s*\([^)]*\))?/gi, '')
+    // Remove rate labels like "(Live Talk)", "(Salary Base)", "(Scheduled Shift)", "(On-Demand Flex)"
+    .replace(/\s*\((?:Live Talk|Salary Base|Scheduled Shift|On-Demand|Flex|Hourly|Per-Minute)[^)]*\)/gi, '')
+    // Remove dangling connectors like " under", " with under", " under."
+    .replace(/\s+under\s*[.,]?/gi, '')
+    .replace(/\s*,\s*,\s*/g, ', ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  clean = clean.replace(/[,;:\-\s]+$/, '').trim();
+  if (clean && !clean.endsWith('.')) {
+    clean += '.';
+  }
+
+  if (!clean || clean.length < 5) {
+    return `Certified professional ${lang || ''} linguist (Badge #${badgeNum || 'Verified'}) bridging live encounters with highest accuracy.`;
+  }
+  return clean;
+};
+
 export default function MainClientBookingFlow({ 
   onStartCall, 
   onSaveAppointment, 
@@ -998,7 +1027,7 @@ END:VCALENDAR`;
                     </div>
 
                     <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed bg-slate-950/40 p-2.5 rounded-xl border border-slate-800/80">
-                      {interp.bio || `Certified professional linguist (Badge #${badgeNum}) bridging live encounters with highest accuracy.`}
+                      {sanitizeClientSafeBio(interp.bio, badgeNum, interp.primaryLang || selectedLanguage)}
                     </p>
 
                     <div className="flex items-center justify-between pt-1">

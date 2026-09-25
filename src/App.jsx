@@ -15,7 +15,7 @@ import InterpreterApplicationModal from './components/InterpreterApplicationModa
 import AppointmentNotificationManager from './components/AppointmentNotificationManager';
 import AIAssistantWidget from './components/AIAssistantWidget';
 import { getSocket } from './services/socket';
-import { LANGUAGES } from './data/mockData';
+import { LANGUAGES, ALL_100_LANGUAGES } from './data/mockData';
 
 export default function App() {
   // Theme state ('dark' or 'light')
@@ -226,10 +226,21 @@ export default function App() {
       setCurrentRole(roleParam);
     }
     if (roomIdParam) {
+      let resolvedLang = 'Urdu';
+      if (langParam) {
+        const found = LANGUAGES.find(l => l.code.toLowerCase() === langParam.toLowerCase() || l.name.toLowerCase() === langParam.toLowerCase()) ||
+                      (ALL_100_LANGUAGES && ALL_100_LANGUAGES.find(l => l.code.toLowerCase() === langParam.toLowerCase() || l.name.toLowerCase() === langParam.toLowerCase()));
+        if (found) {
+          resolvedLang = found.name;
+        } else if (langParam.length > 2) {
+          resolvedLang = langParam.charAt(0).toUpperCase() + langParam.slice(1);
+        }
+      }
+
       setActiveSession(prev => ({
         ...prev,
         roomId: roomIdParam,
-        targetLanguage: langParam === 'es' ? 'Spanish' : langParam === 'ar' ? 'Arabic' : langParam === 'zh' ? 'Mandarin Chinese' : 'Spanish',
+        targetLanguage: resolvedLang || prev.targetLanguage || 'Urdu',
         patientName: nameParam ? decodeURIComponent(nameParam) : prev.patientName
       }));
     }
@@ -237,7 +248,13 @@ export default function App() {
 
   // Launch live conference room
   const handleStartCall = (sessionConfig) => {
-    setActiveSession(prev => ({ ...prev, ...sessionConfig }));
+    const chosenLang = sessionConfig?.targetLanguage || sessionConfig?.language || activeSession.targetLanguage || 'Urdu';
+    setActiveSession(prev => ({
+      ...prev,
+      ...sessionConfig,
+      targetLanguage: chosenLang,
+      language: chosenLang
+    }));
     setCurrentView('room');
   };
 
@@ -269,22 +286,49 @@ export default function App() {
       }
     }
 
+    const logInterpreterName = currentUser?.role === 'interpreter' 
+      ? currentUser.name 
+      : (completedData.interpreterName || activeSession.interpreterName || activeSession.interpreter?.name || 'Elena Rodriguez, CCHI');
+    const logInterpreterId = currentUser?.role === 'interpreter' 
+      ? currentUser.id 
+      : (completedData.interpreterId || activeSession.interpreterId || activeSession.interpreter?.id || 'usr-interp-1');
+    const logInterpreterEmail = currentUser?.role === 'interpreter' 
+      ? currentUser.email 
+      : (completedData.interpreterEmail || activeSession.interpreterEmail || activeSession.interpreter?.email || 'interpreter@linguabridge.com');
+    const logInterpreterBadge = currentUser?.badgeNumber || currentUser?.interpreterBadgeId || completedData.interpreterBadgeNumber || activeSession.interpreterBadgeNumber || '84920';
+
+    const calculatedMinutes = Math.max(1, Math.ceil(seconds / 60));
+
     const newLog = {
       id: `log-${Date.now()}`,
-      date: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
-      hostName: completedData.hostName || activeSession.hostName,
-      hostOrg: 'Mercy General Hospital',
-      clientName: `${completedData.patientName || activeSession.patientName} (${completedData.targetLanguage})`,
-      interpreterName: 'Elena Rodriguez, CCHI',
-      language: completedData.targetLanguage,
-      specialty: completedData.specialty,
-      duration: completedData.duration,
-      cost: actualMinutesUsed > 0 ? `$${((seconds / 60) * 0.95 + 2.50).toFixed(2)}` : '$0.00 (Test Check-in)',
+      date: new Date().toISOString(),
+      hostName: completedData.hostName || activeSession.hostName || 'Main Client',
+      hostOrg: completedData.hostOrg || activeSession.hostOrg || 'Mercy General Hospital',
+      clientName: `${completedData.patientName || activeSession.patientName || 'Guest'} (${completedData.targetLanguage || activeSession.targetLanguage || 'Spanish'})`,
+      interpreterId: logInterpreterId,
+      interpreterEmail: logInterpreterEmail,
+      interpreterName: logInterpreterName,
+      interpreterBadgeNumber: logInterpreterBadge,
+      language: completedData.targetLanguage || activeSession.targetLanguage || 'Spanish',
+      specialty: completedData.specialty || activeSession.specialty || 'General',
+      duration: `${calculatedMinutes} min${calculatedMinutes > 1 ? 's' : ''}`,
+      durationSeconds: Math.max(seconds, calculatedMinutes * 60),
+      cost: `$${(calculatedMinutes * 0.30).toFixed(2)}`,
       rating: completedData.rating || 5,
-      notes: completedData.notes
+      notes: completedData.notes || '3-party interpretation session completed successfully.'
     };
 
-    setCallLogs(prev => [newLog, ...prev]);
+    setCallLogs(prev => [newLog, ...(prev || []).filter(l => l.id !== newLog.id)]);
+
+    fetch('/api/call-logs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newLog)
+    }).catch(() => {});
+
+    if (completedData?.roomId) {
+      setAppointments(prev => prev.map(a => a.roomId === completedData.roomId ? { ...a, status: 'completed' } : a));
+    }
     setCurrentView(currentRole === 'interpreter' ? 'interpreter' : 'host');
   };
 

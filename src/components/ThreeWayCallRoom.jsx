@@ -24,7 +24,8 @@ import {
   Search,
   CheckCircle2,
   Award,
-  Radio
+  Radio,
+  MonitorUp
 } from 'lucide-react';
 import { QUICK_PHRASES, LANGUAGES } from '../data/mockData';
 import { 
@@ -58,8 +59,8 @@ export default function ThreeWayCallRoom({
     : (sessionData.interpreter?.certifications || 'Certified Professional Linguist');
   const interpreterAvatar = sessionData.interpreter?.avatar || null;
   const patientName = sessionData.patientName || sessionData.guestName || 'Non-English Client';
-  const targetLanguage = sessionData.targetLanguage || sessionData.language || 'Urdu';
-  const specialty = sessionData.specialty || 'General / Customer Support';
+  const [targetLanguage, setTargetLanguage] = useState(sessionData.targetLanguage || sessionData.language || 'Urdu');
+  const [specialty, setSpecialty] = useState(sessionData.specialty || 'General / Customer Support');
   const role = sessionData.role || 'host';
   const roomId = sessionData.roomId || `room-${Date.now().toString(36).slice(-6)}`;
   const callType = sessionData.callType || 'audio';
@@ -74,12 +75,32 @@ export default function ThreeWayCallRoom({
   const [activeSpeaker, setActiveSpeaker] = useState(role); // 'host', 'interpreter', 'guest'
   const [viewLayout, setViewLayout] = useState('grid'); // 'grid', 'focus'
   const [focusParticipant, setFocusParticipant] = useState('interpreter');
+  const [showAudioUnlockNotice, setShowAudioUnlockNotice] = useState(false);
+  const [remoteAudioCount, setRemoteAudioCount] = useState(0);
 
-  // Real microphone audio level detection
+  // Real microphone audio level detection & WebRTC Multi-Peer Mesh
   const [micAudioLevel, setMicAudioLevel] = useState(0);
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
   const mediaStreamRef = useRef(null);
+  const peersRef = useRef({}); // remoteSocketId -> RTCPeerConnection
+  const remoteAudiosRef = useRef({}); // remoteSocketId -> HTMLAudioElement
+  const remoteStreamsRef = useRef({}); // remoteSocketId -> MediaStream
+  const screenStreamRef = useRef(null);
+  const localScreenVideoRef = useRef(null);
+  const lastSpeakingEmitRef = useRef(0);
+
+  // WebRTC ICE Servers Configuration (Google STUN + Twilio)
+  const ICE_SERVERS = {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun3.l.google.com:19302' },
+      { urls: 'stun:stun4.l.google.com:19302' },
+      { urls: 'stun:global.stun.twilio.com:3478' }
+    ]
+  };
 
   // Real Speech-to-Text Recognition
   const [isListeningSpeech, setIsListeningSpeech] = useState(false);
@@ -97,6 +118,94 @@ export default function ThreeWayCallRoom({
     const m = Math.floor(sec / 60);
     const s = sec % 60;
     return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  // Helper to attach and play incoming live remote audio stream
+  const attachAndPlayRemoteAudio = (remoteSocketId, stream) => {
+    try {
+      let audioEl = remoteAudiosRef.current[remoteSocketId];
+      if (!audioEl) {
+        audioEl = document.createElement('audio');
+        audioEl.autoplay = true;
+        audioEl.playsInline = true;
+        audioEl.setAttribute('autoplay', 'true');
+        audioEl.setAttribute('playsinline', 'true');
+        document.body.appendChild(audioEl);
+        remoteAudiosRef.current[remoteSocketId] = audioEl;
+      }
+      audioEl.srcObject = stream;
+      audioEl.volume = 1.0;
+      const playPromise = audioEl.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setRemoteAudioCount(Object.keys(remoteAudiosRef.current).length);
+            setShowAudioUnlockNotice(false);
+          })
+          .catch((err) => {
+            console.log('[WebRTC Audio Autoplay Blocked] Needs user tap to unlock output:', err);
+            setShowAudioUnlockNotice(true);
+          });
+      }
+    } catch (err) {
+      console.warn('[Remote Audio Playback Notice]:', err);
+    }
+  };
+
+  // Helper to create a WebRTC PeerConnection for a specific peer
+  const createPeerConnection = (targetSocketId, isInitiator, socket) => {
+    if (peersRef.current[targetSocketId]) {
+      try { peersRef.current[targetSocketId].close(); } catch(e){}
+    }
+
+    const pc = new RTCPeerConnection(ICE_SERVERS);
+    peersRef.current[targetSocketId] = pc;
+
+    // Attach local microphone tracks to the peer connection
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => {
+        pc.addTrack(track, mediaStreamRef.current);
+      });
+    }
+
+    // Send ICE candidates to the target participant
+    pc.onicecandidate = (event) => {
+      if (event.candidate && socket) {
+        socket.emit('webrtc-ice-candidate', {
+          targetSocketId,
+          candidate: event.candidate
+        });
+      }
+    };
+
+    // When remote live audio stream arrives, play it immediately!
+    pc.ontrack = (event) => {
+      console.log('[WebRTC Live Stream Arrived from Remote Peer]:', targetSocketId);
+      if (event.streams && event.streams[0]) {
+        remoteStreamsRef.current[targetSocketId] = event.streams[0];
+        attachAndPlayRemoteAudio(targetSocketId, event.streams[0]);
+      }
+    };
+
+    if (isInitiator) {
+      pc.onnegotiationneeded = async () => {
+        try {
+          const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
+          await pc.setLocalDescription(offer);
+          if (socket) {
+            socket.emit('webrtc-offer', {
+              targetSocketId,
+              offer,
+              senderInfo: { role, name: role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName }
+            });
+          }
+        } catch (err) {
+          console.error('[WebRTC Offer Error]', err);
+        }
+      };
+    }
+
+    return pc;
   };
 
   // Connected Participants in this Room via Socket
@@ -139,7 +248,7 @@ export default function ThreeWayCallRoom({
   const [callRating, setCallRating] = useState(5);
   const [sessionNotes, setSessionNotes] = useState('3-party interpretation session completed successfully.');
 
-  // Initialize Socket.io Connection for this room
+  // Initialize Socket.io Connection & WebRTC Signaling for this room
   useEffect(() => {
     playConnectedChime();
     const socket = getSocket();
@@ -153,17 +262,20 @@ export default function ThreeWayCallRoom({
         specialty
       });
 
-      socket.on('new-chat-message', (msg) => {
-        setChatMessages(prev => [...prev, msg]);
-        playMessageTone();
+      // Handle room join confirmation and connect WebRTC with any existing peers
+      socket.on('room-joined-success', ({ participants, currentUserId, targetLanguage: serverLang, specialty: serverSpec }) => {
+        if (serverLang) setTargetLanguage(serverLang);
+        if (serverSpec) setSpecialty(serverSpec);
+        if (Array.isArray(participants)) {
+          participants.forEach(p => {
+            if (p.socketId && p.socketId !== currentUserId && p.socketId !== socket.id) {
+              createPeerConnection(p.socketId, true, socket);
+            }
+          });
+        }
       });
 
-      socket.on('interpreter-pause-alert', (alert) => {
-        setPauseBanner(alert);
-        playPauseFloorAlert();
-        setTimeout(() => setPauseBanner(null), 8000);
-      });
-
+      // Handle new participant joining room
       socket.on('participant-joined', (p) => {
         setChatMessages(prev => [
           ...prev, 
@@ -175,14 +287,144 @@ export default function ThreeWayCallRoom({
             timestamp: formatTimer(seconds)
           }
         ]);
+
+        if (p.socketId && p.socketId !== socket.id) {
+          createPeerConnection(p.socketId, true, socket);
+        }
+      });
+
+      // WebRTC Signaling: Inbound Offer
+      socket.on('webrtc-offer', async ({ senderSocketId, offer, senderInfo }) => {
+        let pc = peersRef.current[senderSocketId];
+        if (!pc) {
+          pc = createPeerConnection(senderSocketId, false, socket);
+        }
+        try {
+          await pc.setRemoteDescription(new RTCSessionDescription(offer));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          socket.emit('webrtc-answer', { targetSocketId: senderSocketId, answer });
+        } catch (err) {
+          console.error('[WebRTC Inbound Offer Processing Error]', err);
+        }
+      });
+
+      // WebRTC Signaling: Inbound Answer
+      socket.on('webrtc-answer', async ({ senderSocketId, answer }) => {
+        const pc = peersRef.current[senderSocketId];
+        if (pc) {
+          try {
+            await pc.setRemoteDescription(new RTCSessionDescription(answer));
+          } catch (err) {
+            console.error('[WebRTC Inbound Answer Error]', err);
+          }
+        }
+      });
+
+      // WebRTC Signaling: ICE Candidate
+      socket.on('webrtc-ice-candidate', async ({ senderSocketId, candidate }) => {
+        const pc = peersRef.current[senderSocketId];
+        if (pc && candidate) {
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(candidate));
+          } catch (err) {
+            console.warn('[WebRTC ICE Candidate Add Notice]:', err);
+          }
+        }
+      });
+
+      // Handle participant disconnect / cleanup
+      socket.on('participant-left', ({ socketId }) => {
+        if (peersRef.current[socketId]) {
+          try { peersRef.current[socketId].close(); } catch(e){}
+          delete peersRef.current[socketId];
+        }
+        if (remoteAudiosRef.current[socketId]) {
+          try {
+            remoteAudiosRef.current[socketId].pause();
+            remoteAudiosRef.current[socketId].srcObject = null;
+            remoteAudiosRef.current[socketId].remove();
+          } catch(e){}
+          delete remoteAudiosRef.current[socketId];
+        }
+        if (remoteStreamsRef.current[socketId]) {
+          delete remoteStreamsRef.current[socketId];
+        }
+        setRemoteAudioCount(Object.keys(remoteAudiosRef.current).length);
+      });
+
+      // Handle media state / speaking changes from other participants
+      socket.on('participant-media-changed', ({ socketId, isMuted: peerMuted, isSpeaking: peerSpeaking }) => {
+        if (peerSpeaking) {
+          const peerRole = socketId === socket.id ? role : (role === 'host' ? 'interpreter' : 'host');
+          setActiveSpeaker(peerRole);
+        }
+      });
+
+      socket.on('new-chat-message', (msg) => {
+        if (!msg) return;
+        const normalizedMsg = {
+          id: msg.id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+          sender: msg.sender || msg.senderName || 'Participant',
+          senderName: msg.sender || msg.senderName || 'Participant',
+          role: msg.role || msg.senderRole || 'guest',
+          senderRole: msg.role || msg.senderRole || 'guest',
+          text: msg.text,
+          timestamp: msg.timestamp || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          senderSocketId: msg.senderSocketId
+        };
+
+        setChatMessages(prev => {
+          if (prev.some(m => m.id === normalizedMsg.id)) return prev;
+          return [...prev, normalizedMsg];
+        });
+        playMessageTone();
+      });
+
+      socket.on('interpreter-pause-alert', (alert) => {
+        setPauseBanner(alert);
+        playPauseFloorAlert();
+        setTimeout(() => setPauseBanner(null), 8000);
+      });
+
+      socket.on('call-session-ended', ({ roomId: endedRoomId }) => {
+        if (endedRoomId === roomId) {
+          onEndCall({
+            roomId,
+            duration: formatTimer(seconds),
+            seconds: seconds,
+            notes: sessionNotes,
+            rating: callRating,
+            targetLanguage,
+            specialty,
+            patientName,
+            hostName,
+            interpreterName
+          });
+        }
       });
     }
 
     // Initialize real microphone audio stream & volume level meter
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+      navigator.mediaDevices.getUserMedia({ 
+        audio: { 
+          echoCancellation: true, 
+          noiseSuppression: true, 
+          autoGainControl: true 
+        }, 
+        video: false 
+      })
         .then((stream) => {
           mediaStreamRef.current = stream;
+
+          // Attach newly acquired local stream to any established peer connections
+          Object.values(peersRef.current).forEach(pc => {
+            stream.getTracks().forEach(track => {
+              pc.addTrack(track, stream);
+            });
+          });
+
           try {
             const AudioCtx = window.AudioContext || window.webkitAudioContext;
             if (AudioCtx) {
@@ -208,8 +450,16 @@ export default function ThreeWayCallRoom({
                   const normalized = Math.min(100, Math.floor((avg / 128) * 100));
                   setMicAudioLevel(normalized);
 
-                  if (normalized > 15) {
+                  if (normalized > 15 && !isMuted) {
                     setActiveSpeaker(role);
+                    const now = Date.now();
+                    if (!lastSpeakingEmitRef.current || (now - lastSpeakingEmitRef.current > 1200)) {
+                      lastSpeakingEmitRef.current = now;
+                      const s = getSocket();
+                      if (s) {
+                        s.emit('update-media-state', { roomId, isSpeaking: true });
+                      }
+                    }
                   }
                 }
                 requestAnimationFrame(checkVolume);
@@ -220,8 +470,8 @@ export default function ThreeWayCallRoom({
             console.warn('Web Audio meter not available in current environment:', e);
           }
         })
-        .catch(() => {
-          console.log('Microphone permission not granted or running in simulation.');
+        .catch((err) => {
+          console.log('Microphone permission not granted or running in simulation mode:', err);
         });
     }
 
@@ -261,9 +511,35 @@ export default function ThreeWayCallRoom({
       const socket = getSocket();
       if (socket) {
         socket.emit('leave-room', { roomId });
+        socket.off('new-chat-message');
+        socket.off('interpreter-pause-alert');
+        socket.off('call-session-ended');
+        socket.off('participant-joined');
+        socket.off('room-joined-success');
+        socket.off('webrtc-offer');
+        socket.off('webrtc-answer');
+        socket.off('webrtc-ice-candidate');
+        socket.off('participant-left');
+        socket.off('participant-media-changed');
       }
+      Object.values(peersRef.current).forEach(pc => {
+        try { pc.close(); } catch(e){}
+      });
+      peersRef.current = {};
+      Object.values(remoteAudiosRef.current).forEach(el => {
+        try {
+          el.pause();
+          el.srcObject = null;
+          el.remove();
+        } catch(e){}
+      });
+      remoteAudiosRef.current = {};
       if (mediaStreamRef.current) {
         mediaStreamRef.current.getTracks().forEach(t => t.stop());
+      }
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach(t => t.stop());
+        screenStreamRef.current = null;
       }
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
         audioContextRef.current.close().catch(() => {});
@@ -274,30 +550,146 @@ export default function ThreeWayCallRoom({
     };
   }, []);
 
+  // Unlock speaker audio on user interaction (Ensures mobile browser audio autoplay policy is cleared)
+  const unlockAudioOutput = () => {
+    playConnectedChime();
+    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume().catch(() => {});
+    }
+    Object.values(remoteAudiosRef.current).forEach(audio => {
+      if (audio) {
+        audio.play().catch(() => {});
+      }
+    });
+    setShowAudioUnlockNotice(false);
+  };
+
+  const handleToggleMute = () => {
+    const next = !isMuted;
+    setIsMuted(next);
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getAudioTracks().forEach(track => {
+        track.enabled = !next;
+      });
+    }
+    const socket = getSocket();
+    if (socket) {
+      socket.emit('update-media-state', { roomId, isMuted: next, isSpeaking: false });
+    }
+  };
+
+  const handleToggleVideo = () => {
+    const next = !isVideoOff;
+    setIsVideoOff(next);
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getVideoTracks().forEach(track => {
+        track.enabled = !next;
+      });
+    }
+    const socket = getSocket();
+    if (socket) {
+      socket.emit('update-media-state', { roomId, isVideoOff: next });
+    }
+  };
+
+  // Real Screen Share Presenter Handler
+  const handleToggleScreenShare = async () => {
+    if (isScreenSharing) {
+      // Stop current screen share
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach(t => t.stop());
+        screenStreamRef.current = null;
+      }
+      setIsScreenSharing(false);
+      const socket = getSocket();
+      if (socket) {
+        socket.emit('update-media-state', { roomId, isScreenSharing: false });
+      }
+      return;
+    }
+
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        alert('Live screen sharing is supported on desktop browsers (Chrome, Edge, Firefox, Safari).');
+        return;
+      }
+
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: { cursor: 'always' },
+        audio: false
+      });
+
+      screenStreamRef.current = screenStream;
+      setIsScreenSharing(true);
+
+      // Attach stream to local presenter video element
+      setTimeout(() => {
+        if (localScreenVideoRef.current) {
+          localScreenVideoRef.current.srcObject = screenStream;
+        }
+      }, 100);
+
+      // Listen for when the user clicks browser's native "Stop Sharing" floating button
+      const screenTrack = screenStream.getVideoTracks()[0];
+      if (screenTrack) {
+        screenTrack.onended = () => {
+          if (screenStreamRef.current) {
+            screenStreamRef.current.getTracks().forEach(t => t.stop());
+            screenStreamRef.current = null;
+          }
+          setIsScreenSharing(false);
+          const socket = getSocket();
+          if (socket) {
+            socket.emit('update-media-state', { roomId, isScreenSharing: false });
+          }
+        };
+      }
+
+      const socket = getSocket();
+      if (socket) {
+        socket.emit('update-media-state', { roomId, isScreenSharing: true });
+      }
+    } catch (err) {
+      console.warn('Screen sharing cancelled or unavailable:', err);
+      setIsScreenSharing(false);
+    }
+  };
+
   // Send message in 3-Way Chat
   const handleSendMessage = (e) => {
     e.preventDefault();
     if (!messageInput.trim()) return;
 
     const senderDisplayName = role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName;
+    const msgId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+    const formattedTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     const newMsg = {
-      id: `msg-${Date.now()}`,
+      id: msgId,
       sender: senderDisplayName,
+      senderName: senderDisplayName,
       role: role,
-      text: messageInput,
-      timestamp: formatTimer(seconds)
+      senderRole: role,
+      text: messageInput.trim(),
+      timestamp: formattedTime
     };
 
-    setChatMessages(prev => [...prev, newMsg]);
+    setChatMessages(prev => {
+      if (prev.some(m => m.id === msgId)) return prev;
+      return [...prev, newMsg];
+    });
 
     const socket = getSocket();
     if (socket) {
       socket.emit('send-chat-message', {
+        id: msgId,
         roomId,
+        sender: senderDisplayName,
         senderName: senderDisplayName,
+        role: role,
         senderRole: role,
-        text: messageInput
+        text: messageInput.trim(),
+        timestamp: formattedTime
       });
     }
 
@@ -305,7 +697,7 @@ export default function ThreeWayCallRoom({
     setLiveCaption({
       speaker: senderDisplayName,
       speakerRole: role,
-      enText: messageInput,
+      enText: messageInput.trim(),
       targetText: `Spoken / Sent by ${senderDisplayName}`
     });
 
@@ -343,7 +735,17 @@ export default function ThreeWayCallRoom({
   };
 
   const handleConfirmEnd = () => {
+    const socket = getSocket();
+    if (socket) {
+      socket.emit('end-call-session', {
+        roomId,
+        role,
+        participantName: role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName
+      });
+    }
+
     onEndCall({
+      roomId,
       duration: formatTimer(seconds),
       seconds: seconds,
       notes: sessionNotes,
@@ -352,7 +754,11 @@ export default function ThreeWayCallRoom({
       specialty,
       patientName,
       hostName,
-      interpreterName
+      interpreter: sessionData.interpreter,
+      interpreterId: sessionData.interpreter?.id || sessionData.interpreterId,
+      interpreterEmail: sessionData.interpreter?.email || sessionData.interpreterEmail,
+      interpreterBadgeNumber: interpreterBadgeNumber,
+      interpreterName: sessionData.interpreter?.name || interpreterDisplayName
     });
   };
 
@@ -408,25 +814,14 @@ export default function ThreeWayCallRoom({
         {/* Right: Layout & Drawer Toggles */}
         <div className="flex items-center gap-2">
           
-          {/* Audio Output Playback Toggle */}
+          {/* Audio Output Playback & Sound Test Button */}
           <button
-            onClick={() => {
-              const next = !isVoiceActive;
-              setIsVoiceActive(next);
-              setSpeechEnabled(next);
-              if (next) {
-                speakText('Voice output active.', 'en-US');
-              }
-            }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition border ${
-              isVoiceActive 
-                ? 'bg-emerald-600/20 text-emerald-400 border-emerald-500/40 shadow-sm' 
-                : 'bg-slate-800 text-slate-400 border-slate-700'
-            }`}
-            title="Toggle Voice Output"
+            onClick={unlockAudioOutput}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition border bg-emerald-600/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-600/30 shadow-sm"
+            title="Click to test & unblock speaker audio output"
           >
-            <Volume2 className={`w-3.5 h-3.5 ${isVoiceActive ? 'text-emerald-400' : 'text-slate-500'}`} />
-            <span className="hidden md:inline">Voice: {isVoiceActive ? 'ON' : 'OFF'}</span>
+            <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden md:inline">Speaker: Live (Test)</span>
           </button>
 
           <button
@@ -466,8 +861,24 @@ export default function ThreeWayCallRoom({
 
       </div>
 
+      {/* Autoplay Audio Output Unlock Banner for Mobile Browsers */}
+      {showAudioUnlockNotice && (
+        <div 
+          onClick={unlockAudioOutput}
+          className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white px-4 py-2 text-xs font-extrabold flex items-center justify-between cursor-pointer transition shadow-xl z-30 animate-pulse border-b border-emerald-400/30"
+        >
+          <div className="flex items-center gap-2">
+            <Volume2 className="w-4 h-4 text-amber-300 animate-bounce shrink-0" />
+            <span>🔊 Tap here to enable live speaker sound (Browser Security Unmute)</span>
+          </div>
+          <span className="px-2.5 py-1 rounded-lg bg-black/30 text-[10px] uppercase font-black tracking-wider text-white border border-white/20 shrink-0">
+            Unmute Audio
+          </span>
+        </div>
+      )}
+
       {/* Main Conference Arena */}
-      <div className="flex-1 flex overflow-hidden relative">
+      <div className="flex-1 flex overflow-hidden relative" onClick={unlockAudioOutput}>
         
         {/* Left / Center Video & Audio Stage */}
         <div className="flex-1 flex flex-col p-3 sm:p-4 gap-3 overflow-y-auto">
@@ -492,6 +903,30 @@ export default function ThreeWayCallRoom({
               >
                 <X className="w-4 h-4" />
               </button>
+            </div>
+          )}
+
+          {/* Live Screen / Document Share Presenter Stage */}
+          {isScreenSharing && (
+            <div className="rounded-2xl bg-black border-2 border-brand-500 shadow-2xl p-2 relative overflow-hidden flex flex-col items-center justify-center min-h-[260px] sm:min-h-[340px] animate-fade-in">
+              <div className="absolute top-3 left-3 z-10 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-brand-500/50 text-white text-xs font-bold shadow-lg">
+                <MonitorUp className="w-4 h-4 text-brand-400 animate-pulse" />
+                <span>Presenting Live Document / Screen</span>
+              </div>
+              <button
+                onClick={handleToggleScreenShare}
+                className="absolute top-3 right-3 z-10 px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-lg transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Stop Presenting</span>
+              </button>
+              <video
+                ref={localScreenVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full max-h-[420px] object-contain rounded-xl bg-slate-950"
+              />
             </div>
           )}
 
@@ -766,28 +1201,37 @@ export default function ThreeWayCallRoom({
 
                 {/* Messages Stream */}
                 <div className="flex-1 overflow-y-auto p-3 space-y-3">
-                  {chatMessages.map((msg) => (
-                    <div 
-                      key={msg.id} 
-                      className={`p-3 rounded-xl text-xs space-y-1 ${
-                        msg.role === 'system' 
-                          ? 'bg-slate-950/80 border border-slate-800/80 text-slate-400 text-center text-[10px]' 
-                          : msg.role === role 
-                            ? 'bg-brand-600/20 border border-brand-500/40 ml-4' 
-                            : 'bg-slate-800/60 border border-slate-700/60 mr-4'
-                      }`}
-                    >
-                      {msg.role !== 'system' && (
-                        <div className="flex items-center justify-between text-[10px] font-bold text-slate-400">
-                          <span className={msg.role === 'interpreter' ? 'text-emerald-400' : msg.role === 'host' ? 'text-brand-400' : 'text-amber-400'}>
-                            {msg.sender}
-                          </span>
-                          <span>{msg.timestamp}</span>
-                        </div>
-                      )}
-                      <p className="text-slate-100 font-medium">{msg.text}</p>
-                    </div>
-                  ))}
+                  {chatMessages.map((msg) => {
+                    const msgRole = msg.role || msg.senderRole;
+                    const msgSender = msg.sender || msg.senderName || 'Participant';
+                    const isOwnMessage = msgRole === role;
+                    return (
+                      <div 
+                        key={msg.id} 
+                        className={`p-3 rounded-xl text-xs space-y-1 ${
+                          msgRole === 'system' 
+                            ? 'bg-slate-950/80 border border-slate-800/80 text-slate-400 text-center text-[10px]' 
+                            : isOwnMessage 
+                              ? 'bg-brand-600/25 border border-brand-500/50 ml-6 text-white' 
+                              : 'bg-slate-800/80 border border-slate-700/70 mr-6 text-slate-200'
+                        }`}
+                      >
+                        {msgRole !== 'system' && (
+                          <div className="flex items-center justify-between text-[10px] font-bold">
+                            <span className={
+                              isOwnMessage
+                                ? 'text-brand-300'
+                                : (msgRole === 'interpreter' ? 'text-emerald-400' : msgRole === 'host' ? 'text-brand-400' : 'text-amber-400')
+                            }>
+                              {isOwnMessage ? `${msgSender} (You)` : msgSender}
+                            </span>
+                            <span className="text-slate-400 text-[9px]">{msg.timestamp}</span>
+                          </div>
+                        )}
+                        <p className="font-medium leading-relaxed">{msg.text}</p>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {/* Message input */}
@@ -878,7 +1322,7 @@ export default function ThreeWayCallRoom({
         <div className="flex items-center gap-3 mx-auto">
           {/* Mute Toggle */}
           <button
-            onClick={() => setIsMuted(!isMuted)}
+            onClick={handleToggleMute}
             className={`p-3.5 rounded-2xl backdrop-blur-md font-semibold text-xs flex items-center gap-2 transition ${
               isMuted 
                 ? 'bg-red-500 text-white shadow-lg shadow-red-500/30' 
@@ -891,7 +1335,7 @@ export default function ThreeWayCallRoom({
 
           {/* Video Toggle */}
           <button
-            onClick={() => setIsVideoOff(!isVideoOff)}
+            onClick={handleToggleVideo}
             className={`p-3.5 rounded-2xl backdrop-blur-md font-semibold text-xs flex items-center gap-2 transition ${
               isVideoOff 
                 ? 'bg-red-500 text-white shadow-lg shadow-red-500/30' 
@@ -904,15 +1348,16 @@ export default function ThreeWayCallRoom({
 
           {/* Screen Share */}
           <button
-            onClick={() => setIsScreenSharing(!isScreenSharing)}
-            className={`p-3.5 rounded-2xl backdrop-blur-md font-semibold text-xs flex items-center gap-2 transition hidden sm:flex ${
+            onClick={handleToggleScreenShare}
+            className={`p-3.5 rounded-2xl backdrop-blur-md font-semibold text-xs flex items-center gap-2 transition ${
               isScreenSharing 
-                ? 'bg-brand-500 text-white' 
+                ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/40 ring-2 ring-brand-300' 
                 : 'bg-slate-800 hover:bg-slate-700 text-white'
             }`}
-            title="Share Screen"
+            title={isScreenSharing ? 'Stop Sharing Screen' : 'Share Screen / Document'}
           >
-            <Share2 className="w-5 h-5" />
+            <MonitorUp className={`w-5 h-5 ${isScreenSharing ? 'animate-pulse text-white' : 'text-slate-300'}`} />
+            <span className="hidden lg:inline">{isScreenSharing ? 'Sharing' : 'Share Screen'}</span>
           </button>
 
           {/* Interpreter Pause Alert Button */}

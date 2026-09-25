@@ -107,6 +107,7 @@ export default function InterpreterDashboard({
   const [countdown, setCountdown] = useState(30);
   const [testAudioActive, setTestAudioActive] = useState(false);
   const [activeLiveRooms, setActiveLiveRooms] = useState([]);
+  const [dismissedLiveRooms, setDismissedLiveRooms] = useState(new Set());
 
   // Fetch active live rooms and dispatches
   const fetchActiveRooms = () => {
@@ -139,6 +140,9 @@ export default function InterpreterDashboard({
 
     const handleIncomingDispatch = (dispatchData) => {
       if (!dispatchData) return;
+      if (dispatchData.roomId && dismissedLiveRooms.has(dispatchData.roomId)) return;
+      if (dispatchData.status === 'completed' || dispatchData.status === 'ended') return;
+
       const currentLanguages = profile.languages || [profile.primaryLang];
       const targetLang = (dispatchData.targetLanguage || dispatchData.language || '').toLowerCase().trim();
       const myBadge = (profile.badgeNumber || profile.interpreterBadgeId || '').toString();
@@ -167,11 +171,35 @@ export default function InterpreterDashboard({
       }
     };
 
+    const handleCallClaimed = ({ dispatchId, roomId }) => {
+      setIncomingCall(prev => {
+        if (!prev) return null;
+        if (prev.dispatchId === dispatchId || prev.roomId === roomId) {
+          return null;
+        }
+        return prev;
+      });
+      if (roomId) {
+        setDismissedLiveRooms(prev => new Set([...prev, roomId]));
+      }
+      setActiveLiveRooms(prev => prev.filter(r => r.roomId !== roomId && r.dispatchId !== dispatchId));
+    };
+
+    const handleCallSessionEnded = ({ roomId }) => {
+      setIncomingCall(prev => (prev?.roomId === roomId ? null : prev));
+      if (roomId) {
+        setDismissedLiveRooms(prev => new Set([...prev, roomId]));
+      }
+      setActiveLiveRooms(prev => prev.filter(r => r.roomId !== roomId));
+    };
+
     socket.on('incoming-dispatch-call', handleIncomingDispatch);
     socket.on('incoming-call-alert', handleIncomingDispatch);
     socket.on('new-appointment-created', handleIncomingDispatch);
     socket.on('client-waiting-in-room', handleIncomingDispatch);
     socket.on('active-rooms-updated', handleActiveRoomsUpdate);
+    socket.on('call-claimed', handleCallClaimed);
+    socket.on('call-session-ended', handleCallSessionEnded);
 
     const interval = setInterval(fetchActiveRooms, 5000);
 
@@ -182,8 +210,10 @@ export default function InterpreterDashboard({
       socket.off('new-appointment-created', handleIncomingDispatch);
       socket.off('client-waiting-in-room', handleIncomingDispatch);
       socket.off('active-rooms-updated', handleActiveRoomsUpdate);
+      socket.off('call-claimed', handleCallClaimed);
+      socket.off('call-session-ended', handleCallSessionEnded);
     };
-  }, [isOnline, profile.id, profile.name, profile.email, profile.primaryLang, profile.languages, profile.badgeNumber, profile.interpreterBadgeId]);
+  }, [isOnline, profile.id, profile.name, profile.email, profile.primaryLang, profile.languages, profile.badgeNumber, profile.interpreterBadgeId, dismissedLiveRooms]);
 
   // Edit Profile Modal State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -206,23 +236,31 @@ export default function InterpreterDashboard({
     if (!log) return false;
     const matchId = profile.id && (log.interpreterId === profile.id || log.interpreterUserId === profile.id);
     const matchEmail = profile.email && log.interpreterEmail && log.interpreterEmail.toLowerCase() === profile.email.toLowerCase();
-    const matchName = profile.name && log.interpreterName && log.interpreterName.toLowerCase().includes(profile.name.toLowerCase());
-    return matchId || matchEmail || matchName;
+    const matchName = profile.name && log.interpreterName && (
+      log.interpreterName.toLowerCase().includes(profile.name.toLowerCase()) ||
+      profile.name.toLowerCase().includes(log.interpreterName.toLowerCase())
+    );
+    const myBadge = (profile.badgeNumber || profile.interpreterBadgeId || '').toString();
+    const logBadge = (log.interpreterBadgeNumber || log.badgeNumber || '').toString();
+    const matchBadge = myBadge && logBadge && (myBadge === logBadge || log.interpreterName?.includes(myBadge));
+    return matchId || matchEmail || matchName || matchBadge;
   });
 
   const todayDateStr = new Date().toDateString();
   const todayLogs = userCallLogs.filter(log => {
-    if (!log.date) return false;
+    if (!log.date) return true;
     try {
-      return new Date(log.date).toDateString() === todayDateStr;
+      const d = new Date(log.date);
+      if (isNaN(d.getTime())) return true;
+      return d.toDateString() === todayDateStr;
     } catch {
-      return false;
+      return true;
     }
   });
 
   const completedCallsToday = todayLogs.length;
   const activeMinutesToday = todayLogs.reduce((sum, log) => {
-    const durSec = typeof log.durationSeconds === 'number' ? log.durationSeconds : (parseInt(log.duration) || 0);
+    const durSec = typeof log.durationSeconds === 'number' ? log.durationSeconds : (parseInt(log.duration) || 60);
     return sum + Math.max(1, Math.ceil(durSec / 60));
   }, 0);
 
@@ -564,12 +602,12 @@ export default function InterpreterDashboard({
       </div>
 
       {/* 🔴 LIVE WAITING CALLS & ACTIVE ROOMS BANNER */}
-      {activeLiveRooms.filter(r => r.hasClient && !r.hasInterpreter).length > 0 && (
-        <div className="space-y-3 animate-pulse">
-          {activeLiveRooms.filter(r => r.hasClient && !r.hasInterpreter).map(room => (
+      {activeLiveRooms.filter(r => r.hasClient && !r.hasInterpreter && !dismissedLiveRooms.has(r.roomId)).length > 0 && (
+        <div className="space-y-3">
+          {activeLiveRooms.filter(r => r.hasClient && !r.hasInterpreter && !dismissedLiveRooms.has(r.roomId)).map(room => (
             <div 
               key={room.roomId}
-              className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-950/80 via-slate-900 to-slate-900 border-2 border-emerald-500/70 shadow-xl shadow-emerald-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+              className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-950/80 via-slate-900 to-slate-900 border-2 border-emerald-500/70 shadow-xl shadow-emerald-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative"
             >
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/40 shrink-0">
@@ -594,24 +632,38 @@ export default function InterpreterDashboard({
                 </div>
               </div>
 
-              <button
-                onClick={() => onAcceptIncomingCall({
-                  roomId: room.roomId,
-                  role: 'interpreter',
-                  participantName: profile.name,
-                  interpreter: profile,
-                  interpreterName: profile.name,
-                  interpreterBadgeNumber: badgeId,
-                  language: room.targetLanguage || profile.primaryLang,
-                  specialty: room.specialty || 'General',
-                  patientName: room.patientName || 'Client / Patient',
-                  hostName: room.clientName || 'Host'
-                })}
-                className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-xs shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2 transition transform active:scale-95 shrink-0 cursor-pointer"
-              >
-                <PhoneCall className="w-4 h-4 animate-pulse" />
-                <span>⚡ Answer & Join Call Now</span>
-              </button>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  onClick={() => {
+                    setDismissedLiveRooms(prev => new Set([...prev, room.roomId]));
+                  }}
+                  title="Dismiss alert"
+                  className="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition shrink-0 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => {
+                    setIncomingCall(null);
+                    onAcceptIncomingCall({
+                      roomId: room.roomId,
+                      role: 'interpreter',
+                      participantName: profile.name,
+                      interpreter: profile,
+                      interpreterName: profile.name,
+                      interpreterBadgeNumber: badgeId,
+                      language: room.targetLanguage || profile.primaryLang,
+                      specialty: room.specialty || 'General',
+                      patientName: room.patientName || 'Client / Patient',
+                      hostName: room.clientName || 'Host'
+                    });
+                  }}
+                  className="flex-1 sm:flex-initial px-6 py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-xs shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2 transition transform active:scale-95 shrink-0 cursor-pointer"
+                >
+                  <PhoneCall className="w-4 h-4 animate-pulse" />
+                  <span>⚡ Answer & Join Call Now</span>
+                </button>
+              </div>
             </div>
           ))}
         </div>

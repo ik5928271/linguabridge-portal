@@ -223,21 +223,18 @@ const deduplicateClientApplications = (appsList) => {
     if (!app) continue;
     if (app.email && app.email.toLowerCase().trim() === 'ik5928271@gmail.com') continue;
     const cleanEmail = (app.email || '').toLowerCase().trim();
-    const cleanName = (app.name || '').toLowerCase().replace(/[^a-z0-9]/g, '').trim();
     const cleanPhone = (app.phone || '').replace(/[^0-9]/g, '');
     const cleanBadge = (app.badgeNumber || app.interpreterBadgeId || '').toString().trim();
 
     const existingIdx = result.findIndex(item => {
       const itemEmail = (item.email || '').toLowerCase().trim();
-      const itemName = (item.name || '').toLowerCase().replace(/[^a-z0-9]/g, '').trim();
       const itemPhone = (item.phone || '').replace(/[^0-9]/g, '');
       const itemBadge = (item.badgeNumber || item.interpreterBadgeId || '').toString().trim();
 
-      if (cleanEmail && itemEmail && cleanEmail === itemEmail) return true;
-      if (cleanBadge && itemBadge && cleanBadge === itemBadge) return true;
-      if (cleanPhone.length >= 8 && itemPhone.length >= 8 && cleanPhone === itemPhone) return true;
-      if (cleanName.length >= 4 && itemName.length >= 4 && cleanName === itemName) return true;
       if (app.id && item.id && app.id === item.id) return true;
+      if (cleanEmail && itemEmail && cleanEmail.includes('@') && cleanEmail === itemEmail) return true;
+      if (cleanBadge && itemBadge && cleanBadge === itemBadge) return true;
+      if (cleanPhone.length >= 10 && itemPhone.length >= 10 && cleanPhone === itemPhone) return true;
       return false;
     });
 
@@ -253,16 +250,18 @@ const deduplicateClientApplications = (appsList) => {
       result[existingIdx] = {
         ...existing,
         ...app,
-        id: isApproved ? (existing.status === 'approved' ? existing.id : app.id) : existing.id,
+        id: isApproved ? (existing.status === 'approved' ? existing.id : app.id) : (app.id || existing.id),
         status,
         badgeNumber,
         interpreterBadgeId: badgeNumber,
-        displayName: badgeNumber ? `Interpreter #${badgeNumber}` : (existing.displayName || app.displayName),
+        displayName: badgeNumber ? `Interpreter #${badgeNumber}` : (app.displayName || existing.displayName || app.name),
         email: cleanEmail || existing.email,
-        cvFileName: existing.cvFileName || app.cvFileName,
-        docFileName: existing.docFileName || app.docFileName,
-        bio: (existing.bio && existing.bio.length > (app.bio || '').length) ? existing.bio : (app.bio || existing.bio),
-        submittedAt: existing.submittedAt || app.submittedAt
+        cvFileName: app.cvFileName || existing.cvFileName,
+        cvFileData: app.cvFileData || existing.cvFileData,
+        docFileName: app.docFileName || existing.docFileName,
+        docFileData: app.docFileData || existing.docFileData,
+        bio: app.bio || existing.bio,
+        submittedAt: app.submittedAt || existing.submittedAt
       };
     }
   }
@@ -606,6 +605,16 @@ export default function AdminDashboard({
         }
       })
       .catch(() => {});
+  };
+
+  const handleAdminEndRoom = (roomId) => {
+    if (!roomId) return;
+    setActiveLiveRooms(prev => prev.filter(r => r.roomId !== roomId));
+    fetch('/api/admin/end-room', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roomId })
+    }).catch(() => {});
   };
 
   useEffect(() => {
@@ -2155,6 +2164,16 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                     </div>
 
                     <div className="flex items-center justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleAdminEndRoom(room.roomId)}
+                        className="py-2.5 px-3.5 rounded-xl bg-red-500/20 hover:bg-red-500 text-red-300 hover:text-white font-bold text-xs border border-red-500/30 transition cursor-pointer flex items-center gap-1 shrink-0"
+                        title="Force End & Close this Room"
+                      >
+                        <PhoneOff className="w-3.5 h-3.5" />
+                        <span>End Call</span>
+                      </button>
+
                       {onStartCall && (
                         <button
                           type="button"
@@ -2167,10 +2186,10 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                             patientName: room.patientName,
                             hostName: room.clientName
                           })}
-                          className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs shadow-md flex items-center justify-center gap-1.5 transition cursor-pointer"
+                          className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs shadow-md flex items-center justify-center gap-1.5 transition cursor-pointer"
                         >
                           <PhoneCall className="w-3.5 h-3.5" />
-                          <span>👁️ Enter Room (Monitor / Participate)</span>
+                          <span>👁️ Monitor / Join</span>
                         </button>
                       )}
                     </div>
@@ -4907,21 +4926,32 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                               </span>
                             </div>
                           </div>
-                          <button
-                            onClick={() => {
-                              if (typeof onStartCall === 'function') {
-                                onStartCall({
-                                  id: room.roomId,
-                                  language: room.targetLanguage || 'General',
-                                  clientName: client?.name || room.clientName || 'Client'
-                                });
-                              }
-                            }}
-                            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold flex items-center justify-center gap-2 shadow-md shadow-emerald-600/30 transition cursor-pointer self-start sm:self-center shrink-0"
-                          >
-                            <PhoneCall className="w-3.5 h-3.5" />
-                            <span>Monitor / Join Room</span>
-                          </button>
+                          <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleAdminEndRoom(room.roomId)}
+                              className="px-3 py-2 rounded-xl bg-red-500/20 hover:bg-red-500 text-red-300 hover:text-white text-xs font-bold border border-red-500/30 transition cursor-pointer flex items-center gap-1"
+                              title="Force End & Close this Room"
+                            >
+                              <PhoneOff className="w-3.5 h-3.5" />
+                              <span>End</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (typeof onStartCall === 'function') {
+                                  onStartCall({
+                                    roomId: room.roomId,
+                                    language: room.targetLanguage || 'General',
+                                    clientName: client?.name || room.clientName || 'Client'
+                                  });
+                                }
+                              }}
+                              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold flex items-center justify-center gap-2 shadow-md shadow-emerald-600/30 transition cursor-pointer"
+                            >
+                              <PhoneCall className="w-3.5 h-3.5" />
+                              <span>Monitor / Join</span>
+                            </button>
+                          </div>
                         </div>
                       );
                     })}

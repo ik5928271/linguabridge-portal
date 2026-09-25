@@ -292,7 +292,7 @@ export default function InterpreterApplicationModal({ isOpen, onClose }) {
       minuteRate: parseFloat(minuteRate) !== undefined && !isNaN(parseFloat(minuteRate)) ? parseFloat(minuteRate) : 0,
       monthlySalary: parseInt(monthlySalary) !== undefined && !isNaN(parseInt(monthlySalary)) ? parseInt(monthlySalary) : 0,
       rateLabel: resolvedRateLabel,
-      bio: bio.trim() || `Professional ${resolvedPrimary} interpreter with ${experienceYears} years experience under ${resolvedRateLabel}.`,
+      bio: bio.trim() || `Professional ${resolvedPrimary} interpreter with ${experienceYears} years of verified live interpretation experience.`,
       cvFileName: cvFile ? cvFile.name : 'Resume_CV_Submitted.pdf',
       cvFileData: cvFile?.data || null,
       docFileName: supportingDocs.length > 0 ? supportingDocs[0].name : 'Certification_Proof.pdf',

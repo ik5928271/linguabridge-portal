@@ -48,10 +48,22 @@ export default function AppointmentNotificationManager({
       }, 8000);
     };
 
+    const handleCallEnded = ({ roomId }) => {
+      setLiveStartModal(prev => (prev?.apt?.roomId === roomId ? null : prev));
+      setTenMinuteAlert(prev => (prev?.apt?.roomId === roomId ? null : prev));
+      if (roomId) {
+        setDismissedAlerts(prev => new Set([...prev, roomId]));
+      }
+    };
+
     socket.on('new-appointment-created', handleNewAppointment);
+    socket.on('call-session-ended', handleCallEnded);
+    socket.on('call-claimed', handleCallEnded);
 
     return () => {
       socket.off('new-appointment-created', handleNewAppointment);
+      socket.off('call-session-ended', handleCallEnded);
+      socket.off('call-claimed', handleCallEnded);
     };
   }, []);
 
@@ -66,7 +78,7 @@ export default function AppointmentNotificationManager({
       const todayStr = now.toISOString().split('T')[0];
 
       appointments.forEach((apt) => {
-        if (!apt.id || dismissedAlerts.has(apt.id)) return;
+        if (!apt.id || dismissedAlerts.has(apt.id) || apt.status === 'completed' || apt.status === 'cancelled' || apt.status === 'ended') return;
 
         // If today matches appointment date or if it is scheduled
         const isToday = apt.date === todayStr || !apt.date || apt.date.includes('2026-09-04');
