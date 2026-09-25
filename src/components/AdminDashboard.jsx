@@ -200,6 +200,62 @@ const formatShiftSchedule = (sched) => {
   return 'Shift A (09:00 - 18:00 PKT)';
 };
 
+// Strict single-applicant deduplication by normalized email / phone / name / badge
+const deduplicateClientApplications = (appsList) => {
+  if (!Array.isArray(appsList)) return [];
+  const result = [];
+  
+  for (const app of appsList) {
+    if (!app) continue;
+    if (app.email && app.email.toLowerCase().trim() === 'ik5928271@gmail.com') continue;
+    const cleanEmail = (app.email || '').toLowerCase().trim();
+    const cleanName = (app.name || '').toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+    const cleanPhone = (app.phone || '').replace(/[^0-9]/g, '');
+    const cleanBadge = (app.badgeNumber || app.interpreterBadgeId || '').toString().trim();
+
+    const existingIdx = result.findIndex(item => {
+      const itemEmail = (item.email || '').toLowerCase().trim();
+      const itemName = (item.name || '').toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+      const itemPhone = (item.phone || '').replace(/[^0-9]/g, '');
+      const itemBadge = (item.badgeNumber || item.interpreterBadgeId || '').toString().trim();
+
+      if (cleanEmail && itemEmail && cleanEmail === itemEmail) return true;
+      if (cleanBadge && itemBadge && cleanBadge === itemBadge) return true;
+      if (cleanPhone.length >= 8 && itemPhone.length >= 8 && cleanPhone === itemPhone) return true;
+      if (cleanName.length >= 4 && itemName.length >= 4 && cleanName === itemName) return true;
+      if (app.id && item.id && app.id === item.id) return true;
+      return false;
+    });
+
+    if (existingIdx === -1) {
+      result.push({ ...app, email: cleanEmail || app.email });
+    } else {
+      const existing = result[existingIdx];
+      const isApproved = existing.status === 'approved' || app.status === 'approved';
+      const isRejected = (existing.status === 'rejected' || app.status === 'rejected') && !isApproved;
+      const status = isApproved ? 'approved' : (isRejected ? 'rejected' : 'pending');
+      const badgeNumber = existing.badgeNumber || app.badgeNumber || existing.interpreterBadgeId || app.interpreterBadgeId || null;
+
+      result[existingIdx] = {
+        ...existing,
+        ...app,
+        id: isApproved ? (existing.status === 'approved' ? existing.id : app.id) : existing.id,
+        status,
+        badgeNumber,
+        interpreterBadgeId: badgeNumber,
+        displayName: badgeNumber ? `Interpreter #${badgeNumber}` : (existing.displayName || app.displayName),
+        email: cleanEmail || existing.email,
+        cvFileName: existing.cvFileName || app.cvFileName,
+        docFileName: existing.docFileName || app.docFileName,
+        bio: (existing.bio && existing.bio.length > (app.bio || '').length) ? existing.bio : (app.bio || existing.bio),
+        submittedAt: existing.submittedAt || app.submittedAt
+      };
+    }
+  }
+
+  return result;
+};
+
 export default function AdminDashboard({ 
   callLogs = [], 
   appointments = [], 
@@ -321,29 +377,11 @@ export default function AdminDashboard({
     try {
       const localSaved = JSON.parse(localStorage.getItem('linguabridge_submitted_applications') || '[]');
       if (Array.isArray(localSaved) && localSaved.length > 0) {
-        localSaved.forEach(localApp => {
-          if (localApp.email && localApp.email.toLowerCase().trim() === 'ik5928271@gmail.com') return;
-          const cleanEmail = (localApp.email || '').toLowerCase().trim();
-          if (cleanEmail && !list.some(d => (d.email || '').toLowerCase().trim() === cleanEmail)) {
-            list.unshift(localApp);
-          }
-        });
+        list = [...localSaved, ...list];
       }
     } catch {}
 
-    const dedupedMap = new Map();
-    list.forEach(app => {
-      const key = (app.email || '').toLowerCase().trim() || (app.name || '').toLowerCase().trim() || app.id || Math.random().toString();
-      if (!dedupedMap.has(key)) {
-        dedupedMap.set(key, app);
-      } else {
-        const existing = dedupedMap.get(key);
-        if (app.status === 'approved' && existing.status !== 'approved') {
-          dedupedMap.set(key, app);
-        }
-      }
-    });
-    return Array.from(dedupedMap.values());
+    return deduplicateClientApplications(list);
   });
 
   const [appFilter, setAppFilter] = useState('all'); // 'all', 'pending', 'approved', 'rejected'
@@ -469,20 +507,7 @@ export default function AdminDashboard({
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
-          const cleanList = data.filter(a => !(a.email && a.email.toLowerCase().trim() === 'ik5928271@gmail.com'));
-          const dedupedMap = new Map();
-          cleanList.forEach(app => {
-            const key = (app.email || '').toLowerCase().trim() || (app.name || '').toLowerCase().trim() || app.id || Math.random().toString();
-            if (!dedupedMap.has(key)) {
-              dedupedMap.set(key, app);
-            } else {
-              const existing = dedupedMap.get(key);
-              if (app.status === 'approved' && existing.status !== 'approved') {
-                dedupedMap.set(key, app);
-              }
-            }
-          });
-          setApplications(Array.from(dedupedMap.values()));
+          setApplications(deduplicateClientApplications(data));
         }
       })
       .catch(() => {});
@@ -1181,9 +1206,7 @@ export default function AdminDashboard({
 
   // Resolved Applications synchronized with live provisioned accounts in usersList & strictly deduplicated
   const resolvedApplications = React.useMemo(() => {
-    const dedupedMap = new Map();
-
-    applications.forEach(app => {
+    const appsWithLiveStatus = applications.map(app => {
       const cleanEmail = (app.email || '').toLowerCase().trim();
       const existingUser = usersList.find(u => 
         u.role === 'interpreter' && 
@@ -1193,25 +1216,15 @@ export default function AdminDashboard({
       const isApproved = Boolean(existingUser || app.status === 'approved');
       const badgeNumber = (existingUser && (existingUser.badgeNumber || existingUser.interpreterBadgeId)) || app.badgeNumber || app.interpreterBadgeId;
 
-      const item = {
+      return {
         ...app,
         status: isApproved ? 'approved' : (app.status || 'pending'),
         badgeNumber,
         interpreterBadgeId: badgeNumber
       };
-
-      const key = cleanEmail || (app.name || '').toLowerCase().trim() || app.id || Math.random().toString();
-      if (!dedupedMap.has(key)) {
-        dedupedMap.set(key, item);
-      } else {
-        const existing = dedupedMap.get(key);
-        if (item.status === 'approved' && existing.status !== 'approved') {
-          dedupedMap.set(key, item);
-        }
-      }
     });
 
-    return Array.from(dedupedMap.values());
+    return deduplicateClientApplications(appsWithLiveStatus);
   }, [applications, usersList]);
 
   const pendingApplicationsCount = resolvedApplications.filter(a => a.status === 'pending').length;
@@ -2479,14 +2492,14 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
             </div>
           ) : (
             <div className="space-y-4">
-              {filteredApplications.map((app) => {
+              {filteredApplications.map((app, appIdx) => {
                 const isPending = app.status === 'pending';
                 const isApproved = app.status === 'approved';
                 const isRejected = app.status === 'rejected';
 
                 return (
                   <div 
-                    key={app.id} 
+                    key={app.id ? `${app.id}-${app.email || appIdx}` : (app.email || `app-${appIdx}`)} 
                     className={`p-6 rounded-3xl border transition space-y-4 relative ${
                       isPending 
                         ? 'bg-slate-900/90 border-amber-500/40 ring-1 ring-amber-500/20' 
