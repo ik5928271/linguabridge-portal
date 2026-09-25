@@ -1645,6 +1645,54 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
   });
 });
 
+// Admin: Revert Approved Application back to Pending Review
+app.post('/api/admin/interpreter-applications/:id/revert-to-pending', async (req, res) => {
+  const { id } = req.params;
+  const appItem = store.interpreterApplications.find(a => a.id === id);
+  if (!appItem) {
+    return res.status(404).json({ error: 'Application not found.' });
+  }
+
+  const cleanEmail = (appItem.email || '').toLowerCase().trim();
+
+  // Reset all matching applications to pending
+  store.interpreterApplications.forEach(a => {
+    if (a.id === id || (cleanEmail && a.email && a.email.toLowerCase().trim() === cleanEmail)) {
+      a.status = 'pending';
+      delete a.approvedAt;
+      delete a.emailDispatch;
+    }
+  });
+
+  // Remove provisioned active user account
+  if (cleanEmail) {
+    store.users = store.users.filter(u => !(u.email && u.email.toLowerCase().trim() === cleanEmail && u.role === 'interpreter'));
+    store.interpreters = store.interpreters.filter(i => !(i.email && i.email.toLowerCase().trim() === cleanEmail));
+
+    if (db) {
+      try {
+        await db.collection('users').deleteMany({ email: { $regex: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'), role: 'interpreter' } });
+        await db.collection('interpreters').deleteMany({ email: { $regex: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } });
+        await db.collection('interpreter_applications').updateMany(
+          { email: { $regex: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },
+          { $set: { status: 'pending' }, $unset: { approvedAt: '', emailDispatch: '' } }
+        );
+      } catch (e) {
+        console.error('Error reverting application in MongoDB:', e.message);
+      }
+    }
+  }
+
+  store.interpreterApplications = deduplicateApplications(store.interpreterApplications);
+  saveStore();
+
+  res.json({
+    success: true,
+    message: `Application for ${appItem.name} has been reverted back to Pending Review.`,
+    application: appItem
+  });
+});
+
 // 4. Admin: Reject Application
 app.post('/api/admin/interpreter-applications/:id/reject', (req, res) => {
   const { id } = req.params;
