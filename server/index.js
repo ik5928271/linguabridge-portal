@@ -148,7 +148,7 @@ let store = {
 let db = null;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://ik5928271_db_user:Tbe7ruMiqAmYmljz@cluster0.bumsmbw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
 
-// Utility: Strict single-applicant deduplication by normalized email / phone / name
+// Utility: Strict single-applicant deduplication by normalized email / id / phone / badge
 function deduplicateApplications(appsList) {
   if (!Array.isArray(appsList)) return [];
   const result = [];
@@ -156,21 +156,18 @@ function deduplicateApplications(appsList) {
   for (const app of appsList) {
     if (!app) continue;
     const cleanEmail = (app.email || '').toLowerCase().trim();
-    const cleanName = (app.name || '').toLowerCase().replace(/[^a-z0-9]/g, '').trim();
     const cleanPhone = (app.phone || '').replace(/[^0-9]/g, '');
     const cleanBadge = (app.badgeNumber || app.interpreterBadgeId || '').toString().trim();
 
     const existingIdx = result.findIndex(item => {
       const itemEmail = (item.email || '').toLowerCase().trim();
-      const itemName = (item.name || '').toLowerCase().replace(/[^a-z0-9]/g, '').trim();
       const itemPhone = (item.phone || '').replace(/[^0-9]/g, '');
       const itemBadge = (item.badgeNumber || item.interpreterBadgeId || '').toString().trim();
 
-      if (cleanEmail && itemEmail && cleanEmail === itemEmail) return true;
-      if (cleanBadge && itemBadge && cleanBadge === itemBadge) return true;
-      if (cleanPhone.length >= 8 && itemPhone.length >= 8 && cleanPhone === itemPhone) return true;
-      if (cleanName.length >= 4 && itemName.length >= 4 && cleanName === itemName) return true;
       if (app.id && item.id && app.id === item.id) return true;
+      if (cleanEmail && itemEmail && cleanEmail.includes('@') && cleanEmail === itemEmail) return true;
+      if (cleanBadge && itemBadge && cleanBadge === itemBadge) return true;
+      if (cleanPhone.length >= 10 && itemPhone.length >= 10 && cleanPhone === itemPhone) return true;
       return false;
     });
 
@@ -178,6 +175,7 @@ function deduplicateApplications(appsList) {
       result.push({ ...app, email: cleanEmail || app.email });
     } else {
       const existing = result[existingIdx];
+      // Keep the most recent or active status
       const isApproved = existing.status === 'approved' || app.status === 'approved';
       const isRejected = (existing.status === 'rejected' || app.status === 'rejected') && !isApproved;
       const status = isApproved ? 'approved' : (isRejected ? 'rejected' : 'pending');
@@ -186,18 +184,18 @@ function deduplicateApplications(appsList) {
       result[existingIdx] = {
         ...existing,
         ...app,
-        id: isApproved ? (existing.status === 'approved' ? existing.id : app.id) : existing.id,
+        id: isApproved ? (existing.status === 'approved' ? existing.id : app.id) : (app.id || existing.id),
         status,
         badgeNumber,
         interpreterBadgeId: badgeNumber,
-        displayName: badgeNumber ? `Interpreter #${badgeNumber}` : (existing.displayName || app.displayName),
+        displayName: badgeNumber ? `Interpreter #${badgeNumber}` : (app.displayName || existing.displayName || app.name),
         email: cleanEmail || existing.email,
-        cvFileName: existing.cvFileName || app.cvFileName,
-        cvFileData: existing.cvFileData || app.cvFileData,
-        docFileName: existing.docFileName || app.docFileName,
-        docFileData: existing.docFileData || app.docFileData,
-        bio: (existing.bio && existing.bio.length > (app.bio || '').length) ? existing.bio : (app.bio || existing.bio),
-        submittedAt: existing.submittedAt || app.submittedAt
+        cvFileName: app.cvFileName || existing.cvFileName,
+        cvFileData: app.cvFileData || existing.cvFileData,
+        docFileName: app.docFileName || existing.docFileName,
+        docFileData: app.docFileData || existing.docFileData,
+        bio: app.bio || existing.bio,
+        submittedAt: app.submittedAt || existing.submittedAt
       };
     }
   }
@@ -1005,7 +1003,7 @@ app.post('/api/admin/users', (req, res) => {
       monthlySalary: parseInt(monthlySalary) || 1200,
       rateLabel: resolvedRateLabel,
       certifications: [certifications],
-      bio: `Professional ${primaryLang} interpreter provisioned under ${resolvedRateLabel}.`
+      bio: `Professional ${primaryLang} interpreter verified for live assignments.`
     };
     store.interpreters.push(newInterpreter);
     io.emit('interpreter-registered', newInterpreter);
@@ -1678,7 +1676,7 @@ app.post('/api/interpreter-applications', (req, res) => {
     minuteRate: parseFloat(minuteRate) || 0.30,
     monthlySalary: parseInt(monthlySalary) || 1200,
     rateLabel: resolvedRateLabel,
-    bio: bio.trim() || `Certified ${primaryLang} professional linguist under ${resolvedRateLabel}.`,
+    bio: bio.trim() || `Certified ${primaryLang} professional linguist ready for live assignments.`,
     cvFileName: cvFileName || 'Resume_CV.pdf',
     cvFileData: cvFileData || null,
     docFileName: docFileName || 'Credentials_Certificate.pdf',
@@ -2315,9 +2313,41 @@ app.get('/api/admin/analytics', (req, res) => {
   });
 });
 
-// 5. Interpreters Roster
+// Helper to sanitize interpreter bios for client/public consumption
+const sanitizeClientSafeBioServer = (rawBio, badgeNum, lang) => {
+  if (!rawBio || typeof rawBio !== 'string') {
+    return `Certified professional ${lang || ''} linguist (Badge #${badgeNum || 'Verified'}) bridging live encounters with highest accuracy.`;
+  }
+  let clean = rawBio
+    .replace(/\s*under\s+[\$£€]?[0-9.]+(?:-[0-9.]+)?(?:\s*\/\s*(?:min|minute|hr|hour|mo|month))?(?:\s*\([^)]*\))?/gi, '')
+    .replace(/[\$£€]\s*[0-9.]+(?:-[0-9.]+)?(?:\s*\/\s*(?:min|minute|hr|hour|mo|month))(?:\s*\([^)]*\))?/gi, '')
+    .replace(/\s*\((?:Live Talk|Salary Base|Scheduled Shift|On-Demand|Flex|Hourly|Per-Minute)[^)]*\)/gi, '')
+    .replace(/\s+under\s*[.,]?/gi, '')
+    .replace(/\s*,\s*,\s*/g, ', ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  clean = clean.replace(/[,;:\-\s]+$/, '').trim();
+  if (clean && !clean.endsWith('.')) {
+    clean += '.';
+  }
+
+  if (!clean || clean.length < 5) {
+    return `Certified professional ${lang || ''} linguist (Badge #${badgeNum || 'Verified'}) bridging live encounters with highest accuracy.`;
+  }
+  return clean;
+};
+
+// 5. Interpreters Roster (Public / Client view - strictly hides internal contractor rates)
 app.get('/api/interpreters', (req, res) => {
-  res.json(store.interpreters);
+  const publicList = (store.interpreters || []).map(interp => {
+    const { hourlyRate, minuteRate, monthlySalary, rateLabel, password, emailDispatch, ...safeInterp } = interp;
+    return {
+      ...safeInterp,
+      bio: sanitizeClientSafeBioServer(interp.bio, interp.badgeNumber || interp.interpreterBadgeId, interp.primaryLang)
+    };
+  });
+  res.json(publicList);
 });
 
 // Update Interpreter Online/Offline Status
@@ -2361,12 +2391,13 @@ app.get('/api/call-logs', (req, res) => {
 
 app.post('/api/call-logs', (req, res) => {
   const newLog = {
-    id: `log-${Date.now()}`,
-    date: new Date().toLocaleString(),
+    id: req.body?.id || `log-${Date.now()}`,
+    date: req.body?.date || new Date().toISOString(),
     ...req.body
   };
-  store.callLogs.unshift(newLog);
+  store.callLogs = [newLog, ...(store.callLogs || []).filter(l => l.id !== newLog.id)];
   saveStore();
+  io.emit('call-log-added', newLog);
   res.json(newLog);
 });
 
@@ -2761,6 +2792,27 @@ app.get('/api/admin/active-dispatches', (req, res) => {
   res.json(Object.values(activeDispatches));
 });
 
+// Admin force terminate / end call room
+app.post('/api/admin/end-room', (req, res) => {
+  const { roomId } = req.body || {};
+  if (roomId) {
+    if (activeRooms[roomId]) {
+      delete activeRooms[roomId];
+    }
+    Object.keys(activeDispatches).forEach(dId => {
+      if (activeDispatches[dId].roomId === roomId) {
+        delete activeDispatches[dId];
+        io.emit('call-claimed', { dispatchId: dId, roomId });
+      }
+    });
+    io.to(roomId).emit('call-session-ended', { roomId, endedBy: 'admin', endedByName: 'Platform Administrator' });
+    io.emit('call-session-ended', { roomId });
+    io.emit('call-claimed', { roomId });
+    broadcastActiveRooms();
+  }
+  res.json({ success: true });
+});
+
 // ==========================================
 // SOCKET.IO REAL-TIME SIGNALING & ROOMS
 // ==========================================
@@ -2948,7 +3000,7 @@ io.on('connection', (socket) => {
       activeRooms[roomId] = {
         roomId,
         startedAt: Date.now(),
-        targetLanguage: language || 'Spanish',
+        targetLanguage: language || 'Urdu',
         specialty: specialty || 'General',
         clientName: clientName || (role === 'host' ? participantName : 'Client'),
         clientOrg: clientOrg || '',
@@ -2957,8 +3009,8 @@ io.on('connection', (socket) => {
         participants: []
       };
     } else {
-      if (language) activeRooms[roomId].targetLanguage = language;
-      if (specialty) activeRooms[roomId].specialty = specialty;
+      if (language && !activeRooms[roomId].targetLanguage) activeRooms[roomId].targetLanguage = language;
+      if (specialty && !activeRooms[roomId].specialty) activeRooms[roomId].specialty = specialty;
       if (role === 'host' || role === 'client') activeRooms[roomId].clientName = participantName;
       if (role === 'interpreter') activeRooms[roomId].interpreterName = participantName;
       if (role === 'guest') activeRooms[roomId].patientName = participantName;
@@ -2982,7 +3034,9 @@ io.on('connection', (socket) => {
     socket.emit('room-joined-success', {
       roomId,
       participants: activeRooms[roomId].participants,
-      currentUserId: socket.id
+      currentUserId: socket.id,
+      targetLanguage: activeRooms[roomId].targetLanguage,
+      specialty: activeRooms[roomId].specialty
     });
 
     socket.to(roomId).emit('participant-joined', participant);
@@ -3033,18 +3087,28 @@ io.on('connection', (socket) => {
   });
 
   // In-Call Multi-Party Chat
-  socket.on('send-chat-message', ({ roomId, senderName, senderRole, text, translation, originalLang, targetLang }) => {
+  socket.on('send-chat-message', ({ id, roomId, sender, senderName, role, senderRole, text, translation, originalLang, targetLang, timestamp }) => {
+    const messageId = id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+    const resolvedSender = sender || senderName || 'Participant';
+    const resolvedRole = role || senderRole || 'guest';
+    const resolvedTime = timestamp || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
     const message = {
-      id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-      senderName,
-      senderRole,
+      id: messageId,
+      sender: resolvedSender,
+      senderName: resolvedSender,
+      role: resolvedRole,
+      senderRole: resolvedRole,
+      senderSocketId: socket.id,
       text,
       translation: translation || null,
       originalLang,
       targetLang,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      timestamp: resolvedTime
     };
-    io.to(roomId).emit('new-chat-message', message);
+
+    // Broadcast only to OTHER participants in the room (sender already has it locally!)
+    socket.to(roomId).emit('new-chat-message', message);
   });
 
   // Media state updates
@@ -3073,6 +3137,46 @@ io.on('connection', (socket) => {
     });
   });
 
+  // End Call Session (triggered when Host, Interpreter, or Client ends the call)
+  socket.on('end-call-session', ({ roomId, role, participantName }) => {
+    if (!roomId) return;
+    
+    // Notify all participants in this room that the call session is finished
+    io.to(roomId).emit('call-session-ended', {
+      roomId,
+      endedBy: role || socket.userRole || 'participant',
+      endedByName: participantName || socket.userName || 'Participant'
+    });
+
+    // Remove from activeRooms
+    if (activeRooms[roomId]) {
+      delete activeRooms[roomId];
+    }
+
+    // Clear any matching active dispatches
+    Object.keys(activeDispatches).forEach(dId => {
+      if (activeDispatches[dId].roomId === roomId) {
+        delete activeDispatches[dId];
+        io.emit('call-claimed', { dispatchId: dId, roomId });
+      }
+    });
+
+    // Broadcast globally that this room/dispatch is ended & no longer waiting
+    io.emit('call-session-ended', { roomId });
+    io.emit('call-claimed', { roomId });
+
+    // Reset presence to online for the current socket
+    const presence = activePresence.get(socket.id);
+    if (presence) {
+      presence.status = 'online';
+      presence.inCall = false;
+      presence.activeRoomId = null;
+      broadcastPresence();
+    }
+
+    broadcastActiveRooms();
+  });
+
   // Leave room or disconnect
   socket.on('leave-room', ({ roomId }) => {
     handleLeaveRoom(socket, roomId);
@@ -3081,12 +3185,23 @@ io.on('connection', (socket) => {
 
 function handleLeaveRoom(socket, roomId) {
   if (activeRooms[roomId]) {
+    const leavingRole = socket.userRole;
     activeRooms[roomId].participants = activeRooms[roomId].participants.filter(p => p.socketId !== socket.id);
-    socket.to(roomId).emit('participant-left', { socketId: socket.id });
+    socket.to(roomId).emit('participant-left', { socketId: socket.id, role: leavingRole, name: socket.userName });
     socket.leave(roomId);
 
-    if (activeRooms[roomId].participants.length === 0) {
+    // If an interpreter finishes and leaves, or if no participants remain, close the room
+    if (activeRooms[roomId].participants.length === 0 || leavingRole === 'interpreter') {
       delete activeRooms[roomId];
+      // Clean up dispatches
+      Object.keys(activeDispatches).forEach(dId => {
+        if (activeDispatches[dId].roomId === roomId) {
+          delete activeDispatches[dId];
+          io.emit('call-claimed', { dispatchId: dId, roomId });
+        }
+      });
+      io.to(roomId).emit('call-session-ended', { roomId, endedBy: leavingRole || 'interpreter' });
+      io.emit('call-session-ended', { roomId });
     }
     broadcastActiveRooms();
   }
