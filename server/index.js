@@ -148,27 +148,42 @@ let store = {
 let db = null;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://ik5928271_db_user:Tbe7ruMiqAmYmljz@cluster0.bumsmbw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
 
-// Utility: Strict single-applicant deduplication by normalized email / phone
+// Utility: Strict single-applicant deduplication by normalized email / phone / name
 function deduplicateApplications(appsList) {
   if (!Array.isArray(appsList)) return [];
-  const map = new Map();
+  const result = [];
   
   for (const app of appsList) {
     if (!app) continue;
     const cleanEmail = (app.email || '').toLowerCase().trim();
-    const cleanName = (app.name || '').toLowerCase().trim();
-    const key = cleanEmail || (cleanName ? `name:${cleanName}` : app.id || Math.random().toString());
+    const cleanName = (app.name || '').toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+    const cleanPhone = (app.phone || '').replace(/[^0-9]/g, '');
+    const cleanBadge = (app.badgeNumber || app.interpreterBadgeId || '').toString().trim();
 
-    if (!map.has(key)) {
-      map.set(key, { ...app, email: cleanEmail || app.email });
+    const existingIdx = result.findIndex(item => {
+      const itemEmail = (item.email || '').toLowerCase().trim();
+      const itemName = (item.name || '').toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+      const itemPhone = (item.phone || '').replace(/[^0-9]/g, '');
+      const itemBadge = (item.badgeNumber || item.interpreterBadgeId || '').toString().trim();
+
+      if (cleanEmail && itemEmail && cleanEmail === itemEmail) return true;
+      if (cleanBadge && itemBadge && cleanBadge === itemBadge) return true;
+      if (cleanPhone.length >= 8 && itemPhone.length >= 8 && cleanPhone === itemPhone) return true;
+      if (cleanName.length >= 4 && itemName.length >= 4 && cleanName === itemName) return true;
+      if (app.id && item.id && app.id === item.id) return true;
+      return false;
+    });
+
+    if (existingIdx === -1) {
+      result.push({ ...app, email: cleanEmail || app.email });
     } else {
-      const existing = map.get(key);
+      const existing = result[existingIdx];
       const isApproved = existing.status === 'approved' || app.status === 'approved';
       const isRejected = (existing.status === 'rejected' || app.status === 'rejected') && !isApproved;
       const status = isApproved ? 'approved' : (isRejected ? 'rejected' : 'pending');
       const badgeNumber = existing.badgeNumber || app.badgeNumber || existing.interpreterBadgeId || app.interpreterBadgeId || null;
 
-      map.set(key, {
+      result[existingIdx] = {
         ...existing,
         ...app,
         id: isApproved ? (existing.status === 'approved' ? existing.id : app.id) : existing.id,
@@ -183,11 +198,11 @@ function deduplicateApplications(appsList) {
         docFileData: existing.docFileData || app.docFileData,
         bio: (existing.bio && existing.bio.length > (app.bio || '').length) ? existing.bio : (app.bio || existing.bio),
         submittedAt: existing.submittedAt || app.submittedAt
-      });
+      };
     }
   }
 
-  return Array.from(map.values());
+  return result;
 }
 
 // Load existing store if available
