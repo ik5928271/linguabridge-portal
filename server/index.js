@@ -1232,6 +1232,290 @@ app.post('/api/auth/forgot-password', async (req, res) => {
   }
 });
 
+// Admin: Get all users with full synchronized metadata
+app.get('/api/admin/users', (req, res) => {
+  const usersWithWallets = (store.users || []).map(u => ({
+    ...u,
+    wallet: store.wallets[u.id] || u.wallet || { totalPaid: 0, totalMinutesPurchased: 0, minutesUsed: 0, minutesRemaining: 0, billingType: u.billingType || 'prepaid' }
+  }));
+  res.json(usersWithWallets);
+});
+
+// Admin: Create new user account
+app.post('/api/admin/users', async (req, res) => {
+  const {
+    name,
+    email,
+    password = 'pass123',
+    role = 'host',
+    org = '',
+    primaryLang = 'Spanish',
+    languages = ['Spanish', 'English'],
+    specialty = 'General',
+    employmentType = 'hourly',
+    hourlyRate = 8,
+    minuteRate = 0.30,
+    monthlySalary = 1200,
+    rateLabel = '$8/hr',
+    initialMinutes = 120,
+    billingType = 'prepaid',
+    shiftSchedule
+  } = req.body;
+
+  if (!email || !name) {
+    return res.status(400).json({ error: 'Name and email are required' });
+  }
+
+  const cleanEmail = email.toLowerCase().trim();
+  const userId = `usr-${Date.now().toString(36)}`;
+  const assignedBadge = role === 'interpreter' ? generateNumericBadgeId() : null;
+
+  const newUser = {
+    id: userId,
+    name: name.trim(),
+    email: cleanEmail,
+    password,
+    role,
+    org: org || (role === 'admin' ? 'IK Enterprises Operations' : role === 'interpreter' ? 'Certified Linguist Pool' : 'IK Enterprises Client'),
+    primaryLang,
+    languages: Array.isArray(languages) ? languages : [primaryLang, 'English'],
+    specialty,
+    employmentType,
+    hourlyRate: parseInt(hourlyRate) || 8,
+    minuteRate: parseFloat(minuteRate) || 0.30,
+    monthlySalary: parseInt(monthlySalary) || 1200,
+    rateLabel,
+    badgeNumber: assignedBadge,
+    interpreterBadgeId: assignedBadge,
+    displayName: assignedBadge ? `Interpreter #${assignedBadge}` : name.trim(),
+    shiftSchedule: shiftSchedule || {
+      shiftType: employmentType === 'per_minute' ? 'open_unlimited' : 'fixed_9h',
+      dailyHours: employmentType === 'per_minute' ? 'Unlimited' : 9,
+      timeZone: 'PKT (UTC+5:00 - Pakistan / South Asia)',
+      startTime: '09:00',
+      endTime: '18:00',
+      scheduleLabel: '9 Hours Daily (09:00 - 18:00 PKT)'
+    },
+    wallet: {
+      userId,
+      totalPaid: role === 'host' ? (initialMinutes * 0.90) : 0,
+      totalMinutesPurchased: role === 'host' ? initialMinutes : 0,
+      minutesUsed: 0,
+      minutesRemaining: role === 'host' ? initialMinutes : 0,
+      billingType
+    },
+    createdAt: new Date().toISOString()
+  };
+
+  store.users.unshift(newUser);
+  store.wallets[userId] = newUser.wallet;
+
+  if (role === 'interpreter') {
+    store.interpreters.push({
+      ...newUser,
+      isVerified: true
+    });
+  }
+
+  if (db) {
+    try {
+      await db.collection('users').updateOne({ id: userId }, { $set: newUser }, { upsert: true });
+      await db.collection('wallets').updateOne({ userId }, { $set: newUser.wallet }, { upsert: true });
+      if (role === 'interpreter') {
+        await db.collection('interpreters').updateOne({ id: userId }, { $set: newUser }, { upsert: true });
+      }
+    } catch (e) {
+      console.error('Error saving user in Mongo:', e.message);
+    }
+  }
+
+  saveStore();
+  io.emit('user-account-created', newUser);
+  res.json({ success: true, user: newUser });
+});
+
+// Admin: Update user profile, rates, schedule, and languages
+app.put('/api/admin/users/:id', async (req, res) => {
+  const { id } = req.params;
+  const userIdx = store.users.findIndex(u => u.id === id);
+  if (userIdx === -1) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  const existing = store.users[userIdx];
+  const {
+    name,
+    email,
+    password,
+    org,
+    role,
+    primaryLang,
+    languages,
+    specialty,
+    employmentType,
+    hourlyRate,
+    minuteRate,
+    monthlySalary,
+    rateLabel,
+    shiftSchedule,
+    minutesRemaining,
+    totalPaid,
+    billingType
+  } = req.body;
+
+  const cleanEmail = (email || existing.email).toLowerCase().trim();
+  const resolvedLanguages = Array.isArray(languages) && languages.length > 0 
+    ? languages 
+    : (primaryLang ? [primaryLang] : (existing.languages || [existing.primaryLang || 'Spanish']));
+  const resolvedPrimaryLang = primaryLang || resolvedLanguages[0] || existing.primaryLang || 'Spanish';
+
+  const updatedUser = {
+    ...existing,
+    name: name !== undefined ? name.trim() : existing.name,
+    email: cleanEmail,
+    password: password !== undefined ? password : existing.password,
+    org: org !== undefined ? org : existing.org,
+    role: role !== undefined ? role : existing.role,
+    primaryLang: resolvedPrimaryLang,
+    languages: resolvedLanguages,
+    specialty: specialty !== undefined ? specialty : existing.specialty,
+    employmentType: employmentType !== undefined ? employmentType : existing.employmentType,
+    hourlyRate: hourlyRate !== undefined ? parseInt(hourlyRate) : existing.hourlyRate,
+    minuteRate: minuteRate !== undefined ? parseFloat(minuteRate) : existing.minuteRate,
+    monthlySalary: monthlySalary !== undefined ? parseInt(monthlySalary) : existing.monthlySalary,
+    rateLabel: rateLabel !== undefined ? rateLabel : existing.rateLabel,
+    shiftSchedule: shiftSchedule !== undefined ? shiftSchedule : existing.shiftSchedule,
+    updatedAt: new Date().toISOString()
+  };
+
+  store.users[userIdx] = updatedUser;
+
+  // Update wallet if provided
+  if (!store.wallets[id]) {
+    store.wallets[id] = { userId: id, totalPaid: 0, totalMinutesPurchased: 0, minutesUsed: 0, minutesRemaining: 0, billingType: billingType || 'prepaid' };
+  }
+  if (minutesRemaining !== undefined) store.wallets[id].minutesRemaining = parseInt(minutesRemaining);
+  if (totalPaid !== undefined) store.wallets[id].totalPaid = parseFloat(totalPaid);
+  if (billingType !== undefined) store.wallets[id].billingType = billingType;
+  updatedUser.wallet = store.wallets[id];
+
+  // Update interpreter collection
+  const interpIdx = store.interpreters.findIndex(i => i.id === id || (i.email && i.email.toLowerCase() === cleanEmail));
+  if (interpIdx >= 0) {
+    store.interpreters[interpIdx] = {
+      ...store.interpreters[interpIdx],
+      ...updatedUser,
+      isVerified: true
+    };
+  }
+
+  // Update matching application
+  store.interpreterApplications.forEach(a => {
+    if (a.id === id || (a.email && a.email.toLowerCase().trim() === cleanEmail)) {
+      a.name = updatedUser.name;
+      a.email = updatedUser.email;
+      a.primaryLang = resolvedPrimaryLang;
+      a.languages = resolvedLanguages;
+      a.specialty = updatedUser.specialty;
+      a.employmentType = updatedUser.employmentType;
+      a.hourlyRate = updatedUser.hourlyRate;
+      a.minuteRate = updatedUser.minuteRate;
+      a.monthlySalary = updatedUser.monthlySalary;
+      a.rateLabel = updatedUser.rateLabel;
+      a.shiftSchedule = updatedUser.shiftSchedule;
+    }
+  });
+
+  if (db) {
+    try {
+      await db.collection('users').updateOne({ id }, { $set: updatedUser }, { upsert: true });
+      await db.collection('wallets').updateOne({ userId: id }, { $set: store.wallets[id] }, { upsert: true });
+      if (existing.role === 'interpreter' || updatedUser.role === 'interpreter') {
+        await db.collection('interpreters').updateOne({ $or: [{ id }, { email: cleanEmail }] }, { $set: updatedUser }, { upsert: true });
+      }
+      await db.collection('interpreter_applications').updateMany(
+        { $or: [{ id }, { email: cleanEmail }] },
+        { 
+          $set: { 
+            name: updatedUser.name, 
+            email: updatedUser.email, 
+            primaryLang: resolvedPrimaryLang, 
+            languages: resolvedLanguages,
+            hourlyRate: updatedUser.hourlyRate,
+            minuteRate: updatedUser.minuteRate,
+            monthlySalary: updatedUser.monthlySalary,
+            rateLabel: updatedUser.rateLabel,
+            shiftSchedule: updatedUser.shiftSchedule
+          } 
+        }
+      );
+    } catch (e) {
+      console.error('Error updating user in Mongo:', e.message);
+    }
+  }
+
+  saveStore();
+  io.emit('user-account-updated', updatedUser);
+  res.json({ success: true, user: updatedUser, wallet: store.wallets[id] });
+});
+
+// Admin: Update languages on an interpreter application directly
+app.put('/api/admin/interpreter-applications/:id/languages', async (req, res) => {
+  const { id } = req.params;
+  const { languages, primaryLang } = req.body;
+
+  if (!Array.isArray(languages)) {
+    return res.status(400).json({ error: 'Languages must be an array' });
+  }
+
+  const app = store.interpreterApplications.find(a => a.id === id);
+  if (!app) {
+    return res.status(404).json({ error: 'Application not found' });
+  }
+
+  const cleanEmail = (app.email || '').toLowerCase().trim();
+  const resolvedPrimary = primaryLang || languages[0] || app.primaryLang;
+
+  app.languages = languages;
+  app.primaryLang = resolvedPrimary;
+
+  // Also update user if already provisioned
+  store.users.forEach(u => {
+    if (u.id === id || (cleanEmail && u.email && u.email.toLowerCase().trim() === cleanEmail)) {
+      u.languages = languages;
+      u.primaryLang = resolvedPrimary;
+    }
+  });
+  store.interpreters.forEach(i => {
+    if (i.id === id || (cleanEmail && i.email && i.email.toLowerCase().trim() === cleanEmail)) {
+      i.languages = languages;
+      i.primaryLang = resolvedPrimary;
+    }
+  });
+
+  if (db) {
+    try {
+      await db.collection('interpreter_applications').updateMany(
+        { $or: [{ id }, { email: cleanEmail }] },
+        { $set: { languages, primaryLang: resolvedPrimary } }
+      );
+      await db.collection('users').updateMany(
+        { $or: [{ id }, { email: cleanEmail }] },
+        { $set: { languages, primaryLang: resolvedPrimary } }
+      );
+      await db.collection('interpreters').updateMany(
+        { $or: [{ id }, { email: cleanEmail }] },
+        { $set: { languages, primaryLang: resolvedPrimary } }
+      );
+    } catch (e) {
+      console.error('Error updating languages in Mongo:', e.message);
+    }
+  }
+
+  saveStore();
+  res.json({ success: true, application: app });
+});
+
 // Grant / update minutes for any user
 app.post('/api/admin/users/:id/wallet', (req, res) => {
   const { id } = req.params;
