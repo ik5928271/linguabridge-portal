@@ -51,7 +51,8 @@ import {
   Lock,
   Radio,
   ArrowRight,
-  Calendar
+  Calendar,
+  RotateCcw
 } from 'lucide-react';
 import { getSocket } from '../services/socket';
 import { playTelephoneRing, playMessageTone, playConnectedChime } from '../services/audioService';
@@ -1159,6 +1160,22 @@ export default function AdminDashboard({
     fetch(`/api/admin/interpreter-applications/${id}`, { method: 'DELETE' })
       .then(res => res.json())
       .then(() => fetchApplications())
+      .catch(() => {});
+  };
+
+  const handleRevertToPending = (appId) => {
+    if (!confirm('Revert this interpreter back to Pending Review and de-provision their login account?')) return;
+    fetch(`/api/admin/interpreter-applications/${appId}/revert-to-pending`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          fetchApplications();
+          fetchUsers();
+        }
+      })
       .catch(() => {});
   };
 
@@ -2580,6 +2597,15 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                             >
                               <Edit className="w-3.5 h-3.5" />
                               <span>Edit Profile & Rates</span>
+                            </button>
+
+                            <button
+                              onClick={() => handleRevertToPending(app.id)}
+                              className="px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-bold text-xs flex items-center gap-1.5 transition"
+                              title="Revert back to Pending Review"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              <span>Revert to Pending</span>
                             </button>
 
                             {app.emailDispatch && (
