@@ -148,6 +148,48 @@ let store = {
 let db = null;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://ik5928271_db_user:Tbe7ruMiqAmYmljz@cluster0.bumsmbw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
 
+// Utility: Strict single-applicant deduplication by normalized email / phone
+function deduplicateApplications(appsList) {
+  if (!Array.isArray(appsList)) return [];
+  const map = new Map();
+  
+  for (const app of appsList) {
+    if (!app) continue;
+    const cleanEmail = (app.email || '').toLowerCase().trim();
+    const cleanName = (app.name || '').toLowerCase().trim();
+    const key = cleanEmail || (cleanName ? `name:${cleanName}` : app.id || Math.random().toString());
+
+    if (!map.has(key)) {
+      map.set(key, { ...app, email: cleanEmail || app.email });
+    } else {
+      const existing = map.get(key);
+      const isApproved = existing.status === 'approved' || app.status === 'approved';
+      const isRejected = (existing.status === 'rejected' || app.status === 'rejected') && !isApproved;
+      const status = isApproved ? 'approved' : (isRejected ? 'rejected' : 'pending');
+      const badgeNumber = existing.badgeNumber || app.badgeNumber || existing.interpreterBadgeId || app.interpreterBadgeId || null;
+
+      map.set(key, {
+        ...existing,
+        ...app,
+        id: isApproved ? (existing.status === 'approved' ? existing.id : app.id) : existing.id,
+        status,
+        badgeNumber,
+        interpreterBadgeId: badgeNumber,
+        displayName: badgeNumber ? `Interpreter #${badgeNumber}` : (existing.displayName || app.displayName),
+        email: cleanEmail || existing.email,
+        cvFileName: existing.cvFileName || app.cvFileName,
+        cvFileData: existing.cvFileData || app.cvFileData,
+        docFileName: existing.docFileName || app.docFileName,
+        docFileData: existing.docFileData || app.docFileData,
+        bio: (existing.bio && existing.bio.length > (app.bio || '').length) ? existing.bio : (app.bio || existing.bio),
+        submittedAt: existing.submittedAt || app.submittedAt
+      });
+    }
+  }
+
+  return Array.from(map.values());
+}
+
 // Load existing store if available
 function loadStore() {
   try {
@@ -157,6 +199,8 @@ function loadStore() {
 
       if (!Array.isArray(store.interpreterApplications)) {
         store.interpreterApplications = [];
+      } else {
+        store.interpreterApplications = deduplicateApplications(store.interpreterApplications);
       }
 
       if (!Array.isArray(store.visitorLogs)) {
@@ -277,7 +321,10 @@ async function initMongo() {
     if (mongoApps.length > 0) {
       const cleanMongoApps = mongoApps.map(({ _id, ...a }) => a);
       cleanMongoApps.forEach(mApp => {
-        const existingIdx = mergedApps.findIndex(s => (s.id && s.id === mApp.id) || (s.email && mApp.email && s.email.toLowerCase() === mApp.email.toLowerCase()));
+        const existingIdx = mergedApps.findIndex(s => 
+          (s.id && s.id === mApp.id) || 
+          (s.email && mApp.email && s.email.toLowerCase().trim() === mApp.email.toLowerCase().trim())
+        );
         if (existingIdx >= 0) {
           mergedApps[existingIdx] = { ...mergedApps[existingIdx], ...mApp };
         } else {
@@ -285,7 +332,23 @@ async function initMongo() {
         }
       });
     }
-    store.interpreterApplications = mergedApps;
+    store.interpreterApplications = deduplicateApplications(mergedApps);
+
+    // Clean up duplicate application records in MongoDB collection
+    try {
+      const distinctEmails = [...new Set(store.interpreterApplications.map(a => a.email && a.email.toLowerCase().trim()).filter(Boolean))];
+      for (const email of distinctEmails) {
+        const matching = store.interpreterApplications.find(a => a.email && a.email.toLowerCase().trim() === email);
+        if (matching) {
+          await db.collection('interpreter_applications').deleteMany({
+            email: { $regex: new RegExp(`^${email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+            id: { $ne: matching.id }
+          }).catch(() => {});
+        }
+      }
+    } catch (e) {
+      console.warn('MongoDB applications deduplication cleanup warning:', e.message);
+    }
 
     // Sync Inquiries & Support Tickets from MongoDB
     const mongoInquiries = await db.collection('inquiries').find({}).toArray();
@@ -1344,11 +1407,14 @@ app.post('/api/interpreter-applications', (req, res) => {
 
 // 2. Admin: Get all applications (Ultra-fast lightweight payload synced with active users)
 app.get('/api/admin/interpreter-applications', (req, res) => {
-  const cleanList = (store.interpreterApplications || []).map(app => {
+  store.interpreterApplications = deduplicateApplications(store.interpreterApplications);
+
+  const cleanList = store.interpreterApplications.map(app => {
     const { cvFileData, docFileData, supportingDocs, ...rest } = app;
+    const cleanEmail = (app.email || '').toLowerCase().trim();
     const existingUser = (store.users || []).find(u => 
       u.role === 'interpreter' && 
-      ((u.email && app.email && u.email.toLowerCase() === app.email.toLowerCase()) || 
+      ((u.email && u.email.toLowerCase().trim() === cleanEmail) || 
        (u.id && app.id && u.id === app.id) ||
        (u.badgeNumber && app.badgeNumber && u.badgeNumber.toString() === app.badgeNumber.toString()))
     );
@@ -1361,6 +1427,7 @@ app.get('/api/admin/interpreter-applications', (req, res) => {
       status: isApproved ? 'approved' : (app.status || 'pending'),
       badgeNumber,
       interpreterBadgeId: badgeNumber,
+      displayName: badgeNumber ? `Interpreter #${badgeNumber}` : (app.displayName || (app.name ? app.name : 'Interpreter')),
       hasCv: Boolean(cvFileData || app.cvFileName),
       hasDoc: Boolean(docFileData || app.docFileName)
     };
@@ -1394,11 +1461,12 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
     shiftSchedule
   } = req.body;
 
-  const appItem = store.interpreterApplications.find(a => a.id === id);
+  let appItem = store.interpreterApplications.find(a => a.id === id);
   if (!appItem) {
     return res.status(404).json({ error: 'Application not found.' });
   }
 
+  const cleanEmail = (appItem.email || '').toLowerCase().trim();
   const finalType = approvedEmploymentType || appItem.employmentType || 'hourly';
   const finalHourlyRate = approvedHourlyRate !== undefined ? parseInt(approvedHourlyRate) : (appItem.hourlyRate || 8);
   const finalMinuteRate = approvedMinuteRate !== undefined ? parseFloat(approvedMinuteRate) : (appItem.minuteRate || 0.30);
@@ -1424,22 +1492,30 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
   };
 
   // Generate or preserve assigned pure numeric ID
-  let existingUser = store.users.find(u => u.email.toLowerCase() === appItem.email.toLowerCase());
+  let existingUser = store.users.find(u => u.email.toLowerCase().trim() === cleanEmail);
   const assignedBadgeNumber = appItem.badgeNumber || (existingUser && existingUser.badgeNumber) || generateNumericBadgeId();
 
-  // Mark application as approved
-  appItem.status = 'approved';
-  appItem.badgeNumber = assignedBadgeNumber;
-  appItem.interpreterBadgeId = assignedBadgeNumber;
-  appItem.displayName = `Interpreter #${assignedBadgeNumber}`;
-  appItem.employmentType = finalType;
-  appItem.hourlyRate = finalHourlyRate;
-  appItem.minuteRate = finalMinuteRate;
-  appItem.monthlySalary = finalMonthlySalary;
-  appItem.rateLabel = finalRateLabel;
-  appItem.shiftSchedule = resolvedShiftSchedule;
-  appItem.adminNotes = adminNotes || 'Approved by IK Enterprises Administration';
-  appItem.approvedAt = new Date().toISOString();
+  // Mark all matching application entries as approved
+  store.interpreterApplications.forEach(a => {
+    if (a.id === id || (a.email && a.email.toLowerCase().trim() === cleanEmail)) {
+      a.status = 'approved';
+      a.badgeNumber = assignedBadgeNumber;
+      a.interpreterBadgeId = assignedBadgeNumber;
+      a.displayName = `Interpreter #${assignedBadgeNumber}`;
+      a.employmentType = finalType;
+      a.hourlyRate = finalHourlyRate;
+      a.minuteRate = finalMinuteRate;
+      a.monthlySalary = finalMonthlySalary;
+      a.rateLabel = finalRateLabel;
+      a.shiftSchedule = resolvedShiftSchedule;
+      a.adminNotes = adminNotes || 'Approved by IK Enterprises Administration';
+      a.approvedAt = new Date().toISOString();
+    }
+  });
+
+  // Consolidate in-memory store
+  store.interpreterApplications = deduplicateApplications(store.interpreterApplications);
+  appItem = store.interpreterApplications.find(a => a.email && a.email.toLowerCase().trim() === cleanEmail) || appItem;
 
   // Create or Update Active User Account
   const userId = existingUser ? existingUser.id : `usr-${Date.now().toString(36)}`;
@@ -1447,7 +1523,7 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
   const userAccount = {
     id: userId,
     name: appItem.name,
-    email: appItem.email.toLowerCase(),
+    email: cleanEmail,
     password: passwordToSet,
     role: 'interpreter',
     badgeNumber: assignedBadgeNumber,
@@ -1478,12 +1554,12 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
   }
 
   // Create or Update Interpreter Roster Item
-  let existingInterp = store.interpreters.find(i => i.email.toLowerCase() === appItem.email.toLowerCase() || i.userId === userId);
+  let existingInterp = store.interpreters.find(i => i.email.toLowerCase().trim() === cleanEmail || i.userId === userId);
   const interpProfile = {
     id: existingInterp ? existingInterp.id : `int-${Date.now().toString(36)}`,
     userId: userId,
     name: appItem.name,
-    email: appItem.email.toLowerCase(),
+    email: cleanEmail,
     badgeNumber: assignedBadgeNumber,
     interpreterBadgeId: assignedBadgeNumber,
     displayName: `Interpreter #${assignedBadgeNumber}`,
@@ -1514,14 +1590,14 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
 
   // Simulated Official Credential Dispatch Email Record
   const emailDispatch = {
-    to: appItem.email,
+    to: cleanEmail,
     subject: `Welcome to LinguaBridge - Your Certified Interpreter ID is #${assignedBadgeNumber} (Approved & Active)`,
     sentAt: new Date().toISOString(),
     recipientName: appItem.name,
     officialInterpreterId: assignedBadgeNumber,
     interpreterBadgeId: assignedBadgeNumber,
     badgeNumber: assignedBadgeNumber,
-    loginEmail: appItem.email,
+    loginEmail: cleanEmail,
     temporaryPassword: passwordToSet,
     employmentType: finalType === 'salary_base' ? 'Salary Base (Fixed Full-Time)' : finalType === 'per_minute' ? 'Per-Minute Talk Rate (On-Demand Flex)' : 'Hourly Rate (Scheduled Shifts)',
     compensationTerms: finalRateLabel,
@@ -1532,13 +1608,21 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
 
   appItem.emailDispatch = emailDispatch;
 
+  // Clean up duplicate application records in MongoDB collection
+  if (db && cleanEmail) {
+    db.collection('interpreter_applications').deleteMany({
+      email: { $regex: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+      id: { $ne: appItem.id }
+    }).catch(() => {});
+  }
+
   saveStore();
   io.emit('interpreter-registered', interpProfile);
 
   // Send official approval and activation email to interpreter asynchronously
   sendInterpreterApprovedEmail({
     ...interpProfile,
-    email: appItem.email,
+    email: cleanEmail,
     name: appItem.name,
     badgeNumber: assignedBadgeNumber,
     primaryLang: appItem.primaryLang,
@@ -1571,10 +1655,16 @@ app.post('/api/admin/interpreter-applications/:id/reject', (req, res) => {
     return res.status(404).json({ error: 'Application not found.' });
   }
 
-  appItem.status = 'rejected';
-  appItem.adminNotes = rejectReason || 'Application does not meet current credentialing requirements.';
-  appItem.rejectedAt = new Date().toISOString();
+  const cleanEmail = (appItem.email || '').toLowerCase().trim();
+  store.interpreterApplications.forEach(a => {
+    if (a.id === id || (cleanEmail && a.email && a.email.toLowerCase().trim() === cleanEmail)) {
+      a.status = 'rejected';
+      a.adminNotes = rejectReason || 'Application does not meet current credentialing requirements.';
+      a.rejectedAt = new Date().toISOString();
+    }
+  });
 
+  store.interpreterApplications = deduplicateApplications(store.interpreterApplications);
   saveStore();
   res.json({ success: true, message: 'Application status updated to rejected.', application: appItem });
 });
@@ -1582,10 +1672,21 @@ app.post('/api/admin/interpreter-applications/:id/reject', (req, res) => {
 // 5. Admin: Delete Application
 app.delete('/api/admin/interpreter-applications/:id', async (req, res) => {
   const { id } = req.params;
-  store.interpreterApplications = store.interpreterApplications.filter(a => a.id !== id);
+  const targetApp = store.interpreterApplications.find(a => a.id === id);
+  const cleanEmail = targetApp?.email ? targetApp.email.toLowerCase().trim() : null;
+
+  store.interpreterApplications = store.interpreterApplications.filter(a => 
+    a.id !== id && !(cleanEmail && a.email && a.email.toLowerCase().trim() === cleanEmail)
+  );
   if (db) {
     try {
-      await db.collection('interpreter_applications').deleteOne({ id });
+      if (cleanEmail) {
+        await db.collection('interpreter_applications').deleteMany({
+          email: { $regex: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+        });
+      } else {
+        await db.collection('interpreter_applications').deleteOne({ id });
+      }
     } catch (e) {
       console.error('Error deleting application from MongoDB:', e.message);
     }
