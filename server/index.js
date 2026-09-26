@@ -253,10 +253,21 @@ function loadStore() {
         }
       });
 
-      // Initialize Seed Applications only if empty on first setup
-      if (store.interpreterApplications.length === 0) {
-        store.interpreterApplications = [...SEED_APPLICATIONS];
-      }
+      // Ensure all SEED_APPLICATIONS are merged and preserved
+      const currentApps = Array.isArray(store.interpreterApplications) ? store.interpreterApplications : [];
+      const mergedSeedApps = [...SEED_APPLICATIONS];
+      currentApps.forEach(app => {
+        const idx = mergedSeedApps.findIndex(s => 
+          (s.id && s.id === app.id) || 
+          (s.email && app.email && s.email.toLowerCase().trim() === app.email.toLowerCase().trim())
+        );
+        if (idx >= 0) {
+          mergedSeedApps[idx] = { ...mergedSeedApps[idx], ...app };
+        } else {
+          mergedSeedApps.unshift(app);
+        }
+      });
+      store.interpreterApplications = deduplicateApplications(mergedSeedApps);
 
       // Initialize Seed Inquiries only if empty on first setup
       if (store.inquiries.length === 0) {
@@ -358,6 +369,9 @@ async function initMongo() {
             id: { $ne: matching.id }
           }).catch(() => {});
         }
+      }
+      for (const app of store.interpreterApplications) {
+        await db.collection('interpreter_applications').updateOne({ id: app.id }, { $set: app }, { upsert: true }).catch(() => {});
       }
     } catch (e) {
       console.warn('MongoDB applications deduplication cleanup warning:', e.message);
