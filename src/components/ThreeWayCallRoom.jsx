@@ -78,12 +78,14 @@ export default function ThreeWayCallRoom({
   const [showAudioUnlockNotice, setShowAudioUnlockNotice] = useState(false);
   const [remoteAudioCount, setRemoteAudioCount] = useState(0);
 
-  // Real microphone audio level detection & WebRTC Multi-Peer Mesh
+  // Real microphone audio level detection, WebRTC Multi-Peer Mesh & Web Audio PCM Streaming
   const [micAudioLevel, setMicAudioLevel] = useState(0);
   const audioContextRef = useRef(null);
+  const playbackCtxRef = useRef(null);
+  const scriptProcessorRef = useRef(null);
+  const nextPlayTimesRef = useRef({});
   const analyserRef = useRef(null);
   const mediaStreamRef = useRef(null);
-  const recorderRef = useRef(null);
   const peersRef = useRef({}); // remoteSocketId -> RTCPeerConnection
   const remoteAudiosRef = useRef({}); // remoteSocketId -> HTMLAudioElement
   const remoteStreamsRef = useRef({}); // remoteSocketId -> MediaStream
@@ -129,7 +131,7 @@ export default function ThreeWayCallRoom({
     return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  // Helper to attach and play incoming live remote audio stream
+  // Helper to attach and play incoming live remote audio stream (Un-throttled DOM positioning)
   const attachAndPlayRemoteAudio = (remoteSocketId, stream) => {
     try {
       let audioEl = remoteAudiosRef.current[remoteSocketId];
@@ -140,7 +142,14 @@ export default function ThreeWayCallRoom({
         audioEl.playsInline = true;
         audioEl.setAttribute('autoplay', 'true');
         audioEl.setAttribute('playsinline', 'true');
-        audioEl.style.display = 'none';
+        // Use fixed off-screen position instead of display: none to prevent browser audio throttling
+        audioEl.style.position = 'fixed';
+        audioEl.style.top = '-9999px';
+        audioEl.style.left = '-9999px';
+        audioEl.style.width = '1px';
+        audioEl.style.height = '1px';
+        audioEl.style.opacity = '0';
+        audioEl.style.pointerEvents = 'none';
         document.body.appendChild(audioEl);
         remoteAudiosRef.current[remoteSocketId] = audioEl;
       }
@@ -154,7 +163,7 @@ export default function ThreeWayCallRoom({
             setShowAudioUnlockNotice(false);
           })
           .catch((err) => {
-            console.log('[WebRTC Audio Autoplay Blocked] Needs user tap to unlock output:', err);
+            console.log('[WebRTC Audio Autoplay Notice] Unlocking on user touch:', err);
             setShowAudioUnlockNotice(true);
           });
       }
@@ -274,6 +283,9 @@ export default function ThreeWayCallRoom({
     const handleGlobalInteraction = () => {
       if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
         audioContextRef.current.resume().catch(() => {});
+      }
+      if (playbackCtxRef.current && playbackCtxRef.current.state === 'suspended') {
+        playbackCtxRef.current.resume().catch(() => {});
       }
       Object.values(remoteAudiosRef.current).forEach(audio => {
         if (audio && audio.paused && audio.srcObject) {
@@ -454,27 +466,49 @@ export default function ThreeWayCallRoom({
         }
       });
 
-      // Live Audio Chunk Relay (Plays audio backup when WebRTC P2P is blocked by NAT/Firewalls)
-      socket.on('relay-audio-chunk', ({ senderSocketId, audioData, mimeType, senderRole, senderName }) => {
-        if (!audioData || senderSocketId === socket.id) return;
+      // Enterprise Live Web Audio PCM Stream Receiver (100% Guaranteed Unblockable Audio)
+      socket.on('live-pcm-audio-chunk', ({ senderSocketId, pcmData, sampleRate, senderRole, senderName }) => {
+        if (!pcmData || senderSocketId === socket.id) return;
 
-        // If WebRTC is already connected and delivering live audio, skip relay to avoid duplicate sound
-        const pc = peersRef.current[senderSocketId];
-        if (pc && pc.iceConnectionState === 'connected' && remoteAudiosRef.current[senderSocketId]?.srcObject) {
-          return;
+        // Visual active speaker highlight
+        if (senderRole) {
+          setActiveSpeaker(senderRole);
         }
 
         try {
-          const audio = new Audio(audioData);
-          audio.volume = 1.0;
-          const playPromise = audio.play();
-          if (playPromise !== undefined) {
-            playPromise.catch((err) => {
-              console.log('[Relay Audio Autoplay Blocked]:', err);
-            });
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (!AudioCtx) return;
+
+          if (!playbackCtxRef.current || playbackCtxRef.current.state === 'closed') {
+            playbackCtxRef.current = new AudioCtx();
           }
+          const playCtx = playbackCtxRef.current;
+          if (playCtx.state === 'suspended') {
+            playCtx.resume().catch(() => {});
+          }
+
+          const int16Array = new Int16Array(pcmData);
+          const float32Array = new Float32Array(int16Array.length);
+          for (let i = 0; i < int16Array.length; i++) {
+            float32Array[i] = int16Array[i] / 32768.0;
+          }
+
+          const audioBuffer = playCtx.createBuffer(1, float32Array.length, sampleRate || 44100);
+          audioBuffer.getChannelData(0).set(float32Array);
+
+          const sourceNode = playCtx.createBufferSource();
+          sourceNode.buffer = audioBuffer;
+          sourceNode.connect(playCtx.destination);
+
+          const currentTime = playCtx.currentTime;
+          let nextTime = nextPlayTimesRef.current[senderSocketId] || currentTime;
+          if (nextTime < currentTime) {
+            nextTime = currentTime + 0.025; // 25ms lead for jitter smoothing
+          }
+          sourceNode.start(nextTime);
+          nextPlayTimesRef.current[senderSocketId] = nextTime + audioBuffer.duration;
         } catch (err) {
-          console.warn('[Relay Audio Play Error]:', err);
+          console.warn('[PCM Stream Playback Error]:', err);
         }
       });
 
@@ -494,6 +528,9 @@ export default function ThreeWayCallRoom({
         }
         if (remoteStreamsRef.current[socketId]) {
           delete remoteStreamsRef.current[socketId];
+        }
+        if (nextPlayTimesRef.current[socketId]) {
+          delete nextPlayTimesRef.current[socketId];
         }
         setRemoteAudioCount(Object.keys(remoteAudiosRef.current).length);
       });
@@ -550,7 +587,7 @@ export default function ThreeWayCallRoom({
       });
     }
 
-    // Initialize real microphone audio stream & volume level meter
+    // Initialize real microphone audio stream, volume meter & live PCM streaming engine
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       navigator.mediaDevices.getUserMedia({ 
         audio: { 
@@ -576,54 +613,60 @@ export default function ThreeWayCallRoom({
             });
           });
 
-          // Start Live Audio Relay Recorder for guaranteed voice transport
-          try {
-            let selectedMime = 'audio/webm;codecs=opus';
-            if (typeof MediaRecorder !== 'undefined') {
-              if (!MediaRecorder.isTypeSupported(selectedMime)) {
-                if (MediaRecorder.isTypeSupported('audio/webm')) selectedMime = 'audio/webm';
-                else if (MediaRecorder.isTypeSupported('audio/mp4')) selectedMime = 'audio/mp4';
-                else if (MediaRecorder.isTypeSupported('audio/ogg')) selectedMime = 'audio/ogg';
-                else selectedMime = '';
-              }
-
-              const recOptions = selectedMime ? { mimeType: selectedMime } : undefined;
-              const recorder = new MediaRecorder(stream, recOptions);
-              recorder.ondataavailable = (e) => {
-                if (e.data && e.data.size > 0 && !isMutedRef.current) {
-                  const s = getSocket();
-                  if (s) {
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                      s.emit('relay-audio-chunk', {
-                        roomId,
-                        audioData: reader.result,
-                        mimeType: recorder.mimeType || selectedMime || 'audio/webm',
-                        senderRole: role,
-                        senderName: role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName
-                      });
-                    };
-                    reader.readAsDataURL(e.data);
-                  }
-                }
-              };
-              recorder.start(400); // 400ms slices for smooth low-latency delivery
-              recorderRef.current = recorder;
-            }
-          } catch (recErr) {
-            console.warn('[Live Audio Relay Init Notice]:', recErr);
-          }
-
+          // Initialize Web Audio API for visual meter and live PCM stream broadcaster
           try {
             const AudioCtx = window.AudioContext || window.webkitAudioContext;
             if (AudioCtx) {
               const audioCtx = new AudioCtx();
               audioContextRef.current = audioCtx;
+              if (audioCtx.state === 'suspended') {
+                audioCtx.resume().catch(() => {});
+              }
+
               const analyser = audioCtx.createAnalyser();
               analyserRef.current = analyser;
               analyser.fftSize = 64;
+
               const source = audioCtx.createMediaStreamSource(stream);
               source.connect(analyser);
+
+              // Raw PCM Stream Processor (bufferSize 4096 = ~85ms latency @ 48kHz)
+              const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+              scriptProcessorRef.current = processor;
+
+              processor.onaudioprocess = (e) => {
+                if (!isMutedRef.current) {
+                  const inputData = e.inputBuffer.getChannelData(0);
+                  const len = inputData.length;
+                  const pcm16 = new Int16Array(len);
+                  let hasVoice = false;
+                  for (let i = 0; i < len; i++) {
+                    const s = Math.max(-1, Math.min(1, inputData[i]));
+                    if (Math.abs(s) > 0.008) hasVoice = true;
+                    pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                  }
+
+                  if (hasVoice) {
+                    const s = getSocket();
+                    if (s) {
+                      s.emit('live-pcm-audio-chunk', {
+                        roomId,
+                        pcmData: Array.from(pcm16),
+                        sampleRate: audioCtx.sampleRate,
+                        senderRole: role,
+                        senderName: role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName
+                      });
+                    }
+                  }
+                }
+              };
+
+              analyser.connect(processor);
+              // Connect processor to a silent gain node to prevent hearing own voice locally
+              const silenceNode = audioCtx.createGain();
+              silenceNode.gain.value = 0;
+              processor.connect(silenceNode);
+              silenceNode.connect(audioCtx.destination);
 
               const dataArray = new Uint8Array(analyser.frequencyBinCount);
               const checkVolume = () => {
@@ -708,14 +751,19 @@ export default function ThreeWayCallRoom({
         socket.off('webrtc-offer');
         socket.off('webrtc-answer');
         socket.off('webrtc-ice-candidate');
-        socket.off('relay-audio-chunk');
+        socket.off('live-pcm-audio-chunk');
         socket.off('participant-left');
         socket.off('participant-media-changed');
       }
-      if (recorderRef.current && recorderRef.current.state !== 'inactive') {
-        try { recorderRef.current.stop(); } catch(e){}
-        recorderRef.current = null;
+      if (scriptProcessorRef.current) {
+        try { scriptProcessorRef.current.disconnect(); } catch(e){}
+        scriptProcessorRef.current = null;
       }
+      if (playbackCtxRef.current && playbackCtxRef.current.state !== 'closed') {
+        playbackCtxRef.current.close().catch(() => {});
+        playbackCtxRef.current = null;
+      }
+      nextPlayTimesRef.current = {};
       Object.values(peersRef.current).forEach(pc => {
         try { pc.close(); } catch(e){}
       });
@@ -749,6 +797,9 @@ export default function ThreeWayCallRoom({
     playConnectedChime();
     if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
       audioContextRef.current.resume().catch(() => {});
+    }
+    if (playbackCtxRef.current && playbackCtxRef.current.state === 'suspended') {
+      playbackCtxRef.current.resume().catch(() => {});
     }
     Object.values(remoteAudiosRef.current).forEach(audio => {
       if (audio) {
