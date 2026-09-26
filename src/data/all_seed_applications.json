@@ -1,5 +1,55 @@
 [
   {
+    "id": "app-sara-pending-47",
+    "badgeNumber": "88047",
+    "interpreterBadgeId": "88047",
+    "name": "Sara (Certified Medical & Professional Interpreter)",
+    "email": "sara.linguist47@gmail.com",
+    "phone": "+1 (555) 472-9182",
+    "country": "United States / Egypt",
+    "timeZone": "EST (UTC-5:00) / EEST (UTC+3:00)",
+    "primaryLang": "Arabic",
+    "languages": [
+      "Arabic",
+      "English"
+    ],
+    "specialties": [
+      "Medical & Clinical Healthcare",
+      "Emergency 911 & Urgent Care",
+      "Hospital Admissions & OPI/VRI",
+      "General & Legal Intake"
+    ],
+    "certifications": [
+      "Certified Professional Healthcare Linguist",
+      "HIPAA Compliance Verified",
+      "IMIA / CCHI Medical Standards"
+    ],
+    "experienceYears": 5,
+    "employmentType": "per_minute",
+    "hourlyRate": 12,
+    "minuteRate": 0.47,
+    "monthlySalary": 1500,
+    "rateLabel": "$0.47/min (Live On-Demand)",
+    "bio": "Certified Professional Healthcare Linguist with 5+ years experience handling live on-demand VRI/OPI calls for clinical healthcare, emergency intake, and medical appointments. Requested compensation rate: $0.47/min.",
+    "cvFileName": "Sara_Medical_Interpreter_Resume.pdf",
+    "docFileName": "Sara_Certified_Linguist_Credentials.pdf",
+    "shiftWindows": [
+      "shift_a",
+      "shift_b",
+      "shift_c"
+    ],
+    "preferredShiftType": "open_unlimited",
+    "preferredDailyHours": 8,
+    "emergencyOnCall": true,
+    "hardwareAudit": {
+      "headsetVerified": true,
+      "internetVerified": true,
+      "privateOfficeSetting": true
+    },
+    "status": "pending",
+    "submittedAt": "2026-09-26T00:05:42.077Z"
+  },
+  {
     "id": "app-lb-001",
     "badgeNumber": "88001",
     "interpreterBadgeId": "88001",
@@ -6809,9 +6859,9 @@
     "experienceYears": 4,
     "employmentType": "per_minute",
     "hourlyRate": 8,
-    "minuteRate": 0.3,
+    "minuteRate": 0.5,
     "monthlySalary": 1200,
-    "rateLabel": "$4.00-$6.00/hr ($0.12-$0.15/min target / $0.20-$0.25 complex pharma)",
+    "rateLabel": "$0.50/min (Complex Pharma & Clinical)",
     "bio": "Date Received: 2026-09-15 | Sr #195 | Ph.D. Candidate in Pharmaceutical Microbiology & Immunology (Beni-Suef Univ 2023-Pres), M.Sc. Biotechnology-Microbiology (2021), B.Pharm Pharmacy & Pharmaceutical Sciences (Beni-Suef Univ 2014 / Grade 88.75% Excellent with Honors), 9+ Years Healthcare Sector Experience, Quintuple-LSP Medical Interpreter: Propio Language Services (OPI/VRI 2023-Pres), Reviver Global (OPI/VRI), Universal Language Service, One World Global Services OWGS, The Language Group LLC, Remote Healthcare Interpretation & Anatomy/Physiology Certificates (Propio 2025), ALTA Arabic MSA Listening & Speaking Certified (2025), Ibn Sina Training Academy 40h Basic & 24h Advanced Medical Interpretation (64h Total), ProZ HIPAA & 10h Advanced Medical Terminology (2024), C1 English (Busuu), Female Priority Specialist, Secondary Email: sarasalama@psas.bsu.edu.eg, Beni-Suef Egypt EEST",
     "cvFileName": "Dr._Sara_Salama_(Ph.D._Candidate)_CV.pdf",
     "docFileName": "Credentials_Certificate.pdf",
