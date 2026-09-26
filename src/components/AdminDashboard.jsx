@@ -1860,14 +1860,15 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
           >
             <PhoneCall className="w-3.5 h-3.5 text-red-400 animate-pulse" />
             <span>Live Calls & Bookings</span>
-            {activeLiveRooms.length > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full bg-red-500 text-white text-[10px] font-black animate-ping">
-                {activeLiveRooms.length}
+            {activeLiveRooms.length > 0 ? (
+              <span className="px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-black animate-pulse">
+                {activeLiveRooms.length} Live
               </span>
-            )}
-            <span className="px-1.5 py-0.2 rounded-full bg-slate-800 text-purple-300 text-[10px] font-bold">
-              {adminAppointments.length}
-            </span>
+            ) : adminAppointments.length > 0 ? (
+              <span className="px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-400 text-[10px] font-semibold border border-slate-700">
+                {adminAppointments.length} Booked
+              </span>
+            ) : null}
           </button>
           <button
             onClick={() => {
@@ -2011,11 +2012,13 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
         <div className="glass-panel p-5 rounded-2xl border border-slate-800">
           <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
             <span>Active 3-Way Calls</span>
-            <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />
+            <Activity className={`w-4 h-4 ${activeLiveRooms.length > 0 ? 'text-red-400 animate-pulse' : 'text-slate-500'}`} />
           </div>
-          <p className="text-2xl font-black text-white mt-2">Live WebRTC</p>
-          <span className="text-[11px] text-emerald-400 font-medium mt-1 inline-block">
-            ● 0 dispatch wait time
+          <p className="text-2xl font-black text-white mt-2">
+            {activeLiveRooms.length > 0 ? `${activeLiveRooms.length} Live Call${activeLiveRooms.length > 1 ? 's' : ''}` : '0 Active Calls'}
+          </p>
+          <span className={`text-[11px] font-medium mt-1 inline-block ${activeLiveRooms.length > 0 ? 'text-red-400 animate-pulse font-bold' : 'text-slate-400'}`}>
+            {activeLiveRooms.length > 0 ? '● In progress now' : '● No live calls in progress'}
           </span>
         </div>
 

@@ -83,14 +83,20 @@ export default function ThreeWayCallRoom({
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
   const mediaStreamRef = useRef(null);
+  const recorderRef = useRef(null);
   const peersRef = useRef({}); // remoteSocketId -> RTCPeerConnection
   const remoteAudiosRef = useRef({}); // remoteSocketId -> HTMLAudioElement
   const remoteStreamsRef = useRef({}); // remoteSocketId -> MediaStream
   const screenStreamRef = useRef(null);
   const localScreenVideoRef = useRef(null);
   const lastSpeakingEmitRef = useRef(0);
+  const isMutedRef = useRef(isMuted);
 
-  // WebRTC ICE Servers Configuration (Google STUN + Twilio)
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+  }, [isMuted]);
+
+  // WebRTC ICE Servers Configuration (Multi-STUN + Cloudflare + Twilio + Metered)
   const ICE_SERVERS = {
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
@@ -98,7 +104,10 @@ export default function ThreeWayCallRoom({
       { urls: 'stun:stun2.l.google.com:19302' },
       { urls: 'stun:stun3.l.google.com:19302' },
       { urls: 'stun:stun4.l.google.com:19302' },
-      { urls: 'stun:global.stun.twilio.com:3478' }
+      { urls: 'stun:stun.cloudflare.com:3478' },
+      { urls: 'stun:global.stun.twilio.com:3478' },
+      { urls: 'stun:stun.services.mozilla.com' },
+      { urls: 'stun:stun.relay.metered.ca:80' }
     ]
   };
 
@@ -126,10 +135,12 @@ export default function ThreeWayCallRoom({
       let audioEl = remoteAudiosRef.current[remoteSocketId];
       if (!audioEl) {
         audioEl = document.createElement('audio');
+        audioEl.id = `remote-audio-${remoteSocketId}`;
         audioEl.autoplay = true;
         audioEl.playsInline = true;
         audioEl.setAttribute('autoplay', 'true');
         audioEl.setAttribute('playsinline', 'true');
+        audioEl.style.display = 'none';
         document.body.appendChild(audioEl);
         remoteAudiosRef.current[remoteSocketId] = audioEl;
       }
@@ -180,23 +191,15 @@ export default function ThreeWayCallRoom({
 
     const pc = new RTCPeerConnection(ICE_SERVERS);
     pc._iceCandidateQueue = [];
+    pc._isInitiator = isInitiator;
     peersRef.current[targetSocketId] = pc;
-
-    // Ensure transceiver is configured for bidirectional audio (sendrecv)
-    try {
-      pc.addTransceiver('audio', { direction: 'sendrecv' });
-    } catch (e) {
-      console.warn('[WebRTC Transceiver Warning]:', e.message);
-    }
 
     // Attach local microphone tracks to the peer connection if already available
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getAudioTracks().forEach(track => {
-        const senders = pc.getSenders();
-        const hasSender = senders.some(s => s.track && s.track.id === track.id);
-        if (!hasSender) {
+        try {
           pc.addTrack(track, mediaStreamRef.current);
-        }
+        } catch (e) {}
       });
     }
 
@@ -210,30 +213,38 @@ export default function ThreeWayCallRoom({
       }
     };
 
+    // Monitor connection states
+    pc.oniceconnectionstatechange = () => {
+      console.log(`[WebRTC ICE State with ${targetSocketId}]:`, pc.iceConnectionState);
+      if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
+        try { pc.restartIce(); } catch(e){}
+      }
+    };
+
     // When remote live audio stream arrives, play it immediately!
     pc.ontrack = (event) => {
-      console.log('[WebRTC Live Stream Arrived from Remote Peer]:', targetSocketId);
-      if (event.streams && event.streams[0]) {
-        remoteStreamsRef.current[targetSocketId] = event.streams[0];
-        attachAndPlayRemoteAudio(targetSocketId, event.streams[0]);
-      }
+      console.log('[WebRTC Live Audio Stream Received]:', targetSocketId, event.streams);
+      const stream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
+      remoteStreamsRef.current[targetSocketId] = stream;
+      attachAndPlayRemoteAudio(targetSocketId, stream);
     };
 
     const sendOffer = async () => {
       try {
-        // Ensure local mic track is attached before offering
         const stream = await getLocalAudioStream().catch(() => null);
         if (stream) {
           stream.getAudioTracks().forEach(track => {
             const senders = pc.getSenders();
             const hasSender = senders.some(s => s.track && s.track.id === track.id);
             if (!hasSender) {
-              pc.addTrack(track, stream);
+              try { pc.addTrack(track, stream); } catch(e){}
             }
           });
         }
 
+        if (pc.signalingState !== 'stable') return;
         const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
+        if (pc.signalingState !== 'stable') return;
         await pc.setLocalDescription(offer);
         if (socket) {
           socket.emit('webrtc-offer', {
@@ -243,24 +254,41 @@ export default function ThreeWayCallRoom({
           });
         }
       } catch (err) {
-        console.error('[WebRTC Offer Error]', err);
+        console.warn('[WebRTC Offer Warning]:', err.message);
       }
     };
 
     if (isInitiator) {
-      pc.onnegotiationneeded = () => {
-        sendOffer();
-      };
-      // Trigger initial offer immediately
       setTimeout(() => {
         if (pc.signalingState === 'stable') {
           sendOffer();
         }
-      }, 100);
+      }, 150);
     }
 
     return pc;
   };
+
+  // Global touch/click unblocker for mobile browsers
+  useEffect(() => {
+    const handleGlobalInteraction = () => {
+      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume().catch(() => {});
+      }
+      Object.values(remoteAudiosRef.current).forEach(audio => {
+        if (audio && audio.paused && audio.srcObject) {
+          audio.play().then(() => setShowAudioUnlockNotice(false)).catch(() => {});
+        }
+      });
+    };
+
+    window.addEventListener('click', handleGlobalInteraction, { passive: true });
+    window.addEventListener('touchstart', handleGlobalInteraction, { passive: true });
+    return () => {
+      window.removeEventListener('click', handleGlobalInteraction);
+      window.removeEventListener('touchstart', handleGlobalInteraction);
+    };
+  }, []);
 
   // Connected Participants in this Room via Socket
   const [roomParticipants, setRoomParticipants] = useState([
@@ -316,20 +344,21 @@ export default function ThreeWayCallRoom({
         specialty
       });
 
-      // Handle room join confirmation and connect WebRTC with any existing peers
+      // Handle room join confirmation: deterministic initiator based on socket ID
       socket.on('room-joined-success', ({ participants, currentUserId, targetLanguage: serverLang, specialty: serverSpec }) => {
         if (serverLang) setTargetLanguage(serverLang);
         if (serverSpec) setSpecialty(serverSpec);
         if (Array.isArray(participants)) {
           participants.forEach(p => {
             if (p.socketId && p.socketId !== currentUserId && p.socketId !== socket.id) {
-              createPeerConnection(p.socketId, true, socket);
+              const isInitiator = socket.id < p.socketId;
+              createPeerConnection(p.socketId, isInitiator, socket);
             }
           });
         }
       });
 
-      // Handle new participant joining room
+      // Handle new participant joining room: deterministic initiator based on socket ID
       socket.on('participant-joined', (p) => {
         setChatMessages(prev => [
           ...prev, 
@@ -343,32 +372,36 @@ export default function ThreeWayCallRoom({
         ]);
 
         if (p.socketId && p.socketId !== socket.id) {
-          createPeerConnection(p.socketId, true, socket);
+          const isInitiator = socket.id < p.socketId;
+          createPeerConnection(p.socketId, isInitiator, socket);
         }
       });
 
-      // WebRTC Signaling: Inbound Offer (Ensures local microphone is attached before answering)
+      // WebRTC Signaling: Inbound Offer
       socket.on('webrtc-offer', async ({ senderSocketId, offer, senderInfo }) => {
         let pc = peersRef.current[senderSocketId];
         if (!pc) {
           pc = createPeerConnection(senderSocketId, false, socket);
         }
         try {
-          // Attach microphone stream before answering to guarantee outbound audio from interpreter
           const stream = await getLocalAudioStream().catch(() => null);
           if (stream) {
             stream.getAudioTracks().forEach(track => {
               const senders = pc.getSenders();
               const hasSender = senders.some(s => s.track && s.track.id === track.id);
               if (!hasSender) {
-                pc.addTrack(track, stream);
+                try { pc.addTrack(track, stream); } catch(e){}
               }
             });
           }
 
+          if (pc.signalingState !== 'stable') {
+            try { await pc.setLocalDescription({ type: 'rollback' }); } catch(e){}
+          }
+
           await pc.setRemoteDescription(new RTCSessionDescription(offer));
 
-          // Drain queued ICE candidates if any arrived before remote description was ready
+          // Drain queued ICE candidates
           if (Array.isArray(pc._iceCandidateQueue) && pc._iceCandidateQueue.length > 0) {
             for (const cand of pc._iceCandidateQueue) {
               await pc.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
@@ -387,7 +420,7 @@ export default function ThreeWayCallRoom({
       // WebRTC Signaling: Inbound Answer
       socket.on('webrtc-answer', async ({ senderSocketId, answer }) => {
         const pc = peersRef.current[senderSocketId];
-        if (pc) {
+        if (pc && pc.signalingState === 'have-local-offer') {
           try {
             await pc.setRemoteDescription(new RTCSessionDescription(answer));
 
@@ -421,6 +454,30 @@ export default function ThreeWayCallRoom({
         }
       });
 
+      // Live Audio Chunk Relay (Plays audio backup when WebRTC P2P is blocked by NAT/Firewalls)
+      socket.on('relay-audio-chunk', ({ senderSocketId, audioData, mimeType, senderRole, senderName }) => {
+        if (!audioData || senderSocketId === socket.id) return;
+
+        // If WebRTC is already connected and delivering live audio, skip relay to avoid duplicate sound
+        const pc = peersRef.current[senderSocketId];
+        if (pc && pc.iceConnectionState === 'connected' && remoteAudiosRef.current[senderSocketId]?.srcObject) {
+          return;
+        }
+
+        try {
+          const audio = new Audio(audioData);
+          audio.volume = 1.0;
+          const playPromise = audio.play();
+          if (playPromise !== undefined) {
+            playPromise.catch((err) => {
+              console.log('[Relay Audio Autoplay Blocked]:', err);
+            });
+          }
+        } catch (err) {
+          console.warn('[Relay Audio Play Error]:', err);
+        }
+      });
+
       // Handle participant disconnect / cleanup
       socket.on('participant-left', ({ socketId }) => {
         if (peersRef.current[socketId]) {
@@ -442,10 +499,10 @@ export default function ThreeWayCallRoom({
       });
 
       // Handle media state / speaking changes from other participants
-      socket.on('participant-media-changed', ({ socketId, isMuted: peerMuted, isSpeaking: peerSpeaking }) => {
+      socket.on('participant-media-changed', ({ socketId, isMuted: peerMuted, isSpeaking: peerSpeaking, role: peerRole }) => {
         if (peerSpeaking) {
-          const peerRole = socketId === socket.id ? role : (role === 'host' ? 'interpreter' : 'host');
-          setActiveSpeaker(peerRole);
+          const resolvedRole = peerRole || (socketId === socket.id ? role : (role === 'host' ? 'interpreter' : 'host'));
+          setActiveSpeaker(resolvedRole);
         }
       });
 
@@ -514,10 +571,48 @@ export default function ThreeWayCallRoom({
               if (audioSender) {
                 audioSender.replaceTrack(track).catch(() => {});
               } else {
-                pc.addTrack(track, stream);
+                try { pc.addTrack(track, stream); } catch(e){}
               }
             });
           });
+
+          // Start Live Audio Relay Recorder for guaranteed voice transport
+          try {
+            let selectedMime = 'audio/webm;codecs=opus';
+            if (typeof MediaRecorder !== 'undefined') {
+              if (!MediaRecorder.isTypeSupported(selectedMime)) {
+                if (MediaRecorder.isTypeSupported('audio/webm')) selectedMime = 'audio/webm';
+                else if (MediaRecorder.isTypeSupported('audio/mp4')) selectedMime = 'audio/mp4';
+                else if (MediaRecorder.isTypeSupported('audio/ogg')) selectedMime = 'audio/ogg';
+                else selectedMime = '';
+              }
+
+              const recOptions = selectedMime ? { mimeType: selectedMime } : undefined;
+              const recorder = new MediaRecorder(stream, recOptions);
+              recorder.ondataavailable = (e) => {
+                if (e.data && e.data.size > 0 && !isMutedRef.current) {
+                  const s = getSocket();
+                  if (s) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      s.emit('relay-audio-chunk', {
+                        roomId,
+                        audioData: reader.result,
+                        mimeType: recorder.mimeType || selectedMime || 'audio/webm',
+                        senderRole: role,
+                        senderName: role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName
+                      });
+                    };
+                    reader.readAsDataURL(e.data);
+                  }
+                }
+              };
+              recorder.start(400); // 400ms slices for smooth low-latency delivery
+              recorderRef.current = recorder;
+            }
+          } catch (recErr) {
+            console.warn('[Live Audio Relay Init Notice]:', recErr);
+          }
 
           try {
             const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -532,7 +627,7 @@ export default function ThreeWayCallRoom({
 
               const dataArray = new Uint8Array(analyser.frequencyBinCount);
               const checkVolume = () => {
-                if (!analyserRef.current || isMuted) {
+                if (!analyserRef.current || isMutedRef.current) {
                   setMicAudioLevel(0);
                 } else {
                   analyserRef.current.getByteFrequencyData(dataArray);
@@ -544,14 +639,14 @@ export default function ThreeWayCallRoom({
                   const normalized = Math.min(100, Math.floor((avg / 128) * 100));
                   setMicAudioLevel(normalized);
 
-                  if (normalized > 15 && !isMuted) {
+                  if (normalized > 15 && !isMutedRef.current) {
                     setActiveSpeaker(role);
                     const now = Date.now();
                     if (!lastSpeakingEmitRef.current || (now - lastSpeakingEmitRef.current > 1200)) {
                       lastSpeakingEmitRef.current = now;
                       const s = getSocket();
                       if (s) {
-                        s.emit('update-media-state', { roomId, isSpeaking: true });
+                        s.emit('update-media-state', { roomId, isSpeaking: true, role });
                       }
                     }
                   }
@@ -613,8 +708,13 @@ export default function ThreeWayCallRoom({
         socket.off('webrtc-offer');
         socket.off('webrtc-answer');
         socket.off('webrtc-ice-candidate');
+        socket.off('relay-audio-chunk');
         socket.off('participant-left');
         socket.off('participant-media-changed');
+      }
+      if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+        try { recorderRef.current.stop(); } catch(e){}
+        recorderRef.current = null;
       }
       Object.values(peersRef.current).forEach(pc => {
         try { pc.close(); } catch(e){}
