@@ -3115,6 +3115,16 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Enterprise Web Audio PCM Raw Streaming Relay (Zero-header raw audio streaming, 100% firewall & NAT proof)
+  socket.on('live-pcm-audio-chunk', (payload) => {
+    if (payload && payload.roomId && payload.pcmData) {
+      socket.to(payload.roomId).emit('live-pcm-audio-chunk', {
+        ...payload,
+        senderSocketId: socket.id
+      });
+    }
+  });
+
   // In-Call Multi-Party Chat
   socket.on('send-chat-message', ({ id, roomId, sender, senderName, role, senderRole, text, translation, originalLang, targetLang, timestamp }) => {
     const messageId = id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
