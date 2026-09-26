@@ -152,6 +152,26 @@ export default function ThreeWayCallRoom({
     }
   };
 
+  // Asynchronously get or ensure active local microphone stream
+  const getLocalAudioStream = async () => {
+    if (mediaStreamRef.current && mediaStreamRef.current.active && mediaStreamRef.current.getAudioTracks().length > 0) {
+      return mediaStreamRef.current;
+    }
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: { 
+          echoCancellation: true, 
+          noiseSuppression: true, 
+          autoGainControl: true 
+        }, 
+        video: false 
+      });
+      mediaStreamRef.current = stream;
+      return stream;
+    }
+    return null;
+  };
+
   // Helper to create a WebRTC PeerConnection for a specific peer
   const createPeerConnection = (targetSocketId, isInitiator, socket) => {
     if (peersRef.current[targetSocketId]) {
@@ -159,12 +179,24 @@ export default function ThreeWayCallRoom({
     }
 
     const pc = new RTCPeerConnection(ICE_SERVERS);
+    pc._iceCandidateQueue = [];
     peersRef.current[targetSocketId] = pc;
 
-    // Attach local microphone tracks to the peer connection
+    // Ensure transceiver is configured for bidirectional audio (sendrecv)
+    try {
+      pc.addTransceiver('audio', { direction: 'sendrecv' });
+    } catch (e) {
+      console.warn('[WebRTC Transceiver Warning]:', e.message);
+    }
+
+    // Attach local microphone tracks to the peer connection if already available
     if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach(track => {
-        pc.addTrack(track, mediaStreamRef.current);
+      mediaStreamRef.current.getAudioTracks().forEach(track => {
+        const senders = pc.getSenders();
+        const hasSender = senders.some(s => s.track && s.track.id === track.id);
+        if (!hasSender) {
+          pc.addTrack(track, mediaStreamRef.current);
+        }
       });
     }
 
@@ -187,22 +219,44 @@ export default function ThreeWayCallRoom({
       }
     };
 
-    if (isInitiator) {
-      pc.onnegotiationneeded = async () => {
-        try {
-          const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
-          await pc.setLocalDescription(offer);
-          if (socket) {
-            socket.emit('webrtc-offer', {
-              targetSocketId,
-              offer,
-              senderInfo: { role, name: role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName }
-            });
-          }
-        } catch (err) {
-          console.error('[WebRTC Offer Error]', err);
+    const sendOffer = async () => {
+      try {
+        // Ensure local mic track is attached before offering
+        const stream = await getLocalAudioStream().catch(() => null);
+        if (stream) {
+          stream.getAudioTracks().forEach(track => {
+            const senders = pc.getSenders();
+            const hasSender = senders.some(s => s.track && s.track.id === track.id);
+            if (!hasSender) {
+              pc.addTrack(track, stream);
+            }
+          });
         }
+
+        const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
+        await pc.setLocalDescription(offer);
+        if (socket) {
+          socket.emit('webrtc-offer', {
+            targetSocketId,
+            offer,
+            senderInfo: { role, name: role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName }
+          });
+        }
+      } catch (err) {
+        console.error('[WebRTC Offer Error]', err);
+      }
+    };
+
+    if (isInitiator) {
+      pc.onnegotiationneeded = () => {
+        sendOffer();
       };
+      // Trigger initial offer immediately
+      setTimeout(() => {
+        if (pc.signalingState === 'stable') {
+          sendOffer();
+        }
+      }, 100);
     }
 
     return pc;
@@ -215,8 +269,8 @@ export default function ThreeWayCallRoom({
     { role: 'guest', name: patientName, status: 'connected' }
   ]);
 
-  // Chat drawer & Interpreter Drawer States
-  const [activeDrawer, setActiveDrawer] = useState('chat'); // 'chat', 'glossary', 'none'
+  // Chat drawer & Interpreter Drawer States (Default to 'none' so call floor is front and center)
+  const [activeDrawer, setActiveDrawer] = useState('none'); // 'chat', 'glossary', 'none'
   const [chatMessages, setChatMessages] = useState([
     {
       id: 'm1',
@@ -293,15 +347,36 @@ export default function ThreeWayCallRoom({
         }
       });
 
-      // WebRTC Signaling: Inbound Offer
+      // WebRTC Signaling: Inbound Offer (Ensures local microphone is attached before answering)
       socket.on('webrtc-offer', async ({ senderSocketId, offer, senderInfo }) => {
         let pc = peersRef.current[senderSocketId];
         if (!pc) {
           pc = createPeerConnection(senderSocketId, false, socket);
         }
         try {
+          // Attach microphone stream before answering to guarantee outbound audio from interpreter
+          const stream = await getLocalAudioStream().catch(() => null);
+          if (stream) {
+            stream.getAudioTracks().forEach(track => {
+              const senders = pc.getSenders();
+              const hasSender = senders.some(s => s.track && s.track.id === track.id);
+              if (!hasSender) {
+                pc.addTrack(track, stream);
+              }
+            });
+          }
+
           await pc.setRemoteDescription(new RTCSessionDescription(offer));
-          const answer = await pc.createAnswer();
+
+          // Drain queued ICE candidates if any arrived before remote description was ready
+          if (Array.isArray(pc._iceCandidateQueue) && pc._iceCandidateQueue.length > 0) {
+            for (const cand of pc._iceCandidateQueue) {
+              await pc.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
+            }
+            pc._iceCandidateQueue = [];
+          }
+
+          const answer = await pc.createAnswer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
           await pc.setLocalDescription(answer);
           socket.emit('webrtc-answer', { targetSocketId: senderSocketId, answer });
         } catch (err) {
@@ -315,6 +390,14 @@ export default function ThreeWayCallRoom({
         if (pc) {
           try {
             await pc.setRemoteDescription(new RTCSessionDescription(answer));
+
+            // Drain queued ICE candidates
+            if (Array.isArray(pc._iceCandidateQueue) && pc._iceCandidateQueue.length > 0) {
+              for (const cand of pc._iceCandidateQueue) {
+                await pc.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
+              }
+              pc._iceCandidateQueue = [];
+            }
           } catch (err) {
             console.error('[WebRTC Inbound Answer Error]', err);
           }
@@ -326,7 +409,12 @@ export default function ThreeWayCallRoom({
         const pc = peersRef.current[senderSocketId];
         if (pc && candidate) {
           try {
-            await pc.addIceCandidate(new RTCIceCandidate(candidate));
+            if (pc.remoteDescription && pc.remoteDescription.type) {
+              await pc.addIceCandidate(new RTCIceCandidate(candidate));
+            } else {
+              pc._iceCandidateQueue = pc._iceCandidateQueue || [];
+              pc._iceCandidateQueue.push(candidate);
+            }
           } catch (err) {
             console.warn('[WebRTC ICE Candidate Add Notice]:', err);
           }
@@ -420,8 +508,14 @@ export default function ThreeWayCallRoom({
 
           // Attach newly acquired local stream to any established peer connections
           Object.values(peersRef.current).forEach(pc => {
-            stream.getTracks().forEach(track => {
-              pc.addTrack(track, stream);
+            stream.getAudioTracks().forEach(track => {
+              const senders = pc.getSenders();
+              const audioSender = senders.find(s => (s.track && s.track.kind === 'audio') || (!s.track));
+              if (audioSender) {
+                audioSender.replaceTrack(track).catch(() => {});
+              } else {
+                pc.addTrack(track, stream);
+              }
             });
           });
 
@@ -1150,7 +1244,7 @@ export default function ThreeWayCallRoom({
 
         {/* Right Drawer: Live 3-Way Chat or Terminology Glossary */}
         {activeDrawer !== 'none' && (
-          <div className="w-80 md:w-96 border-l border-slate-800 bg-slate-900/95 flex flex-col z-10 shrink-0">
+          <div className="w-full sm:w-80 md:w-96 border-l border-slate-800 bg-slate-900/98 flex flex-col z-30 shrink-0 absolute sm:relative inset-y-0 right-0 shadow-2xl sm:shadow-none animate-fade-in">
             
             {/* Drawer Header */}
             <div className="p-3 border-b border-slate-800 flex items-center justify-between">
