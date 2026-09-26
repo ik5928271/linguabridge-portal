@@ -339,22 +339,24 @@ async function initMongo() {
       }
     }
 
-    // Sync Applications from MongoDB (Always guarantee all SEED_APPLICATIONS are preserved & merged with Mongo DB records)
+    // Sync Applications from MongoDB (MongoDB live data is the strict ground truth, seed apps only inserted if missing)
     const mongoApps = await db.collection('interpreter_applications').find({}).toArray();
-    let mergedApps = [...SEED_APPLICATIONS];
+    let mergedApps = [];
     if (mongoApps.length > 0) {
       const cleanMongoApps = mongoApps.map(({ _id, ...a }) => a);
-      cleanMongoApps.forEach(mApp => {
-        const existingIdx = mergedApps.findIndex(s => 
-          (s.id && s.id === mApp.id) || 
-          (s.email && mApp.email && s.email.toLowerCase().trim() === mApp.email.toLowerCase().trim())
+      mergedApps = [...cleanMongoApps];
+      // Only append seed apps if not present in MongoDB
+      SEED_APPLICATIONS.forEach(sApp => {
+        const exists = mergedApps.some(m => 
+          (m.id && m.id === sApp.id) || 
+          (m.email && sApp.email && m.email.toLowerCase().trim() === sApp.email.toLowerCase().trim())
         );
-        if (existingIdx >= 0) {
-          mergedApps[existingIdx] = { ...mergedApps[existingIdx], ...mApp };
-        } else {
-          mergedApps.unshift(mApp);
+        if (!exists) {
+          mergedApps.push(sApp);
         }
       });
+    } else {
+      mergedApps = [...SEED_APPLICATIONS];
     }
     store.interpreterApplications = deduplicateApplications(mergedApps);
 
@@ -379,16 +381,16 @@ async function initMongo() {
 
     // Sync Inquiries & Support Tickets from MongoDB
     const mongoInquiries = await db.collection('inquiries').find({}).toArray();
-    const mergedInquiries = [...store.inquiries];
+    let mergedInquiries = [];
     if (mongoInquiries.length > 0) {
-      mongoInquiries.forEach(({ _id, ...mInq }) => {
-        const existingIdx = mergedInquiries.findIndex(i => i.id === mInq.id);
-        if (existingIdx >= 0) {
-          mergedInquiries[existingIdx] = { ...mergedInquiries[existingIdx], ...mInq };
-        } else {
-          mergedInquiries.unshift(mInq);
+      mergedInquiries = mongoInquiries.map(({ _id, ...mInq }) => mInq);
+      SEED_INQUIRIES.forEach(sInq => {
+        if (!mergedInquiries.some(i => i.id === sInq.id)) {
+          mergedInquiries.push(sInq);
         }
       });
+    } else {
+      mergedInquiries = [...SEED_INQUIRIES];
     }
     store.inquiries = mergedInquiries;
     for (const inq of store.inquiries) {
@@ -3098,6 +3100,19 @@ io.on('connection', (socket) => {
       senderSocketId: socket.id,
       candidate
     });
+  });
+
+  // Live Audio Chunk Relay (Guarantees zero-drop voice audio across mobile 4G/5G, symmetric NAT, and restrictive firewalls)
+  socket.on('relay-audio-chunk', ({ roomId, audioData, mimeType, senderRole, senderName }) => {
+    if (roomId && audioData) {
+      socket.to(roomId).emit('relay-audio-chunk', {
+        senderSocketId: socket.id,
+        audioData,
+        mimeType,
+        senderRole,
+        senderName
+      });
+    }
   });
 
   // In-Call Multi-Party Chat
