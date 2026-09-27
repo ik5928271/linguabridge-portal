@@ -1,14 +1,15 @@
 {
-  "id": "/",
   "name": "LinguaBridge - On-Demand 3-Way Interpretation",
   "short_name": "LinguaBridge",
   "description": "Enterprise On-Demand 3-Way Video & Audio Interpretation Platform",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
   "orientation": "portrait-primary",
   "background_color": "#020617",
   "theme_color": "#020617",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icon-192.png",
