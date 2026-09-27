@@ -278,7 +278,7 @@ export default function ThreeWayCallRoom({
     return pc;
   };
 
-  // Global touch/click unblocker for mobile browsers
+  // Global touch/click and mobile screen-on/wake listener for unblocking audio & re-syncing connection
   useEffect(() => {
     const handleGlobalInteraction = () => {
       if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
@@ -294,13 +294,39 @@ export default function ThreeWayCallRoom({
       });
     };
 
+    const handleMobileWakeup = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('[Mobile Wakeup Detected] Reconnecting session and unlocking audio...');
+        handleGlobalInteraction();
+        const socket = getSocket();
+        if (socket) {
+          if (!socket.connected) {
+            socket.connect();
+          }
+          socket.emit('join-room', {
+            roomId,
+            role,
+            participantName: role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName,
+            language: targetLanguage,
+            specialty
+          });
+        }
+      }
+    };
+
     window.addEventListener('click', handleGlobalInteraction, { passive: true });
     window.addEventListener('touchstart', handleGlobalInteraction, { passive: true });
+    document.addEventListener('visibilitychange', handleMobileWakeup, { passive: true });
+    window.addEventListener('pageshow', handleMobileWakeup, { passive: true });
+    window.addEventListener('focus', handleMobileWakeup, { passive: true });
     return () => {
       window.removeEventListener('click', handleGlobalInteraction);
       window.removeEventListener('touchstart', handleGlobalInteraction);
+      document.removeEventListener('visibilitychange', handleMobileWakeup);
+      window.removeEventListener('pageshow', handleMobileWakeup);
+      window.removeEventListener('focus', handleMobileWakeup);
     };
-  }, []);
+  }, [roomId, role, hostName, interpreterName, patientName, targetLanguage, specialty]);
 
   // Connected Participants in this Room via Socket
   const [roomParticipants, setRoomParticipants] = useState([

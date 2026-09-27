@@ -96,18 +96,48 @@ export default function AIAssistantWidget({ currentUser = null, currentRole = 'h
     { label: '✉️ Inquiries & Rate Quotes', query: 'How do I request rates, billing, or custom organization proposals?' }
   ];
 
-  // Comprehensive Knowledge Base Engine
+  // Intelligent, Conversational Knowledge Base & Natural Response Engine
   const generateBotResponse = (query) => {
     const q = query.toLowerCase().trim();
+    const words = q.split(/\s+/).filter(Boolean);
 
-    if (q.includes('3-way') || q.includes('3 way') || q.includes('three way') || q.includes('call room') || q.includes('how it works') || q.includes('how does') || q.includes('connect patient') || q.includes('guest link') || q.includes('invite')) {
-      return `### 📞 How LinguaBridge 3-Way Calling Works:
-1. **Host Initiates**: The Host (e.g. Doctor, Attorney, or Customer Rep) selects their target language (e.g. Spanish, Russian, Arabic) and specialty.
-2. **Instant Match**: The system connects a verified, certified live interpreter into the encrypted WebRTC room in **under 15 seconds**.
-3. **Patient / Client Joins**: The host clicks **"Invite Patient"** to send an instant SMS or copy a direct guest join link. The third party joins on any phone or browser with zero downloads required!
-4. **Live Audio/Video**: Everyone communicates with crystal-clear 3-way simultaneous audio, video toggle, and live terminology glossary aids.`;
+    // 1. Natural Greetings & Salutations (Short & Friendly)
+    const isGreeting = 
+      q === 'hi' || q === 'hello' || q === 'hey' || q === 'salam' || q === 'assalam o alaikum' || 
+      q === 'aoa' || q === 'hola' || q === 'good morning' || q === 'good evening' || q === 'good afternoon' ||
+      words.includes('hi') || words.includes('hello') || words.includes('hey') || words.includes('salam');
+    
+    if (isGreeting && words.length <= 4 && !q.includes('rate') && !q.includes('price') && !q.includes('human') && !q.includes('call') && !q.includes('apply')) {
+      return `Hi! 👋 How can I help you today? You can ask me about our 3-way interpretation calls, finding an interpreter in 150+ languages, rates, or applying as a linguist.`;
     }
 
+    // 2. Casual / Well-being Inquiries ("how are you", "hope you ok")
+    if (q.includes('how are you') || q.includes('hope you ok') || q.includes('hope you are ok') || q.includes('how r u') || q.includes('how you doing') || q.includes('are you ok')) {
+      return `I'm doing great, thank you for asking! 😊 How can I assist you with LinguaBridge today?`;
+    }
+
+    // 3. Live Human / Admin Dispatch Requests ("any human available", "talk to human", "real person")
+    if (q.includes('human') || q.includes('real person') || q.includes('live agent') || q.includes('talk to someone') || q.includes('speak to human') || q.includes('admin') || q.includes('dispatch') || q.includes('support team') || q.includes('representative')) {
+      return `Yes, our **IK Enterprises Admin Dispatch** team is available! 🙋‍♂️\n\nYou can type your request or contact details right here in this chat, or email us directly:\n• 🏥 **Client & Enterprise Support**: \`iksale9817@gmail.com\`\n• 🗣️ **Interpreter Inquiries**: \`iksale9815@gmail.com\`\n\nHow can we help you right now?`;
+    }
+
+    // 4. Short conversational acknowledgments ("hmmm", "ok", "okay", "thanks", "thank you", "great", "got it")
+    if (q.includes('thank') || q.includes('thx')) {
+      return `You're very welcome! 😊 Let me know if you need anything else.`;
+    }
+    if (q === 'ok' || q === 'okay' || q === 'hmmm' || q === 'hmm' || q === 'k' || q === 'alright' || q === 'got it' || q === 'sure' || q === 'cool' || q === 'perfect' || q === 'yes' || q === 'no') {
+      return `Feel free to ask whenever you have a question! I'm here 24/7 to assist with calls, rates, or interpreter onboarding.`;
+    }
+    if (q.includes('bye') || q.includes('goodbye') || q.includes('see you')) {
+      return `Goodbye! Have a wonderful day, and feel free to reach out anytime you need live interpretation. 👋`;
+    }
+
+    // 5. 3-Way Conference Calling Workflows
+    if (q.includes('3-way') || q.includes('3 way') || q.includes('three way') || q.includes('how it works') || q.includes('how does it work') || q.includes('call room') || q.includes('connect patient') || q.includes('guest link') || q.includes('start call')) {
+      return `### 📞 How 3-Way Calling Works:\n1. **Select Language**: The Host (Doctor, Attorney, or Business) selects their target language and connects to a certified live interpreter in **under 15 seconds**.\n2. **Invite Guest**: Click **"Invite Patient / Guest"** to send an instant SMS or direct join link (no app download needed).\n3. **3-Way Real-Time Audio/Video**: All three parties communicate simultaneously in encrypted HD audio with terminology aids.`;
+    }
+
+    // 6. Pricing, Rates & Billing Queries
     const isPricingOrRateQuery = 
       q.includes('rate') || q.includes('rates') || 
       q.includes('charge') || q.includes('charges') || 
@@ -116,64 +146,35 @@ export default function AIAssistantWidget({ currentUser = null, currentRole = 'h
       q.includes('fee') || q.includes('fees') || 
       q.includes('how much') || q.includes('pay') || 
       q.includes('salary') || q.includes('hourly') || 
-      q.includes('per minute') || q.includes('minute') || 
+      q.includes('per minute') || q.includes('minute package') || 
       q.includes('earning') || q.includes('compensation') || 
       q.includes('quote') || q.includes('quotation') || 
-      q.includes('proposal') || q.includes('package') || 
-      q.includes('packages') || q.includes('wallet') || 
+      q.includes('proposal') || q.includes('wallet') || 
       q.includes('invoice') || q.includes('invoicing') || 
       q.includes('net 30') || q.includes('net-30') || 
-      q.includes('bill') || q.includes('billing') ||
-      q.includes('discount') || q.includes('deposit');
+      q.includes('billing') || q.includes('discount');
 
     if (isPricingOrRateQuery) {
-      return `### 📋 Official Pricing, Rates & Custom Quotes:
-All client rates, minute package pricing, and interpreter compensation agreements are **customized and provided separately** by **IK Enterprises Administration & Dispatch**.
-
-* **For Clients & Organizations (Hospitals, Clinics, Law Firms)**:
-  Custom rate sheets, prepaid bulk minute packages, and Net-30 enterprise invoicing terms are provided directly based on your monthly volume and language requirements.
-  📧 **Client Billing & Proposals**: \`iksale9817@gmail.com\`
-
-* **For Interpreters & Linguists**:
-  Compensation models (Live Talk, Scheduled Shifts, or Salary Base) are finalized privately during the credentialing and onboarding review.
-  📧 **Interpreter Relations & Rates**: \`iksale9815@gmail.com\`
-
-👇 **Please enter your details in the form below so Admin Dispatch can immediately send you the customized rate quote!**`;
+      return `### 📋 Pricing & Custom Rate Quotes:\nAll client minute package rates and interpreter compensation schedules are customized by **IK Enterprises Administration & Dispatch**:\n\n• 🏥 **For Clients (Hospitals, Clinics, Law Firms)**: Custom volume rate sheets & Net-30 enterprise terms via \`iksale9817@gmail.com\`.\n• 🗣️ **For Interpreters**: Per-minute, shift, and compensation models finalized via \`iksale9815@gmail.com\`.\n\nLeave your details below and Admin Dispatch will send your tailored proposal!`;
     }
 
-    if (q.includes('protocol') || q.includes('conduct') || q.includes('rule') || q.includes('standard') || q.includes('ethics') || q.includes('guideline') || q.includes('best practice')) {
-      return `### 📋 Interpretation Protocols & Professional Conduct:
-LinguaBridge enforces industry-standard protocols for high-stakes medical, legal, and enterprise sessions:
-1. **Consecutive Protocol**: The speaker pauses every 1–2 sentences for accurate, unhurried translation without interruption.
-2. **Direct First-Person Delivery**: Interpreters speak in the first person ("I have pain in my chest" rather than "She says she has pain").
-3. **Impartiality & Neutrality**: Interpreters maintain absolute professional neutrality, adding or omitting nothing.
-4. **Pre-Session Briefing**: The host can spend 30 seconds briefing the interpreter on case nuances before admitting the guest.
-5. **HIPAA & Confidentiality**: All dialogue is confidential; no medical recordings are retained without written patient authorization.`;
+    // 7. Supported Languages
+    if (q.includes('language') || q.includes('languages') || q.includes('spanish') || q.includes('arabic') || q.includes('urdu') || q.includes('russian') || q.includes('french') || q.includes('chinese') || q.includes('punjabi') || q.includes('pashto') || q.includes('hindi') || q.includes('vietnamese') || q.includes('korean')) {
+      return `🌐 We support **150+ languages** on demand, including Spanish, Arabic, Urdu, Russian, Mandarin, Cantonese, Pashto, Punjabi, French, Portuguese, Vietnamese, Somali, Korean, and many more.\n\nWould you like to connect with an interpreter for a specific language pair right now?`;
     }
 
-    if (q.includes('apply') || q.includes('profile') || q.includes('propio') || q.includes('credential') || q.includes('resume') || q.includes('cv') || q.includes('certif') || q.includes('join as interpreter') || q.includes('onboard') || q.includes('document')) {
-      return `### 👤 Interpreter Profile Setup & Onboarding:
-1. Click **"Apply as Interpreter"** on the top navigation bar.
-2. **Personal & Contact Info**: Enter your full name, email, phone number, and country.
-3. **Working Language Pairs**: Select your primary and secondary language pairs (e.g. English ⟷ Russian, Spanish, Arabic, Urdu, etc.).
-4. **Specialties & Certifications**: Select your areas of expertise (Medical, Legal, Immigration) and list your professional credentials.
-5. **Attach Verification Files**:
-   * **CV / Resume** (PDF/DOCX)
-   * **Training / Credential Certificate** (such as **Propio Healthcare Training**, CCHI/NBCMI, Court Certification, or Diploma).
-6. **Review & Approval**: Our **IK Enterprises Verification Board** reviews your application and documents. Once approved, your certified portal account is activated with your separate compensation schedule!
-📧 **Interpreter Onboarding Support**: \`iksale9815@gmail.com\``;
+    // 8. Interpreter Application & Onboarding
+    if (q.includes('apply') || q.includes('profile') || q.includes('propio') || q.includes('credential') || q.includes('resume') || q.includes('cv') || q.includes('certif') || q.includes('join as interpreter') || q.includes('onboard') || q.includes('job') || q.includes('hiring') || q.includes('document')) {
+      return `### 👤 Interpreter Application & Onboarding:\n1. Click **"Apply as Interpreter"** in the top navigation.\n2. Enter your working language pairs, specialties, and upload your **CV/Resume** and **Training Certificate** (e.g. Propio, CCHI/NBCMI, Court/Medical Certification).\n3. Our verification board reviews and approves applications within 24–48 hours.\n\n📧 Questions? Contact: \`iksale9815@gmail.com\``;
     }
 
-    return `Thank you for your question! LinguaBridge is an enterprise on-demand 3-way interpretation portal bridging Doctors, Patients, and Certified Interpreters in 150+ languages.
+    // 9. Interpretation Protocols & Standards
+    if (q.includes('protocol') || q.includes('conduct') || q.includes('rule') || q.includes('ethics') || q.includes('guideline') || q.includes('hipaa') || q.includes('confidential')) {
+      return `### 📋 Professional Interpretation Protocols:\n• **Consecutive Mode**: Speaker pauses every 1–2 sentences for accurate, unhurried translation.\n• **First-Person Delivery**: Interpreters speak directly as the speaker ("I feel dizzy").\n• **Strict Neutrality & Confidentiality**: 100% HIPAA-compliant, impartial, with nothing added or omitted.`;
+    }
 
-* **Workflows & 3-Way Calling**: Learn how instant calls, guest invites, and scheduled appointments operate.
-* **Protocols & Ethics**: Learn about clinical and court interpretation standards.
-* **Profile Setup**: Step-by-step guidance for interpreter applications and document uploads.
-* **Rates & Inquiries**: Pricing and compensation are provided separately by Admin Dispatch:
-  - 🏥 **For Clients**: \`iksale9817@gmail.com\`
-  - 🗣️ **For Interpreters**: \`iksale9815@gmail.com\`
-
-👇 **Please share your contact details below if you would like Admin Dispatch to reach out directly!**`;
+    // 10. Smart, concise fallback for unrecognized queries (Never repeating the huge generic block!)
+    return `I'm here to assist with **3-way interpretation calls**, finding interpreters in **150+ languages**, **rate quotes**, or **interpreter onboarding**.\n\nCould you please clarify your question, or leave your message here for our Admin Dispatch team?`;
   };
 
   // Quick Inline Lead Capture in Chat

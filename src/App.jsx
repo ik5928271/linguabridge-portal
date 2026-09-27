@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { PhoneCall, X, Radio, ArrowRight } from 'lucide-react';
 import Navbar from './components/Navbar';
 import LandingPage from './components/LandingPage';
 import HostDashboard from './components/HostDashboard';
@@ -64,8 +65,40 @@ export default function App() {
     return 'host';
   });
 
+  // Persistent Active Session state for live conference room (survives mobile sleep / page reload)
+  const [activeSession, setActiveSession] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('linguabridge_active_call_session') || localStorage.getItem('linguabridge_active_call_session');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.roomId && (!parsed.startedAt || Date.now() - parsed.startedAt < 4 * 3600 * 1000)) {
+          return parsed;
+        }
+      }
+    } catch {}
+    return {
+      roomId: 'room-demo-849',
+      role: 'host',
+      participantName: 'Dr. Sarah Jenkins, MD',
+      targetLanguage: 'Spanish',
+      specialty: 'Medical / Healthcare',
+      patientName: 'Carlos Hernandez',
+      hostName: 'Dr. Sarah Jenkins, MD',
+      callType: 'audio'
+    };
+  });
+
   const [currentView, setCurrentView] = useState(() => {
     try {
+      // If there is an active ongoing call that was interrupted by screen sleep / reload, resume directly to room!
+      const savedCall = sessionStorage.getItem('linguabridge_active_call_session') || localStorage.getItem('linguabridge_active_call_session');
+      if (savedCall) {
+        const parsed = JSON.parse(savedCall);
+        if (parsed && parsed.roomId && (!parsed.startedAt || Date.now() - parsed.startedAt < 4 * 3600 * 1000)) {
+          return 'room';
+        }
+      }
+
       const savedUser = localStorage.getItem('linguabridge_user');
       if (savedUser) {
         const u = JSON.parse(savedUser);
@@ -106,18 +139,6 @@ export default function App() {
       return updated;
     });
   };
-
-  // Active Session state for live conference room
-  const [activeSession, setActiveSession] = useState({
-    roomId: 'room-demo-849',
-    role: 'host',
-    participantName: 'Dr. Sarah Jenkins, MD',
-    targetLanguage: 'Spanish',
-    specialty: 'Medical / Healthcare',
-    patientName: 'Carlos Hernandez',
-    hostName: 'Dr. Sarah Jenkins, MD',
-    callType: 'audio'
-  });
 
   // Modals state
   const [isGlossaryOpen, setIsGlossaryOpen] = useState(false);
@@ -249,17 +270,28 @@ export default function App() {
   // Launch live conference room
   const handleStartCall = (sessionConfig) => {
     const chosenLang = sessionConfig?.targetLanguage || sessionConfig?.language || activeSession.targetLanguage || 'Urdu';
-    setActiveSession(prev => ({
-      ...prev,
+    const completeConfig = {
+      ...activeSession,
       ...sessionConfig,
       targetLanguage: chosenLang,
-      language: chosenLang
-    }));
+      language: chosenLang,
+      startedAt: Date.now()
+    };
+    setActiveSession(completeConfig);
+    try {
+      sessionStorage.setItem('linguabridge_active_call_session', JSON.stringify(completeConfig));
+      localStorage.setItem('linguabridge_active_call_session', JSON.stringify(completeConfig));
+    } catch {}
     setCurrentView('room');
   };
 
   // End live conference room
   const handleEndCall = (completedData) => {
+    try {
+      sessionStorage.removeItem('linguabridge_active_call_session');
+      localStorage.removeItem('linguabridge_active_call_session');
+    } catch {}
+
     const seconds = completedData?.seconds || 0;
     // 30-second grace period: If user enters and quits within 30 seconds, 0 minutes deducted (Test Check-in)
     const actualMinutesUsed = seconds < 30 ? 0 : Math.ceil(seconds / 60);
@@ -404,6 +436,42 @@ export default function App() {
           onOpenSchedule={() => setIsScheduleOpen(true)}
         />
       )}
+
+      {/* Persistent Live Call Rejoin Banner if user is on dashboard/search while call is active */}
+      {currentView !== 'room' && activeSession?.roomId && (() => {
+        try {
+          const saved = sessionStorage.getItem('linguabridge_active_call_session') || localStorage.getItem('linguabridge_active_call_session');
+          if (!saved) return null;
+          const parsed = JSON.parse(saved);
+          if (!parsed || !parsed.roomId || (parsed.startedAt && Date.now() - parsed.startedAt > 4 * 3600 * 1000)) return null;
+          return (
+            <div className="bg-gradient-to-r from-red-600 via-rose-600 to-red-700 text-white px-4 py-2.5 shadow-2xl flex items-center justify-between z-50 sticky top-0 border-b border-red-400/40">
+              <div className="flex items-center gap-2.5 text-xs font-bold">
+                <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping shrink-0" />
+                <span>🔴 3-Party Interpretation Call in Progress (Room: {parsed.roomId})</span>
+                <span className="hidden sm:inline opacity-80">• {parsed.targetLanguage || 'Live Language'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentView('room')}
+                  className="px-3.5 py-1.5 rounded-xl bg-white text-red-700 font-extrabold text-xs shadow hover:bg-slate-100 transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <PhoneCall className="w-3.5 h-3.5 text-red-600" />
+                  <span>Rejoin Call Room</span>
+                </button>
+                <button
+                  onClick={() => handleEndCall({ roomId: parsed.roomId, seconds: 0 })}
+                  className="px-2.5 py-1.5 rounded-xl bg-black/30 hover:bg-black/50 text-white font-bold text-xs transition cursor-pointer"
+                >
+                  End Call
+                </button>
+              </div>
+            </div>
+          );
+        } catch {
+          return null;
+        }
+      })()}
 
       {/* Main Content Body */}
       <main className="flex-1">
