@@ -230,6 +230,25 @@ export default function ThreeWayCallRoom({
       }
     };
 
+    // Handle negotiation needed when tracks are dynamically added
+    pc.onnegotiationneeded = async () => {
+      try {
+        if (pc.signalingState !== 'stable') return;
+        const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
+        if (pc.signalingState !== 'stable') return;
+        await pc.setLocalDescription(offer);
+        if (socket) {
+          socket.emit('webrtc-offer', {
+            targetSocketId,
+            offer,
+            senderInfo: { role, name: role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName }
+          });
+        }
+      } catch (err) {
+        console.warn('[WebRTC Negotiation Warning]:', err.message);
+      }
+    };
+
     // When remote live audio stream arrives, play it immediately!
     pc.ontrack = (event) => {
       console.log('[WebRTC Live Audio Stream Received]:', targetSocketId, event.streams);
@@ -327,6 +346,32 @@ export default function ThreeWayCallRoom({
       window.removeEventListener('focus', handleMobileWakeup);
     };
   }, [roomId, role, hostName, interpreterName, patientName, targetLanguage, specialty]);
+
+  // Mobile Screen WakeLock (Keeps screen awake on mobile during live 3-way call)
+  useEffect(() => {
+    let wakeLock = null;
+    const requestLock = async () => {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+        }
+      } catch (e) {}
+    };
+    requestLock();
+
+    const handleVisChange = () => {
+      if (document.visibilityState === 'visible') {
+        requestLock();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisChange);
+      if (wakeLock) {
+        wakeLock.release().catch(() => {});
+      }
+    };
+  }, []);
 
   // Connected Participants in this Room via Socket
   const [roomParticipants, setRoomParticipants] = useState([
@@ -680,13 +725,13 @@ export default function ThreeWayCallRoom({
                   let hasVoice = false;
                   for (let i = 0; i < len; i++) {
                     const s = Math.max(-1, Math.min(1, inputData[i]));
-                    if (Math.abs(s) > 0.001) hasVoice = true;
+                    if (Math.abs(s) > 0.0003) hasVoice = true;
                     pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
                   }
 
                   if (hasVoice) {
                     const s = getSocket();
-                    if (s) {
+                    if (s && s.connected) {
                       s.emit('live-pcm-audio-chunk', {
                         roomId,
                         pcmData: Array.from(pcm16),

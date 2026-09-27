@@ -33,7 +33,8 @@ export default function Navbar({
   onLogout,
   onOpenGlossary,
   onOpenSchedule,
-  onOpenInterpreterApplication
+  onOpenInterpreterApplication,
+  onInstallPwa
 }) {
   const [showUserMenu, setShowUserMenu] = useState(false);
 
@@ -287,6 +288,19 @@ export default function Navbar({
 
 
 
+                  {onInstallPwa && (
+                    <button
+                      onClick={() => {
+                        onInstallPwa();
+                        setShowUserMenu(false);
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-sky-500/20 text-sky-400 font-bold flex items-center gap-2 transition cursor-pointer"
+                    >
+                      <Zap className="w-4 h-4 text-sky-400" />
+                      <span>Install Mobile App</span>
+                    </button>
+                  )}
+
                   <button
                     onClick={() => {
                       onLogout();
@@ -305,6 +319,18 @@ export default function Navbar({
             /* Clean Visitor Actions: Apply as Interpreter + Single Unified Sign In */
             <div className="flex items-center gap-2">
               
+              {/* 0. Mobile App Install Button */}
+              {onInstallPwa && (
+                <button
+                  onClick={onInstallPwa}
+                  className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-sky-400 text-xs font-bold border border-sky-500/30 transition shadow-sm cursor-pointer"
+                  title="Install LinguaBridge on your Mobile or Desktop"
+                >
+                  <Zap className="w-3.5 h-3.5 text-sky-400" />
+                  <span>Install App</span>
+                </button>
+              )}
+
               {/* 1. Apply as Interpreter Button */}
               <button
                 onClick={() => {

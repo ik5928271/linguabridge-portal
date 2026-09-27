@@ -44,7 +44,6 @@ export default function App() {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark');
   };
 
-  // Navigation & Role states
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const saved = localStorage.getItem('linguabridge_user');
@@ -53,6 +52,123 @@ export default function App() {
       return null;
     }
   });
+
+  // Mobile App PWA Install Prompt State
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showPwaBanner, setShowPwaBanner] = useState(false);
+  const [isIos, setIsIos] = useState(false);
+  const [showIosGuide, setShowIosGuide] = useState(false);
+
+  useEffect(() => {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+    if (isStandalone) return;
+
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    const isIosDevice = /iphone|ipad|ipod/.test(userAgent);
+    setIsIos(isIosDevice);
+
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowPwaBanner(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallPwa = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setShowPwaBanner(false);
+      }
+      setDeferredPrompt(null);
+    } else if (isIos) {
+      setShowIosGuide(true);
+    } else {
+      alert('To install on your mobile device, open your browser menu (⋮) and tap "Install App" or "Add to Home Screen".');
+    }
+  };
+
+  // Global Screen Wake Lock (Keeps screen awake while app is open in foreground; releases when in background so screen can sleep)
+  useEffect(() => {
+    let wakeLockSentinel = null;
+
+    const requestWakeLock = async () => {
+      try {
+        if ('wakeLock' in navigator && document.visibilityState === 'visible') {
+          wakeLockSentinel = await navigator.wakeLock.request('screen');
+          console.log('[Screen WakeLock] Active - screen will stay on while app is open');
+        }
+      } catch (err) {
+        console.log('[Screen WakeLock Notice]:', err.message);
+      }
+    };
+
+    requestWakeLock();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        requestWakeLock();
+      } else {
+        if (wakeLockSentinel) {
+          wakeLockSentinel.release().catch(() => {});
+          wakeLockSentinel = null;
+          console.log('[Screen WakeLock] Released - screen can sleep while app is in background');
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', requestWakeLock);
+    window.addEventListener('pageshow', requestWakeLock);
+
+    // Request Native Notifications permission on user touch/load
+    if ('Notification' in window && Notification.permission === 'default') {
+      const askPermission = () => {
+        Notification.requestPermission().catch(() => {});
+        window.removeEventListener('click', askPermission);
+        window.removeEventListener('touchstart', askPermission);
+      };
+      window.addEventListener('click', askPermission, { once: true });
+      window.addEventListener('touchstart', askPermission, { once: true });
+    }
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', requestWakeLock);
+      window.removeEventListener('pageshow', requestWakeLock);
+      if (wakeLockSentinel) {
+        wakeLockSentinel.release().catch(() => {});
+      }
+    };
+  }, []);
+
+  // Helper to send native push/browser notifications when app is running in backend/background
+  const triggerBackgroundNotification = (title, body, url = '/') => {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+    if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+      navigator.serviceWorker.ready.then(registration => {
+        registration.showNotification(title, {
+          body,
+          icon: '/icon-192.svg',
+          badge: '/icon-192.svg',
+          vibrate: [300, 100, 300, 100, 300],
+          requireInteraction: true,
+          data: { url }
+        });
+      }).catch(() => {
+        new Notification(title, { body, icon: '/icon-192.svg' });
+      });
+    } else {
+      new Notification(title, { body, icon: '/icon-192.svg' });
+    }
+  };
 
   const [currentRole, setCurrentRole] = useState(() => {
     try {
@@ -208,27 +324,89 @@ export default function App() {
       socket.on('new-appointment-created', (newApt) => {
         if (newApt && newApt.id) {
           setAppointments(prev => [newApt, ...prev.filter(a => a.id !== newApt.id)]);
+          if (document.visibilityState === 'hidden') {
+            triggerBackgroundNotification(
+              '📅 New 3-Way Appointment Scheduled',
+              `Appointment booked for ${newApt.language || 'Interpretation'} on ${newApt.date || 'today'} at ${newApt.time || 'now'}.`,
+              '/'
+            );
+          }
+        }
+      });
+
+      // Background Alert for Incoming Live Calls & Dispatches (triggers phone notification when screen is off)
+      socket.on('incoming-call-alert', (dispatch) => {
+        if (document.visibilityState === 'hidden') {
+          triggerBackgroundNotification(
+            '📞 Incoming 3-Way Interpretation Call',
+            `Live request from ${dispatch.hostName || 'Client'} for ${dispatch.targetLanguage || 'Language'} interpretation. Tap to accept.`,
+            `/?roomId=${dispatch.roomId}&role=interpreter`
+          );
+        }
+      });
+
+      socket.on('incoming-dispatch-call', (dispatch) => {
+        if (document.visibilityState === 'hidden') {
+          triggerBackgroundNotification(
+            '📞 Incoming 3-Way Interpretation Call',
+            `Live request from ${dispatch.hostName || 'Client'} for ${dispatch.targetLanguage || 'Language'} interpretation. Tap to accept.`,
+            `/?roomId=${dispatch.roomId}&role=interpreter`
+          );
+        }
+      });
+
+      socket.on('client-waiting-in-room', (alertData) => {
+        if (document.visibilityState === 'hidden') {
+          triggerBackgroundNotification(
+            '🌐 Client Waiting in Room',
+            `Client is waiting for a ${alertData.targetLanguage || 'Language'} interpreter in room ${alertData.roomId}. Tap to connect!`,
+            `/?roomId=${alertData.roomId}&role=interpreter`
+          );
         }
       });
     }
   }, []);
 
-  // Sync user presence with socket server
+  // Sync user presence with socket server (with continuous heartbeat & mobile screen wake listeners)
   useEffect(() => {
-    const socket = getSocket();
-    if (socket && currentUser) {
-      socket.emit('register-user', {
-        userId: currentUser.id,
-        role: currentUser.role || (currentRole === 'host' ? 'host' : currentRole),
-        name: currentUser.name,
-        email: currentUser.email,
-        language: currentUser.primaryLang || currentUser.language || 'English',
-        org: currentUser.org || '',
-        specialty: currentUser.specialty || '',
-        badgeNumber: currentUser.badgeNumber || '',
-        phone: currentUser.phone || ''
-      });
-    }
+    const syncPresence = () => {
+      const socket = getSocket();
+      if (socket && currentUser) {
+        if (!socket.connected) {
+          socket.connect();
+        }
+        socket.emit('register-user', {
+          userId: currentUser.id,
+          role: currentUser.role || (currentRole === 'host' ? 'host' : currentRole),
+          name: currentUser.name,
+          email: currentUser.email,
+          language: currentUser.primaryLang || currentUser.language || 'English',
+          org: currentUser.org || '',
+          specialty: currentUser.specialty || '',
+          badgeNumber: currentUser.badgeNumber || '',
+          phone: currentUser.phone || ''
+        });
+      }
+    };
+
+    syncPresence();
+    const interval = setInterval(syncPresence, 20000); // 20s persistent heartbeat
+    const handleVis = () => {
+      if (document.visibilityState === 'visible') {
+        syncPresence();
+      }
+    };
+
+    window.addEventListener('focus', syncPresence);
+    window.addEventListener('pageshow', syncPresence);
+    document.addEventListener('visibilitychange', handleVis);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', syncPresence);
+      window.removeEventListener('pageshow', syncPresence);
+      document.removeEventListener('visibilitychange', handleVis);
+    };
   }, [currentUser, currentRole]);
 
   // Read URL query parameters for direct guest join links (e.g. ?view=guest&roomId=xyz&lang=es)
@@ -434,6 +612,7 @@ export default function App() {
           setOnlineStatus={setOnlineStatus}
           onOpenGlossary={() => setIsGlossaryOpen(true)}
           onOpenSchedule={() => setIsScheduleOpen(true)}
+          onInstallPwa={handleInstallPwa}
         />
       )}
 
@@ -592,6 +771,67 @@ export default function App() {
           currentUser={currentUser}
           currentRole={currentRole}
         />
+      )}
+
+      {/* PWA Mobile App Install Prompt Bar / Floating Trigger */}
+      {showPwaBanner && currentView !== 'room' && (
+        <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-md z-40 bg-slate-900/95 border border-sky-500/40 backdrop-blur-xl p-4 rounded-2xl shadow-2xl shadow-sky-500/10 flex items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom duration-300">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-600 to-sky-400 flex items-center justify-center text-white text-lg font-bold shadow-md shrink-0">
+              🌐
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-white truncate">Install LinguaBridge App</p>
+              <p className="text-[11px] text-slate-400 truncate">1-Tap instant access & screen keep-alive</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={handleInstallPwa}
+              className="px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs shadow-md transition"
+            >
+              Install App
+            </button>
+            <button
+              onClick={() => setShowPwaBanner(false)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* iOS Add-to-Home-Screen Step-by-Step Guide Modal */}
+      {showIosGuide && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="max-w-sm w-full bg-slate-900 border border-slate-700 rounded-3xl p-6 shadow-2xl text-center space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-sky-500/20 text-sky-400 flex items-center justify-center mx-auto text-2xl font-bold">
+              📲
+            </div>
+            <h3 className="text-base font-bold text-white">Install on iPhone / iPad</h3>
+            <div className="text-xs text-slate-300 text-left space-y-2 bg-slate-950/60 p-4 rounded-xl border border-slate-800">
+              <p className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-sky-500/20 text-sky-400 font-bold flex items-center justify-center text-[10px]">1</span>
+                <span>Tap the <strong>Share</strong> button (box with arrow) in Safari.</span>
+              </p>
+              <p className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-sky-500/20 text-sky-400 font-bold flex items-center justify-center text-[10px]">2</span>
+                <span>Scroll down and select <strong>"Add to Home Screen"</strong>.</span>
+              </p>
+              <p className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-sky-500/20 text-sky-400 font-bold flex items-center justify-center text-[10px]">3</span>
+                <span>Tap <strong>"Add"</strong> in the top-right corner to finish.</span>
+              </p>
+            </div>
+            <button
+              onClick={() => setShowIosGuide(false)}
+              className="w-full py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs transition shadow-lg"
+            >
+              Got it!
+            </button>
+          </div>
+        </div>
       )}
 
     </div>
