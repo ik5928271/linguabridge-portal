@@ -2202,7 +2202,11 @@ app.post('/api/inquiries/clear', async (req, res) => {
       } catch (e) {}
     }
   } else if (type === 'ai_chats') {
-    const idsToDelete = (store.inquiries || []).filter(i => i.category === 'AI Chat Assistant' || (i.subject && i.subject.startsWith('AI Chat:'))).map(i => i.id);
+    const idsToDelete = (store.inquiries || []).filter(i => 
+      i.category === 'AI Chat Assistant' || 
+      i.category === 'AI Concierge & Live Chat' || 
+      (i.subject && (i.subject.startsWith('AI Chat:') || i.subject.startsWith('💬 Live Guest Chat')))
+    ).map(i => i.id);
     store.inquiries = (store.inquiries || []).filter(i => !idsToDelete.includes(i.id));
     if (db) {
       try {
@@ -2228,6 +2232,139 @@ app.post('/api/inquiries/clear', async (req, res) => {
   saveStore();
   io.emit('inquiries-cleared', { type });
   res.json({ success: true, message: 'Inquiries cleared successfully.' });
+});
+
+// ==========================================
+// 🤖 GOOGLE GEMINI 1.5 FLASH AI ENGINE API
+// ==========================================
+
+const GEMINI_SYSTEM_INSTRUCTION = `You are LinguaBot, the intelligent, warm, and highly capable AI Concierge for LinguaBridge (a premier on-demand 3-way live interpretation platform operated by IK Enterprises).
+
+CORE BUSINESS CONTEXT:
+1. 3-Way Live Interpretation Calling:
+   - Connects Host (Doctor, Attorney, or Enterprise), Patient / Guest, and a Certified Live Interpreter in under 15 seconds.
+   - Dual-engine audio streaming with instant guest invite links via SMS or Direct Web URL (no app download required).
+   - Real-time clinical/legal terminology and secure HIPAA-compliant encrypted channels.
+
+2. Languages & On-Demand Support:
+   - Over 150+ languages supported on demand (including Spanish, Arabic, Urdu, Russian, Mandarin, Cantonese, Pashto, Punjabi, French, Portuguese, Vietnamese, Somali, Korean, Tagalog, and more).
+
+3. Rates, Custom Quotes & Dispatch Support:
+   - Custom client minute packages and enterprise contracts are customized by IK Enterprises Administration.
+   - Client & Enterprise support email: iksale9817@gmail.com
+   - Interpreter recruitment & credential inquiries: iksale9815@gmail.com
+   - Always encourage visitors to leave their name, email, or WhatsApp phone number in the chat so Admin Dispatch can follow up with tailored proposals.
+
+4. Interpreter Onboarding & Propio Integration:
+   - Interpreters can click "Apply as Interpreter" in the header to submit their language pairs, shift availability, CV/Resume, and certification credentials (Propio, CCHI/NBCMI, Medical/Court certified).
+   - Verification board reviews applications within 24–48 hours.
+
+RESPONSE GUIDELINES:
+- Keep replies concise, helpful, friendly, and natural.
+- When the user greets (e.g. "hi", "hello", "salam", "hey"), reply with a short friendly greeting asking how you can assist with interpretation, rates, or linguist onboarding.
+- Respond in the same language the user is speaking (English, Spanish, Urdu, Arabic, French, etc.).
+- Format with clean Markdown (bullet points, bold highlights) for readability.`;
+
+app.post('/api/ai/chat', async (req, res) => {
+  const { query, messages = [] } = req.body;
+  const userText = (query || (Array.isArray(messages) && messages.filter(m => m.sender === 'user').slice(-1)[0]?.text) || '').trim();
+
+  if (!userText) {
+    return res.status(400).json({ error: 'Query or user message is required.' });
+  }
+
+  const apiKey = (process.env.GEMINI_API_KEY || store.geminiApiKey || '').trim();
+
+  if (!apiKey) {
+    return res.json({ 
+      success: false, 
+      fallback: true, 
+      message: 'GEMINI_API_KEY is not configured on server.' 
+    });
+  }
+
+  try {
+    const contents = [];
+    const recentHistory = (Array.isArray(messages) ? messages : []).slice(-8);
+    
+    recentHistory.forEach(msg => {
+      if (!msg || !msg.text) return;
+      if (msg.id === 'msg-welcome' || msg.category === 'welcome') return;
+      contents.push({
+        role: msg.sender === 'user' ? 'user' : 'model',
+        parts: [{ text: msg.text }]
+      });
+    });
+
+    if (contents.length === 0 || contents[contents.length - 1].role !== 'user') {
+      contents.push({
+        role: 'user',
+        parts: [{ text: userText }]
+      });
+    }
+
+    const payload = {
+      system_instruction: {
+        parts: [{ text: GEMINI_SYSTEM_INSTRUCTION }]
+      },
+      contents: contents,
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 600,
+        topP: 0.95
+      }
+    };
+
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const response = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+
+    if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+      const botReply = data.candidates[0].content.parts[0].text;
+      return res.json({
+        success: true,
+        reply: botReply,
+        model: 'gemini-2.5-flash'
+      });
+    } else {
+      console.warn('[Gemini API Response Warning]:', data.error || data);
+      return res.json({ 
+        success: false, 
+        fallback: true, 
+        error: data.error?.message || 'Gemini model did not return text candidate.' 
+      });
+    }
+  } catch (error) {
+    console.error('[Gemini API Exception]:', error.message);
+    return res.json({ 
+      success: false, 
+      fallback: true, 
+      error: error.message 
+    });
+  }
+});
+
+// Admin Gemini Key Management
+app.get('/api/admin/settings/gemini-key', (req, res) => {
+  const currentKey = (process.env.GEMINI_API_KEY || store.geminiApiKey || '').trim();
+  res.json({ 
+    configured: Boolean(currentKey),
+    maskedKey: currentKey ? `${currentKey.slice(0, 6)}...${currentKey.slice(-4)}` : ''
+  });
+});
+
+app.post('/api/admin/settings/gemini-key', (req, res) => {
+  const { apiKey } = req.body;
+  if (apiKey !== undefined) {
+    store.geminiApiKey = apiKey.trim();
+    saveStore();
+  }
+  res.json({ success: true, message: 'Gemini API key updated successfully.' });
 });
 
 // ==========================================
