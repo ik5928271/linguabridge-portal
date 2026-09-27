@@ -1,0 +1,39 @@
+{
+  "name": "LinguaBridge - On-Demand 3-Way Interpretation",
+  "short_name": "LinguaBridge",
+  "description": "Enterprise On-Demand 3-Way Video & Audio Interpretation Platform",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#020617",
+  "theme_color": "#0f8ce9",
+  "icons": [
+    {
+      "src": "/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "communication", "medical", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Quick Connect Call",
+      "short_name": "Instant Call",
+      "description": "Connect instantly with a live certified interpreter",
+      "url": "/?action=quickcall"
+    },
+    {
+      "name": "Interpreter Dashboard",
+      "short_name": "Interpreter",
+      "description": "Log into Interpreter Portal",
+      "url": "/?role=interpreter"
+    }
+  ]
+}
