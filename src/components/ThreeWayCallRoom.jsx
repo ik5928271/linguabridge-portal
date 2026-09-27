@@ -167,21 +167,6 @@ export default function ThreeWayCallRoom({
             setShowAudioUnlockNotice(true);
           });
       }
-
-      // Route via Web Audio destination as secondary unblockable engine
-      try {
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        if (AudioCtx) {
-          if (!playbackCtxRef.current || playbackCtxRef.current.state === 'closed') {
-            playbackCtxRef.current = new AudioCtx();
-          }
-          if (playbackCtxRef.current.state === 'suspended') {
-            playbackCtxRef.current.resume().catch(() => {});
-          }
-          const src = playbackCtxRef.current.createMediaStreamSource(stream);
-          src.connect(playbackCtxRef.current.destination);
-        }
-      } catch (e) {}
     } catch (err) {
       console.warn('[Remote Audio Playback Notice]:', err);
     }
@@ -704,7 +689,7 @@ export default function ThreeWayCallRoom({
                     if (s) {
                       s.emit('live-pcm-audio-chunk', {
                         roomId,
-                        pcmData: pcm16.buffer,
+                        pcmData: Array.from(pcm16),
                         sampleRate: audioCtx.sampleRate,
                         senderRole: role,
                         senderName: role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName
