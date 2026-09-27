@@ -2869,11 +2869,22 @@ app.get('/api/glossary', (req, res) => {
 });
 
 // ==========================================
-// Active Live Online Presence Tracking
-const activePresence = new Map();
+// ==========================================
+// Active Live Online Presence Tracking (Session & User-Aware with Mobile Sleep Grace Period)
+const activePresence = new Map(); // userId -> PresenceObject
+const socketToUser = new Map(); // socketId -> userId
+const disconnectTimeouts = new Map(); // userId -> timeoutId
+const roomDisconnectTimeouts = new Map(); // roomId -> timeoutId
 
 function broadcastPresence() {
-  const onlineList = Array.from(activePresence.values());
+  const now = Date.now();
+  const onlineList = Array.from(activePresence.values()).filter(u => {
+    // Keep user online if connected, or if disconnected within 5 minutes grace period
+    if (u.status === 'online' || u.status === 'on_call') return true;
+    if (u.disconnectedAt && (now - u.disconnectedAt < 5 * 60 * 1000)) return true;
+    return false;
+  });
+
   io.emit('online-presence-updated', {
     total: onlineList.length,
     users: onlineList,
@@ -2975,33 +2986,85 @@ io.on('connection', (socket) => {
 
   // Register user info on socket & add to active presence
   socket.on('register-user', ({ role = 'guest', userId, name, email, language, org, specialty, badgeNumber, phone }) => {
+    const resolvedUserId = userId || (email ? email.toLowerCase().trim() : '') || `usr-${socket.id.substring(0, 6)}`;
     socket.userRole = role;
-    socket.userId = userId;
+    socket.userId = resolvedUserId;
     socket.userName = name;
     socket.userLang = language;
     
-    activePresence.set(socket.id, {
+    socketToUser.set(socket.id, resolvedUserId);
+
+    // Cancel any pending disconnect grace timeout
+    if (disconnectTimeouts.has(resolvedUserId)) {
+      clearTimeout(disconnectTimeouts.get(resolvedUserId));
+      disconnectTimeouts.delete(resolvedUserId);
+    }
+
+    const existing = activePresence.get(resolvedUserId) || {};
+    activePresence.set(resolvedUserId, {
+      ...existing,
       socketId: socket.id,
-      userId: userId || `usr-${socket.id.substring(0, 6)}`,
+      userId: resolvedUserId,
       role: (role || 'guest').toLowerCase(),
-      name: name || 'Online User',
-      email: email || '',
-      language: language || 'English',
-      org: org || '',
-      specialty: specialty || 'General',
-      badgeNumber: badgeNumber || '',
-      phone: phone || '',
-      connectedAt: new Date().toISOString(),
-      status: 'online'
+      name: name || existing.name || 'Online User',
+      email: email || existing.email || '',
+      language: language || existing.language || 'English',
+      org: org || existing.org || '',
+      specialty: specialty || existing.specialty || 'General',
+      badgeNumber: badgeNumber || existing.badgeNumber || '',
+      phone: phone || existing.phone || '',
+      lastSeen: Date.now(),
+      connectedAt: existing.connectedAt || new Date().toISOString(),
+      status: existing.inCall ? 'on_call' : 'online',
+      disconnectedAt: null
     });
     broadcastPresence();
   });
 
   socket.on('disconnect', () => {
-    activePresence.delete(socket.id);
-    broadcastPresence();
-    if (socket.currentRoom) {
-      handleLeaveRoom(socket, socket.currentRoom);
+    const userId = socketToUser.get(socket.id);
+    socketToUser.delete(socket.id);
+
+    if (userId && activePresence.has(userId)) {
+      const userPres = activePresence.get(userId);
+      userPres.disconnectedAt = Date.now();
+      // Keep presence in online standby state for 60 minutes to prevent mobile sleep drop-offs
+      if (disconnectTimeouts.has(userId)) {
+        clearTimeout(disconnectTimeouts.get(userId));
+      }
+      const timeoutId = setTimeout(() => {
+        activePresence.delete(userId);
+        disconnectTimeouts.delete(userId);
+        broadcastPresence();
+      }, 60 * 60 * 1000); // 60 minutes background standby
+      disconnectTimeouts.set(userId, timeoutId);
+    }
+
+    if (socket.currentRoom && activeRooms[socket.currentRoom]) {
+      const roomId = socket.currentRoom;
+      const room = activeRooms[roomId];
+      const p = room.participants.find(part => part.socketId === socket.id);
+      if (p) {
+        p.isTempDisconnected = true;
+        p.disconnectedAt = Date.now();
+        socket.to(roomId).emit('participant-sleeping', { socketId: socket.id, role: p.role, name: p.name });
+      }
+
+      // Start a 3-minute grace period for the call room before terminating
+      if (!roomDisconnectTimeouts.has(roomId)) {
+        const rTimeout = setTimeout(() => {
+          if (activeRooms[roomId]) {
+            const allGone = activeRooms[roomId].participants.every(part => part.isTempDisconnected);
+            if (allGone) {
+              delete activeRooms[roomId];
+              io.emit('call-session-ended', { roomId });
+              broadcastActiveRooms();
+            }
+          }
+          roomDisconnectTimeouts.delete(roomId);
+        }, 3 * 60 * 1000);
+        roomDisconnectTimeouts.set(roomId, rTimeout);
+      }
     }
   });
 
@@ -3366,8 +3429,8 @@ function handleLeaveRoom(socket, roomId) {
     socket.to(roomId).emit('participant-left', { socketId: socket.id, role: leavingRole, name: socket.userName });
     socket.leave(roomId);
 
-    // If an interpreter finishes and leaves, or if no participants remain, close the room
-    if (activeRooms[roomId].participants.length === 0 || leavingRole === 'interpreter') {
+    // Only close room if all participants have left
+    if (activeRooms[roomId].participants.length === 0) {
       delete activeRooms[roomId];
       // Clean up dispatches
       Object.keys(activeDispatches).forEach(dId => {
@@ -3376,15 +3439,16 @@ function handleLeaveRoom(socket, roomId) {
           io.emit('call-claimed', { dispatchId: dId, roomId });
         }
       });
-      io.to(roomId).emit('call-session-ended', { roomId, endedBy: leavingRole || 'interpreter' });
+      io.to(roomId).emit('call-session-ended', { roomId, endedBy: leavingRole || 'user' });
       io.emit('call-session-ended', { roomId });
     }
     broadcastActiveRooms();
   }
 
   // Restore presence to online (not on call)
-  const presence = activePresence.get(socket.id);
-  if (presence) {
+  const userId = socketToUser.get(socket.id) || socket.userId;
+  if (userId && activePresence.has(userId)) {
+    const presence = activePresence.get(userId);
     presence.status = 'online';
     presence.inCall = false;
     presence.activeRoomId = null;
