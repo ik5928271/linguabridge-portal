@@ -1,5 +1,5 @@
 // LinguaBridge Service Worker - PWA Mobile App Support
-const CACHE_NAME = 'linguabridge-pwa-v4';
+const CACHE_NAME = 'linguabridge-pwa-v5';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
