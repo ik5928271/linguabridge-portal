@@ -14,7 +14,7 @@
     <meta name="application-name" content="LinguaBridge" />
     <meta name="msapplication-TileColor" content="#020617" />
     <title>LinguaBridge - 3-Party Interpreter Connection Portal</title>
-    <!-- Lightweight Legacy Mobile Browser Polyfill -->
+    <!-- Lightweight Legacy Mobile Browser Polyfill & Process Shim -->
     <script>
       (function() {
         if (typeof window.globalThis === 'undefined') {
@@ -23,6 +23,9 @@
         if (typeof window.global === 'undefined') {
           window.global = window;
         }
+        if (typeof window.process === 'undefined') {
+          window.process = { env: { NODE_ENV: 'production' } };
+        }
       })();
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -30,7 +33,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Google AdSense Verification & Library -->
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7848335022850228" crossorigin="anonymous"></script>
-    <script type="module" crossorigin src="/assets/index-D5pSXUgY.js"></script>
+    <script type="module" crossorigin src="/assets/index-BP4pKBUM.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-D862j5nl.css">
   </head>
   <body class="bg-slate-950 text-slate-100 min-h-screen antialiased selection:bg-brand-500 selection:text-white font-['Plus_Jakarta_Sans',sans-serif]">
