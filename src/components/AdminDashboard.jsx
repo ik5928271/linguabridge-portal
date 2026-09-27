@@ -1470,7 +1470,11 @@ export default function AdminDashboard({
     if (!confirm(`Are you sure you want to permanently delete ${label}? This cannot be undone.`)) return;
     
     if (type === 'ai_chats') {
-      setInquiriesList(prev => prev.filter(i => i.category !== 'AI Chat Assistant' && !(i.subject && i.subject.startsWith('AI Chat:'))));
+      setInquiriesList(prev => prev.filter(i => 
+        i.category !== 'AI Chat Assistant' && 
+        i.category !== 'AI Concierge & Live Chat' && 
+        !(i.subject && (i.subject.startsWith('AI Chat:') || i.subject.startsWith('💬 Live Guest Chat')))
+      ));
     } else if (type === 'resolved') {
       setInquiriesList(prev => prev.filter(i => i.status !== 'resolved'));
     } else if (type === 'all') {
@@ -4062,86 +4066,116 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
 
                       {/* Conversation Stream (WhatsApp Chat Bubbles UI) */}
                       <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px]">
-                        
-                        {/* Initial User Inquiry Message Bubble */}
-                        <div className="flex items-start gap-2.5 max-w-[85%]">
-                          <div className="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-slate-300 shrink-0 mt-0.5">
-                            {activeInquiry.userName?.charAt(0)?.toUpperCase() || 'U'}
-                          </div>
-                          <div className="p-3.5 rounded-2xl rounded-tl-sm bg-slate-900 border border-slate-700/80 text-xs text-slate-100 shadow-md space-y-1">
-                            <div className="flex items-center justify-between gap-3 text-[10px] font-bold text-cyan-300">
-                              <span>{activeInquiry.userName || 'Client'}</span>
-                              <span className="text-slate-400 font-normal">
-                                {formatBubbleTimestamp(activeInquiry.createdAt)}
-                              </span>
-                            </div>
-                            <p className="whitespace-pre-line leading-relaxed text-xs">
-                              {activeInquiry.message}
-                            </p>
-                          </div>
-                        </div>
+                        {(() => {
+                          const rawMessages = Array.isArray(activeInquiry.messages) ? activeInquiry.messages : [];
+                          const displayMessages = rawMessages.filter(m => m && m.id !== 'msg-welcome' && m.category !== 'welcome');
 
-                        {/* Multi-message Transcript if present */}
-                        {Array.isArray(activeInquiry.messages) && activeInquiry.messages.length > 1 && (
-                          activeInquiry.messages.slice(1).map((msg, mIdx) => {
-                            const isUser = msg.sender === 'user';
+                          if (displayMessages.length > 0) {
                             return (
-                              <div
-                                key={mIdx}
-                                className={`flex items-start gap-2.5 max-w-[85%] ${
-                                  isUser ? '' : 'ml-auto flex-row-reverse'
-                                }`}
-                              >
-                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 ${
-                                  isUser 
-                                    ? 'bg-slate-800 border border-slate-700 text-slate-300' 
-                                    : 'bg-purple-600 text-white shadow-md'
-                                }`}>
-                                  {isUser ? (activeInquiry.userName?.charAt(0) || 'U') : 'IK'}
+                              <>
+                                {displayMessages.map((msg, mIdx) => {
+                                  const isUser = msg.sender === 'user';
+                                  return (
+                                    <div
+                                      key={msg.id || mIdx}
+                                      className={`flex items-start gap-2.5 max-w-[85%] ${
+                                        isUser ? '' : 'ml-auto flex-row-reverse'
+                                      }`}
+                                    >
+                                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 ${
+                                        isUser 
+                                          ? 'bg-slate-800 border border-slate-700 text-slate-300' 
+                                          : 'bg-purple-600 text-white shadow-md'
+                                      }`}>
+                                        {isUser ? (activeInquiry.userName?.charAt(0)?.toUpperCase() || 'U') : 'IK'}
+                                      </div>
+                                      <div className={`p-3.5 rounded-2xl text-xs shadow-md space-y-1 ${
+                                        isUser 
+                                          ? 'rounded-tl-sm bg-slate-900 border border-slate-700/80 text-slate-100' 
+                                          : 'rounded-tr-sm bg-purple-950 border border-purple-700/70 text-purple-100'
+                                      }`}>
+                                        <div className="flex items-center justify-between gap-3 text-[10px] font-bold">
+                                          <span className={isUser ? 'text-cyan-300' : 'text-purple-300'}>
+                                            {isUser ? (activeInquiry.userName || 'Client') : 'IK Enterprises Dispatch'}
+                                          </span>
+                                          <span className="text-slate-400 font-normal">
+                                            {formatBubbleTimestamp(msg.createdAt || msg.timestamp || msg.time, msg.time)}
+                                          </span>
+                                        </div>
+                                        <p className="whitespace-pre-line leading-relaxed text-xs">
+                                          {msg.text || msg.message}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+
+                                {/* Standalone Admin Reply if not already in messages thread */}
+                                {activeInquiry.adminReply && !displayMessages.some(m => m.text && m.text.includes(activeInquiry.adminReply)) && (
+                                  <div className="flex items-start gap-2.5 max-w-[85%] ml-auto flex-row-reverse">
+                                    <div className="w-7 h-7 rounded-lg bg-purple-600 text-white shadow-md flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                                      IK
+                                    </div>
+                                    <div className="p-3.5 rounded-2xl rounded-tr-sm bg-purple-950 border border-purple-700/70 text-purple-100 text-xs shadow-md space-y-1">
+                                      <div className="flex items-center justify-between gap-3 text-[10px] font-bold text-purple-300">
+                                        <span className="flex items-center gap-1">
+                                          <ShieldCheck className="w-3 h-3 text-purple-400" />
+                                          <span>Official Dispatch Reply</span>
+                                        </span>
+                                        <span className="text-slate-400 font-normal">Resolved</span>
+                                      </div>
+                                      <p className="whitespace-pre-line leading-relaxed text-xs">
+                                        {activeInquiry.adminReply}
+                                      </p>
+                                    </div>
+                                  </div>
+                                )}
+                              </>
+                            );
+                          }
+
+                          // Fallback: Single message inquiry (e.g. from static contact forms)
+                          return (
+                            <>
+                              <div className="flex items-start gap-2.5 max-w-[85%]">
+                                <div className="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-slate-300 shrink-0 mt-0.5">
+                                  {activeInquiry.userName?.charAt(0)?.toUpperCase() || 'U'}
                                 </div>
-                                <div className={`p-3.5 rounded-2xl text-xs shadow-md space-y-1 ${
-                                  isUser 
-                                    ? 'rounded-tl-sm bg-slate-900 border border-slate-700/80 text-slate-100' 
-                                    : 'rounded-tr-sm bg-purple-950 border border-purple-700/70 text-purple-100'
-                                }`}>
-                                  <div className="flex items-center justify-between gap-3 text-[10px] font-bold">
-                                    <span className={isUser ? 'text-cyan-300' : 'text-purple-300'}>
-                                      {isUser ? activeInquiry.userName : 'IK Enterprises Dispatch'}
-                                    </span>
+                                <div className="p-3.5 rounded-2xl rounded-tl-sm bg-slate-900 border border-slate-700/80 text-xs text-slate-100 shadow-md space-y-1">
+                                  <div className="flex items-center justify-between gap-3 text-[10px] font-bold text-cyan-300">
+                                    <span>{activeInquiry.userName || 'Client'}</span>
                                     <span className="text-slate-400 font-normal">
-                                      {formatBubbleTimestamp(msg.createdAt || msg.timestamp || msg.time, msg.time)}
+                                      {formatBubbleTimestamp(activeInquiry.createdAt)}
                                     </span>
                                   </div>
                                   <p className="whitespace-pre-line leading-relaxed text-xs">
-                                    {msg.text}
+                                    {activeInquiry.message || 'No message preview'}
                                   </p>
                                 </div>
                               </div>
-                            );
-                          })
-                        )}
 
-                        {/* Standalone Admin Dispatch Reply if resolved without messages array */}
-                        {activeInquiry.adminReply && (!Array.isArray(activeInquiry.messages) || activeInquiry.messages.length <= 1) && (
-                          <div className="flex items-start gap-2.5 max-w-[85%] ml-auto flex-row-reverse">
-                            <div className="w-7 h-7 rounded-lg bg-purple-600 text-white shadow-md flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
-                              IK
-                            </div>
-                            <div className="p-3.5 rounded-2xl rounded-tr-sm bg-purple-950 border border-purple-700/70 text-purple-100 text-xs shadow-md space-y-1">
-                              <div className="flex items-center justify-between gap-3 text-[10px] font-bold text-purple-300">
-                                <span className="flex items-center gap-1">
-                                  <ShieldCheck className="w-3 h-3 text-purple-400" />
-                                  <span>Official Dispatch Reply</span>
-                                </span>
-                                <span className="text-slate-400 font-normal">Resolved</span>
-                              </div>
-                              <p className="whitespace-pre-line leading-relaxed text-xs">
-                                {activeInquiry.adminReply}
-                              </p>
-                            </div>
-                          </div>
-                        )}
-
+                              {activeInquiry.adminReply && (
+                                <div className="flex items-start gap-2.5 max-w-[85%] ml-auto flex-row-reverse">
+                                  <div className="w-7 h-7 rounded-lg bg-purple-600 text-white shadow-md flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                                    IK
+                                  </div>
+                                  <div className="p-3.5 rounded-2xl rounded-tr-sm bg-purple-950 border border-purple-700/70 text-purple-100 text-xs shadow-md space-y-1">
+                                    <div className="flex items-center justify-between gap-3 text-[10px] font-bold text-purple-300">
+                                      <span className="flex items-center gap-1">
+                                        <ShieldCheck className="w-3 h-3 text-purple-400" />
+                                        <span>Official Dispatch Reply</span>
+                                      </span>
+                                      <span className="text-slate-400 font-normal">Resolved</span>
+                                    </div>
+                                    <p className="whitespace-pre-line leading-relaxed text-xs">
+                                      {activeInquiry.adminReply}
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
 
                       {/* Quick Presets & Reply Footer (WhatsApp / Gmail Input Bar) */}

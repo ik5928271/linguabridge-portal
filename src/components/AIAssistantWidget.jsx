@@ -249,41 +249,58 @@ export default function AIAssistantWidget({ currentUser = null, currentRole = 'h
     setInputQuery('');
     setIsTyping(true);
 
-    // Simulate AI thinking and generate rich response
-    setTimeout(async () => {
-      const botResponseText = generateBotResponse(userText);
-      const botMsg = {
-        id: `msg-bot-${Date.now()}`,
-        sender: 'bot',
-        text: botResponseText,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        createdAt: new Date().toISOString()
-      };
+    // Query Google Gemini 1.5 Flash API with local rule-engine fallback
+    let botResponseText = '';
+    try {
+      const aiRes = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: userText,
+          messages: updatedMessages
+        })
+      });
+      const aiData = await aiRes.json();
+      if (aiData && aiData.success && aiData.reply) {
+        botResponseText = aiData.reply;
+      } else {
+        botResponseText = generateBotResponse(userText);
+      }
+    } catch {
+      botResponseText = generateBotResponse(userText);
+    }
 
-      const finalMessages = [...updatedMessages, botMsg];
-      setMessages(finalMessages);
-      setIsTyping(false);
+    const botMsg = {
+      id: `msg-bot-${Date.now()}`,
+      sender: 'bot',
+      text: botResponseText,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      createdAt: new Date().toISOString()
+    };
 
-      // Automatically sync live chat to Admin Support Hub & MongoDB Atlas
-      try {
-        await fetch('/api/inquiries', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id: sessionIdRef.current,
-            userName: ticketName.trim() || (currentUser?.name || 'Guest Visitor'),
-            userEmail: ticketEmail.trim() || (currentUser?.email || ''),
-            userPhone: ticketPhone.trim() || '',
-            phone: ticketPhone.trim() || '',
-            userRole: currentUser?.role || currentRole || 'guest',
-            subject: `💬 Live Guest Chat: "${userText.slice(0, 40)}${userText.length > 40 ? '...' : ''}"`,
-            message: userText,
-            category: 'AI Concierge & Live Chat',
-            messages: finalMessages
-          })
-        });
-      } catch {}
-    }, 600);
+    const finalMessages = [...updatedMessages, botMsg];
+    setMessages(finalMessages);
+    setIsTyping(false);
+
+    // Automatically sync live chat to Admin Support Hub & MongoDB Atlas
+    try {
+      await fetch('/api/inquiries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: sessionIdRef.current,
+          userName: ticketName.trim() || (currentUser?.name || 'Guest Visitor'),
+          userEmail: ticketEmail.trim() || (currentUser?.email || ''),
+          userPhone: ticketPhone.trim() || '',
+          phone: ticketPhone.trim() || '',
+          userRole: currentUser?.role || currentRole || 'guest',
+          subject: `💬 Live Guest Chat: "${userText.slice(0, 40)}${userText.length > 40 ? '...' : ''}"`,
+          message: userText,
+          category: 'AI Concierge & Live Chat',
+          messages: finalMessages
+        })
+      });
+    } catch {}
   };
 
   // Handle Submitting Formal Support Inquiry
