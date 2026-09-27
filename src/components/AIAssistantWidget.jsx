@@ -27,6 +27,9 @@ export default function AIAssistantWidget({ currentUser = null, currentRole = 'h
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('chat'); // 'chat' or 'ticket'
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isLauncherMinimized, setIsLauncherMinimized] = useState(() => {
+    return localStorage.getItem('linguabot_launcher_mini') === 'true';
+  });
   
   // Chat Conversation State
   const [messages, setMessages] = useState(() => {
@@ -347,21 +350,60 @@ export default function AIAssistantWidget({ currentUser = null, currentRole = 'h
       
       {/* Floating Widget Launcher Button (When Closed) */}
       {!isOpen && (
-        <button
-          onClick={() => setIsOpen(true)}
-          className="group relative flex items-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-brand-600 hover:from-purple-500 hover:to-brand-500 text-white font-black text-xs shadow-2xl shadow-purple-600/40 border border-white/20 transition-all duration-300 transform hover:scale-105 active:scale-95 cursor-pointer"
-          title="Open AI Concierge & Support Box"
-        >
-          <div className="relative">
-            <Bot className="w-4 h-4 sm:w-5 sm:h-5 text-amber-300 animate-bounce" />
-            <span className="absolute -top-1 -right-1 w-2 h-2 sm:w-2.5 sm:h-2.5 bg-emerald-400 rounded-full ring-2 ring-slate-900 animate-pulse" />
+        isLauncherMinimized ? (
+          <div className="relative group">
+            <button
+              onClick={() => setIsOpen(true)}
+              className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-gradient-to-tr from-purple-600 via-indigo-600 to-brand-600 hover:from-purple-500 hover:to-brand-500 text-white flex items-center justify-center shadow-2xl shadow-purple-600/50 border border-white/30 transition-all duration-300 transform hover:scale-110 active:scale-95 cursor-pointer"
+              title="Open LinguaBot AI Concierge"
+            >
+              <Bot className="w-5 h-5 sm:w-6 sm:h-6 text-amber-300 animate-pulse" />
+              <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full ring-2 ring-slate-900 animate-pulse" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsLauncherMinimized(false);
+                localStorage.setItem('linguabot_launcher_mini', 'false');
+              }}
+              className="absolute -top-1.5 -left-1.5 w-4 h-4 rounded-full bg-slate-800 border border-slate-600 text-slate-300 hover:text-white flex items-center justify-center text-[10px] font-black opacity-0 group-hover:opacity-100 transition shadow"
+              title="Expand badge text"
+            >
+              +
+            </button>
           </div>
-          <span className="hidden sm:inline font-bold tracking-wide">LinguaBot AI & Inquiries</span>
-          <span className="sm:hidden font-bold text-[11px]">AI Bot</span>
-          <span className="px-1.5 py-0.5 rounded-full bg-white/20 text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider text-amber-200">
-            24/7 Live
-          </span>
-        </button>
+        ) : (
+          <div className="flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md p-1 pl-1.5 rounded-full border border-purple-500/30 shadow-2xl shadow-purple-950/60">
+            <button
+              onClick={() => setIsOpen(true)}
+              className="group relative flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-brand-600 hover:from-purple-500 hover:to-brand-500 text-white font-black text-xs transition-all duration-300 transform hover:scale-105 active:scale-95 cursor-pointer"
+              title="Open AI Concierge & Support Box"
+            >
+              <div className="relative">
+                <Bot className="w-4 h-4 text-amber-300 animate-bounce" />
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-400 rounded-full ring-2 ring-slate-900 animate-pulse" />
+              </div>
+              <span className="hidden sm:inline font-bold tracking-wide text-xs">LinguaBot AI</span>
+              <span className="sm:hidden font-bold text-[11px]">AI Bot</span>
+              <span className="px-1.5 py-0.2 rounded-full bg-white/20 text-[9px] font-extrabold uppercase tracking-wider text-amber-200">
+                24/7
+              </span>
+            </button>
+
+            {/* Quick 1-click minimize to unblock elements behind */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsLauncherMinimized(true);
+                localStorage.setItem('linguabot_launcher_mini', 'true');
+              }}
+              className="p-1 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              title="Minimize to small icon so you can see behind"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )
       )}
 
       {/* Expanded Interactive Chat & Inquiry Modal Window */}

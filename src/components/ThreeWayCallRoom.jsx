@@ -167,6 +167,21 @@ export default function ThreeWayCallRoom({
             setShowAudioUnlockNotice(true);
           });
       }
+
+      // Route via Web Audio destination as secondary unblockable engine
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) {
+          if (!playbackCtxRef.current || playbackCtxRef.current.state === 'closed') {
+            playbackCtxRef.current = new AudioCtx();
+          }
+          if (playbackCtxRef.current.state === 'suspended') {
+            playbackCtxRef.current.resume().catch(() => {});
+          }
+          const src = playbackCtxRef.current.createMediaStreamSource(stream);
+          src.connect(playbackCtxRef.current.destination);
+        }
+      } catch (e) {}
     } catch (err) {
       console.warn('[Remote Audio Playback Notice]:', err);
     }
@@ -513,7 +528,19 @@ export default function ThreeWayCallRoom({
             playCtx.resume().catch(() => {});
           }
 
-          const int16Array = new Int16Array(pcmData);
+          let int16Array;
+          if (pcmData instanceof ArrayBuffer) {
+            int16Array = new Int16Array(pcmData);
+          } else if (pcmData && pcmData.buffer instanceof ArrayBuffer) {
+            int16Array = new Int16Array(pcmData.buffer);
+          } else if (Array.isArray(pcmData)) {
+            int16Array = new Int16Array(pcmData);
+          } else {
+            int16Array = new Int16Array(pcmData);
+          }
+
+          if (!int16Array || int16Array.length === 0) return;
+
           const float32Array = new Float32Array(int16Array.length);
           for (let i = 0; i < int16Array.length; i++) {
             float32Array[i] = int16Array[i] / 32768.0;
@@ -529,7 +556,7 @@ export default function ThreeWayCallRoom({
           const currentTime = playCtx.currentTime;
           let nextTime = nextPlayTimesRef.current[senderSocketId] || currentTime;
           if (nextTime < currentTime) {
-            nextTime = currentTime + 0.025; // 25ms lead for jitter smoothing
+            nextTime = currentTime + 0.020; // 20ms lead for jitter smoothing
           }
           sourceNode.start(nextTime);
           nextPlayTimesRef.current[senderSocketId] = nextTime + audioBuffer.duration;
@@ -668,7 +695,7 @@ export default function ThreeWayCallRoom({
                   let hasVoice = false;
                   for (let i = 0; i < len; i++) {
                     const s = Math.max(-1, Math.min(1, inputData[i]));
-                    if (Math.abs(s) > 0.008) hasVoice = true;
+                    if (Math.abs(s) > 0.001) hasVoice = true;
                     pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
                   }
 
@@ -677,7 +704,7 @@ export default function ThreeWayCallRoom({
                     if (s) {
                       s.emit('live-pcm-audio-chunk', {
                         roomId,
-                        pcmData: Array.from(pcm16),
+                        pcmData: pcm16.buffer,
                         sampleRate: audioCtx.sampleRate,
                         senderRole: role,
                         senderName: role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName
