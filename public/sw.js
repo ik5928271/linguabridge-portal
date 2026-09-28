@@ -1,4 +1,5 @@
-const CACHE_NAME = 'linguabridge-pwa-v3';
+// LinguaBridge Service Worker - PWA Mobile App Support
+const CACHE_NAME = 'linguabridge-pwa-v5';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -9,16 +10,22 @@ const ASSETS_TO_CACHE = [
   '/icon-512.svg'
 ];
 
-// Install: Cache core static shell
+// Install: Cache core static shell safely without failing on single item
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
+      return Promise.all(
+        ASSETS_TO_CACHE.map((url) => {
+          return cache.add(url).catch((err) => {
+            console.warn('[SW Cache Notice] Non-critical asset skipped:', url);
+          });
+        })
+      );
     }).then(() => self.skipWaiting())
   );
 });
 
-// Activate: Clean up old caches
+// Activate: Clean up old caches immediately
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -35,10 +42,10 @@ self.addEventListener('activate', (event) => {
 
 // Fetch: Network first with Cache fallback for seamless real-time operations
 self.addEventListener('fetch', (event) => {
-  // Pass WebSocket and API requests straight to network
-  if (event.request.url.includes('/socket.io/') || event.request.url.includes('/api/')) {
-    return;
-  }
+  // Only handle GET requests from same origin
+  if (event.request.method !== 'GET') return;
+  if (event.request.url.includes('/socket.io/') || event.request.url.includes('/api/')) return;
+  if (!event.request.url.startsWith('http')) return;
 
   event.respondWith(
     fetch(event.request)
@@ -56,8 +63,8 @@ self.addEventListener('fetch', (event) => {
           if (cachedResponse) {
             return cachedResponse;
           }
-          if (event.request.mode === 'navigate') {
-            return caches.match('/index.html');
+          if (event.request.mode === 'navigate' || (event.request.headers.get('accept') && event.request.headers.get('accept').includes('text/html'))) {
+            return caches.match('/index.html').then(htmlRes => htmlRes || caches.match('/'));
           }
         });
       })
@@ -100,8 +107,8 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: data.body,
-    icon: '/icon-192.svg',
-    badge: '/icon-192.svg',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
     vibrate: [300, 100, 300, 100, 300],
     requireInteraction: true,
     data: {

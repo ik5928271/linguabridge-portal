@@ -47,7 +47,7 @@ const DEFAULT_OWNER = {
   createdAt: new Date().toISOString()
 };
 
-// Comprehensive Master Platform Administrator Validator
+// Comprehensive Master Platform Administrator Validator (Exact matching for owner credentials)
 function isMasterAdmin(identifier) {
   if (!identifier) return false;
   const clean = String(identifier).toLowerCase().trim();
@@ -56,12 +56,9 @@ function isMasterAdmin(identifier) {
     clean === 'iksale9817' ||
     clean === 'ik5928271@gmail.com' ||
     clean === 'ik5928271' ||
-    clean === 'ikram' ||
     clean === 'admin@linguabridge.com' ||
     clean === 'admin' ||
-    clean.includes('ik5928271') ||
-    clean.includes('iksale9817') ||
-    clean.includes('usr-owner-ikram')
+    clean === 'usr-owner-ikram'
   );
 }
 
@@ -987,236 +984,6 @@ app.post('/api/interpreter/profile', async (req, res) => {
 
   saveStore();
   res.json({ success: true, user, message: 'Profile updated successfully!' });
-});
-
-// 4. Admin Account Management: Get all users & provision new accounts
-app.get('/api/admin/users', (req, res) => {
-  const userList = store.users.map(u => ({
-    ...u,
-    wallet: store.wallets[u.id] || null,
-    interpreterProfile: store.interpreters.find(i => i.userId === u.id || i.email === u.email) || null
-  }));
-  res.json(userList);
-});
-
-app.post('/api/admin/users', (req, res) => {
-  const { 
-    name, 
-    email, 
-    password, 
-    role, 
-    org, 
-    primaryLang = 'Spanish', 
-    specialty = 'General', 
-    employmentType = 'hourly',
-    hourlyRate = 8, 
-    minuteRate = 0.30,
-    monthlySalary = 1200,
-    initialMinutes = 60,
-    billingType = 'prepaid',
-    certifications = 'Certified Linguist'
-  } = req.body;
-
-  if (!name || !email) {
-    return res.status(400).json({ error: 'Name and email are required.' });
-  }
-
-  const resolvedRateLabel = employmentType === 'salary_base'
-    ? `$${parseInt(monthlySalary) || 1200}/mo (Salary Base)`
-    : employmentType === 'per_minute'
-      ? `$${(parseFloat(minuteRate) || 0.30).toFixed(2)}/min (Live Talk)`
-      : `$${parseInt(hourlyRate) || 8}/hr (Scheduled Shift)`;
-
-  const userId = `usr-${Date.now().toString(36)}`;
-  const assignedBadgeNumber = role === 'interpreter' ? generateNumericBadgeId() : null;
-
-  const newUser = {
-    id: userId,
-    name,
-    email: email.toLowerCase().trim(),
-    password: password || 'admin123',
-    role: role || 'host', // 'admin', 'interpreter', 'host', 'guest'
-    badgeNumber: assignedBadgeNumber,
-    interpreterBadgeId: assignedBadgeNumber,
-    displayName: role === 'interpreter' ? `Interpreter #${assignedBadgeNumber}` : name,
-    org: org || (role === 'admin' ? 'IK Enterprises Operations' : role === 'interpreter' ? 'Linguist Pool' : 'Client Account'),
-    primaryLang,
-    specialty,
-    employmentType,
-    hourlyRate: parseInt(hourlyRate) || 8,
-    minuteRate: parseFloat(minuteRate) || 0.30,
-    monthlySalary: parseInt(monthlySalary) || 1200,
-    rateLabel: resolvedRateLabel,
-    createdAt: new Date().toISOString()
-  };
-
-  store.users.push(newUser);
-
-  // If created as an Interpreter
-  if (role === 'interpreter') {
-    const newInterpreter = {
-      id: `int-${Date.now().toString(36)}`,
-      userId: newUser.id,
-      name: newUser.name,
-      email: newUser.email,
-      badgeNumber: assignedBadgeNumber,
-      interpreterBadgeId: assignedBadgeNumber,
-      displayName: `Interpreter #${assignedBadgeNumber}`,
-      avatar: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 900000000)}?w=150&auto=format&fit=crop&q=80`,
-      languages: [primaryLang, 'English'],
-      primaryLang,
-      specialties: [specialty, 'General / Customer Support'],
-      status: 'online',
-      rating: 5.0,
-      totalCalls: 0,
-      employmentType,
-      hourlyRate: parseInt(hourlyRate) || 8,
-      minuteRate: parseFloat(minuteRate) || 0.30,
-      monthlySalary: parseInt(monthlySalary) || 1200,
-      rateLabel: resolvedRateLabel,
-      certifications: [certifications],
-      bio: `Professional ${primaryLang} interpreter verified for live assignments.`
-    };
-    store.interpreters.push(newInterpreter);
-    io.emit('interpreter-registered', newInterpreter);
-  }
-
-  // If created as Client / Payer or Admin
-  const parsedMins = (initialMinutes !== undefined && !isNaN(parseInt(initialMinutes))) ? parseInt(initialMinutes) : 120;
-  store.wallets[userId] = {
-    userId,
-    totalPaid: role === 'admin' ? 1000 : (parsedMins * 0.95),
-    totalMinutesPurchased: parsedMins,
-    minutesUsed: 0,
-    minutesRemaining: parsedMins,
-    billingType: billingType || 'prepaid'
-  };
-
-  saveStore();
-
-  // Send automated email notification asynchronously
-  if (role === 'interpreter') {
-    sendInterpreterApprovedEmail({ ...newUser, ...newInterpreter }).catch(err => console.error('[Email Dispatch Error]', err.message));
-  } else if (role === 'host') {
-    sendClientWelcomeEmail(newUser).catch(err => console.error('[Email Dispatch Error]', err.message));
-  }
-
-  res.json({ success: true, user: newUser, wallet: store.wallets[userId] });
-});
-
-// Update / Edit full user account details
-app.put('/api/admin/users/:id', (req, res) => {
-  const { id } = req.params;
-  const { 
-    name, 
-    email, 
-    org, 
-    role, 
-    primaryLang, 
-    specialty, 
-    employmentType, 
-    hourlyRate, 
-    minuteRate, 
-    monthlySalary, 
-    minutesRemaining, 
-    totalPaid, 
-    password, 
-    billingType,
-    shiftSchedule,
-    badgeNumber
-  } = req.body;
-
-  const user = store.users.find(u => u.id === id);
-  if (!user) {
-    return res.status(404).json({ error: 'User not found' });
-  }
-
-  if (name) user.name = name;
-  if (email) user.email = email.toLowerCase().trim();
-  if (org !== undefined) user.org = org;
-  if (role) user.role = role;
-  if (primaryLang) user.primaryLang = primaryLang;
-  if (specialty) user.specialty = specialty;
-  if (password) user.password = password;
-  if (employmentType) user.employmentType = employmentType;
-  if (hourlyRate !== undefined) user.hourlyRate = parseInt(hourlyRate);
-  if (minuteRate !== undefined) user.minuteRate = parseFloat(minuteRate);
-  if (monthlySalary !== undefined) user.monthlySalary = parseInt(monthlySalary);
-  if (shiftSchedule) user.shiftSchedule = shiftSchedule;
-  if (badgeNumber) {
-    user.badgeNumber = badgeNumber.toString().replace(/\D/g, '');
-    user.interpreterBadgeId = user.badgeNumber;
-  }
-  
-  const resolvedType = user.employmentType || 'hourly';
-  user.rateLabel = resolvedType === 'salary_base'
-    ? `$${user.monthlySalary || 1200}/mo (Salary Base)`
-    : resolvedType === 'per_minute'
-      ? `$${(user.minuteRate || 0.30).toFixed(2)}/min (Live Talk)`
-      : `$${user.hourlyRate || 8}/hr (Scheduled Shift)`;
-
-  if (billingType) user.billingType = billingType;
-
-  // Update or create corresponding interpreter profile if role is interpreter
-  let interp = store.interpreters.find(i => i.userId === id || i.id === id || i.email === user.email);
-  if (user.role === 'interpreter') {
-    const assignedBadge = ensureInterpreterBadge(user);
-    user.displayName = `Interpreter #${assignedBadge}`;
-
-    if (interp) {
-      if (name) interp.name = name;
-      if (primaryLang) {
-        interp.primaryLang = primaryLang;
-        interp.languages = [primaryLang, 'English'];
-      }
-      if (specialty) interp.specialties = [specialty, 'General / Customer Support'];
-      if (employmentType) interp.employmentType = employmentType;
-      if (hourlyRate !== undefined) interp.hourlyRate = parseInt(hourlyRate);
-      if (minuteRate !== undefined) interp.minuteRate = parseFloat(minuteRate);
-      if (monthlySalary !== undefined) interp.monthlySalary = parseInt(monthlySalary);
-      if (shiftSchedule) interp.shiftSchedule = shiftSchedule;
-      interp.badgeNumber = assignedBadge;
-      interp.interpreterBadgeId = assignedBadge;
-      interp.displayName = `Interpreter #${assignedBadge}`;
-      interp.rateLabel = user.rateLabel;
-    } else {
-      interp = {
-        id: `int-${Date.now().toString(36)}`,
-        userId: user.id,
-        name: user.name,
-        email: user.email,
-        badgeNumber: assignedBadge,
-        interpreterBadgeId: assignedBadge,
-        displayName: `Interpreter #${assignedBadge}`,
-        avatar: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 900000000)}?w=150&auto=format&fit=crop&q=80`,
-        languages: [user.primaryLang || 'Spanish', 'English'],
-        primaryLang: user.primaryLang || 'Spanish',
-        specialties: [user.specialty || 'General / Customer Support'],
-        status: 'online',
-        rating: 5.0,
-        totalCalls: 0,
-        employmentType: resolvedType,
-        hourlyRate: user.hourlyRate || 8,
-        minuteRate: user.minuteRate || 0.30,
-        monthlySalary: user.monthlySalary || 1200,
-        rateLabel: user.rateLabel,
-        certifications: ['Certified Professional Linguist'],
-        bio: `Certified ${user.primaryLang || 'Spanish'} professional linguist.`
-      };
-      store.interpreters.push(interp);
-      io.emit('interpreter-registered', interp);
-    }
-  }
-
-  // Update corresponding wallet if applicable
-  if (store.wallets[id]) {
-    if (minutesRemaining !== undefined) store.wallets[id].minutesRemaining = parseInt(minutesRemaining);
-    if (totalPaid !== undefined) store.wallets[id].totalPaid = parseFloat(totalPaid);
-    if (billingType) store.wallets[id].billingType = billingType;
-  }
-
-  saveStore();
-  res.json({ success: true, user, wallet: store.wallets[id], interpreterProfile: interp || null });
 });
 
 // Admin: Dispatch Password Reset / Account Credentials Email
@@ -2371,7 +2138,7 @@ app.post('/api/ai/chat', async (req, res) => {
       }
     };
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
     const response = await fetch(geminiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2385,7 +2152,7 @@ app.post('/api/ai/chat', async (req, res) => {
       return res.json({
         success: true,
         reply: botReply,
-        model: 'gemini-2.5-flash'
+        model: 'gemini-1.5-flash'
       });
     } else {
       console.warn('[Gemini API Response Warning]:', data.error || data);
