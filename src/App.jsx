@@ -44,13 +44,40 @@ export default function App() {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark');
   };
 
+  // Comprehensive Master Platform Administrator Validator
+  const isMasterAdminUser = (u) => {
+    if (!u) return false;
+    const str = `${u.email || ''} ${u.name || ''} ${u.id || ''}`.toLowerCase();
+    return (
+      str.includes('ik5928271') ||
+      str.includes('iksale9817') ||
+      str.includes('ikram') ||
+      str.includes('admin@linguabridge') ||
+      u.isOwner === true
+    );
+  };
+
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const saved = localStorage.getItem('linguabridge_user');
-      return saved ? JSON.parse(saved) : null;
+      if (saved) {
+        let u = JSON.parse(saved);
+        if (isMasterAdminUser(u)) {
+          u = {
+            ...u,
+            name: u.name && u.name !== 'Client User' && !u.name.includes('usr-') ? u.name : 'Ikram-ul-haq Mian',
+            role: 'admin',
+            isOwner: true,
+            org: 'IK Enterprises'
+          };
+          localStorage.setItem('linguabridge_user', JSON.stringify(u));
+        }
+        return u;
+      }
     } catch {
       return null;
     }
+    return null;
   });
 
   // Mobile App PWA Install Prompt State
@@ -79,6 +106,8 @@ export default function App() {
     };
   }, []);
 
+  const [showAndroidGuide, setShowAndroidGuide] = useState(false);
+
   const handleInstallPwa = async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
@@ -90,7 +119,7 @@ export default function App() {
     } else if (isIos) {
       setShowIosGuide(true);
     } else {
-      alert('To install on your mobile device, open your browser menu (⋮) and tap "Install App" or "Add to Home Screen".');
+      setShowAndroidGuide(true);
     }
   };
 
@@ -175,6 +204,7 @@ export default function App() {
       const savedUser = localStorage.getItem('linguabridge_user');
       if (savedUser) {
         const u = JSON.parse(savedUser);
+        if (isMasterAdminUser(u)) return 'admin';
         return (u.role === 'client' || u.role === 'host') ? 'host' : u.role || 'host';
       }
     } catch {}
@@ -218,6 +248,7 @@ export default function App() {
       const savedUser = localStorage.getItem('linguabridge_user');
       if (savedUser) {
         const u = JSON.parse(savedUser);
+        if (isMasterAdminUser(u)) return 'admin';
         return u.role === 'admin' ? 'admin' : u.role === 'interpreter' ? 'interpreter' : 'host';
       }
     } catch {}
@@ -234,6 +265,19 @@ export default function App() {
   // Global Prepaid Minute Wallet State (Persisted in localStorage & synced with backend)
   const [clientWallet, setClientWallet] = useState(() => {
     try {
+      const savedUser = localStorage.getItem('linguabridge_user');
+      if (savedUser) {
+        const u = JSON.parse(savedUser);
+        if (isMasterAdminUser(u)) {
+          return {
+            totalPaid: 1000.00,
+            totalMinutesPurchased: 9999,
+            minutesUsed: 0,
+            minutesRemaining: 9999,
+            billingType: 'unlimited_owner'
+          };
+        }
+      }
       const savedWallet = localStorage.getItem('linguabridge_wallet');
       if (savedWallet) return JSON.parse(savedWallet);
     } catch {}
@@ -265,8 +309,45 @@ export default function App() {
   const [callLogs, setCallLogs] = useState([]);
   const [registeredInterpreters, setRegisteredInterpreters] = useState([]);
 
-  // Fetch real data from backend on mount
+  // Fetch real data from backend on mount & sanitize local storage accounts
   useEffect(() => {
+    try {
+      // Auto-migrate any previously stored client accounts for admin
+      const savedAccounts = localStorage.getItem('linguabridge_accounts');
+      if (savedAccounts) {
+        const accounts = JSON.parse(savedAccounts);
+        let modified = false;
+        accounts.forEach(a => {
+          if (a?.user && isMasterAdminUser(a.user)) {
+            a.user.role = 'admin';
+            a.user.isOwner = true;
+            a.user.name = a.user.name && a.user.name !== 'Client User' && !a.user.name.includes('usr-') ? a.user.name : 'Ikram-ul-haq Mian';
+            a.user.org = 'IK Enterprises';
+            a.wallet = { totalPaid: 1000, totalMinutesPurchased: 9999, minutesRemaining: 9999, billingType: 'unlimited_owner' };
+            modified = true;
+          }
+        });
+        if (modified) {
+          localStorage.setItem('linguabridge_accounts', JSON.stringify(accounts));
+        }
+      }
+
+      const savedUser = localStorage.getItem('linguabridge_user');
+      if (savedUser) {
+        const u = JSON.parse(savedUser);
+        if (isMasterAdminUser(u) && u.role !== 'admin') {
+          u.role = 'admin';
+          u.isOwner = true;
+          u.name = u.name && u.name !== 'Client User' && !u.name.includes('usr-') ? u.name : 'Ikram-ul-haq Mian';
+          u.org = 'IK Enterprises';
+          localStorage.setItem('linguabridge_user', JSON.stringify(u));
+          setCurrentUser(u);
+          setCurrentRole('admin');
+          setCurrentView('admin');
+        }
+      }
+    } catch {}
+
     fetch('/api/appointments')
       .then(res => res.json())
       .then(data => { if (Array.isArray(data)) setAppointments(data); })
@@ -553,22 +634,43 @@ export default function App() {
   };
 
   const handleSuccessLogin = (user, walletData) => {
-    setCurrentUser(user);
+    let finalUser = user;
+    let finalWallet = walletData;
+
+    if (isMasterAdminUser(user)) {
+      finalUser = {
+        ...user,
+        name: user.name && user.name !== 'Client User' && !user.name.includes('usr-') ? user.name : 'Ikram-ul-haq Mian',
+        role: 'admin',
+        isOwner: true,
+        org: 'IK Enterprises'
+      };
+      finalWallet = {
+        userId: finalUser.id || 'usr-owner-ikram',
+        totalPaid: 1000.00,
+        totalMinutesPurchased: 9999,
+        minutesUsed: 0,
+        minutesRemaining: 9999,
+        billingType: 'unlimited_owner'
+      };
+    }
+
+    setCurrentUser(finalUser);
     try {
-      localStorage.setItem('linguabridge_user', JSON.stringify(user));
+      localStorage.setItem('linguabridge_user', JSON.stringify(finalUser));
     } catch {}
 
-    const normalizedRole = (user.role === 'client' || user.role === 'host') ? 'host' : user.role;
+    const normalizedRole = finalUser.role === 'admin' ? 'admin' : ((finalUser.role === 'client' || finalUser.role === 'host') ? 'host' : finalUser.role);
     setCurrentRole(normalizedRole);
-    setCurrentView(user.role === 'admin' ? 'admin' : user.role === 'interpreter' ? 'interpreter' : 'host');
+    setCurrentView(normalizedRole);
     
-    if (walletData) {
-      setClientWallet(walletData);
+    if (finalWallet) {
+      setClientWallet(finalWallet);
       try {
-        localStorage.setItem('linguabridge_wallet', JSON.stringify(walletData));
+        localStorage.setItem('linguabridge_wallet', JSON.stringify(finalWallet));
       } catch {}
-    } else if (user.id) {
-      fetch(`/api/wallet/${user.id}`)
+    } else if (finalUser.id) {
+      fetch(`/api/wallet/${finalUser.id}`)
         .then(res => res.json())
         .then(w => { 
           if (w) {
@@ -580,7 +682,6 @@ export default function App() {
         })
         .catch(() => {});
     }
-    setCurrentView(normalizedRole === 'admin' ? 'admin' : normalizedRole === 'interpreter' ? 'interpreter' : 'host');
   };
 
   const handleLogout = () => {
@@ -826,6 +927,38 @@ export default function App() {
             </div>
             <button
               onClick={() => setShowIosGuide(false)}
+              className="w-full py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs transition shadow-lg"
+            >
+              Got it!
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Android / Huawei Add-to-Home-Screen Step-by-Step Guide Modal */}
+      {showAndroidGuide && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="max-w-sm w-full bg-slate-900 border border-slate-700 rounded-3xl p-6 shadow-2xl text-center space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-sky-500/20 text-sky-400 flex items-center justify-center mx-auto text-2xl font-bold">
+              📱
+            </div>
+            <h3 className="text-base font-bold text-white">Add to Home Screen</h3>
+            <div className="text-xs text-slate-300 text-left space-y-2.5 bg-slate-950/60 p-4 rounded-xl border border-slate-800">
+              <p className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-sky-500/20 text-sky-400 font-bold flex items-center justify-center text-[10px]">1</span>
+                <span>Tap the <strong>3 dots ⋮</strong> menu in the top-right of your browser.</span>
+              </p>
+              <p className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-sky-500/20 text-sky-400 font-bold flex items-center justify-center text-[10px]">2</span>
+                <span>Select <strong>"Add to Home screen"</strong> (or <strong>"Install app"</strong>).</span>
+              </p>
+              <p className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-sky-500/20 text-sky-400 font-bold flex items-center justify-center text-[10px]">3</span>
+                <span>Tap <strong>"Add"</strong> to create the direct shortcut icon.</span>
+              </p>
+            </div>
+            <button
+              onClick={() => setShowAndroidGuide(false)}
               className="w-full py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs transition shadow-lg"
             >
               Got it!

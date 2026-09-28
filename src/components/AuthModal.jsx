@@ -82,6 +82,25 @@ export default function AuthModal({
       });
   };
 
+  // Comprehensive Master Platform Administrator Validator
+  const isMasterAdmin = (identifier) => {
+    if (!identifier) return false;
+    const clean = String(identifier).toLowerCase().trim();
+    return (
+      clean === 'iksale9817@gmail.com' ||
+      clean === 'iksale9817' ||
+      clean === 'ik5928271@gmail.com' ||
+      clean === 'ik5928271' ||
+      clean === 'ikram' ||
+      clean === 'admin@linguabridge.com' ||
+      clean === 'admin' ||
+      clean.includes('ik5928271') ||
+      clean.includes('iksale9817') ||
+      clean.includes('admin') ||
+      clean.includes('ikram')
+    );
+  };
+
   // Helper to get local accounts
   const getLocalAccounts = () => {
     try {
@@ -128,8 +147,11 @@ export default function AuthModal({
       .then(data => {
         setIsSubmitting(false);
         if (data.success && data.user) {
-          saveLocalAccount(data.user, data.wallet);
-          onSuccessLogin(data.user, data.wallet);
+          const isOwnerAdmin = isMasterAdmin(data.user.email) || isMasterAdmin(data.user.id) || isMasterAdmin(query) || data.user.isOwner;
+          const finalUser = isOwnerAdmin ? { ...data.user, role: 'admin', isOwner: true, org: 'IK Enterprises', name: data.user.name || 'Ikram-ul-haq Mian' } : data.user;
+          const finalWallet = isOwnerAdmin ? { totalPaid: 1000, totalMinutesPurchased: 9999, minutesRemaining: 9999, billingType: 'unlimited_owner' } : data.wallet;
+          saveLocalAccount(finalUser, finalWallet);
+          onSuccessLogin(finalUser, finalWallet);
           onClose();
         } else {
           fallbackSignIn(query);
@@ -142,25 +164,12 @@ export default function AuthModal({
   };
 
   const fallbackSignIn = (query) => {
-    // 1. Check local browser account store first
-    const localAccounts = getLocalAccounts();
-    const found = localAccounts.find(a => 
-      (a.user.email && a.user.email.toLowerCase() === query) ||
-      (a.user.name && a.user.name.toLowerCase() === query)
-    );
-
-    if (found) {
-      onSuccessLogin(found.user, found.wallet);
-      onClose();
-      return;
-    }
-
-    // 2. Known system default logins
-    if (query === 'iksale9817@gmail.com' || query === 'ik5928271@gmail.com' || query.includes('admin') || query.includes('ikram')) {
+    // 1. Check Master Admin first
+    if (isMasterAdmin(query)) {
       const ownerUser = {
         id: 'usr-owner-ikram',
         name: 'Ikram-ul-haq Mian',
-        email: 'iksale9817@gmail.com',
+        email: query.includes('@') ? query : 'iksale9817@gmail.com',
         role: 'admin',
         isOwner: true,
         org: 'IK Enterprises'
@@ -168,7 +177,30 @@ export default function AuthModal({
       const ownerWallet = { totalPaid: 1000, totalMinutesPurchased: 9999, minutesRemaining: 9999, billingType: 'unlimited_owner' };
       saveLocalAccount(ownerUser, ownerWallet);
       onSuccessLogin(ownerUser, ownerWallet);
-    } else if (query.includes('interp') || query.includes('elena') || query.includes('alex') || query.includes('wali') || query.includes('sally') || query.includes('mehran')) {
+      onClose();
+      return;
+    }
+
+    // 2. Check local browser account store
+    const localAccounts = getLocalAccounts();
+    const found = localAccounts.find(a => 
+      (a.user.email && a.user.email.toLowerCase() === query) ||
+      (a.user.name && a.user.name.toLowerCase() === query)
+    );
+
+    if (found) {
+      if (isMasterAdmin(found.user.email) || isMasterAdmin(found.user.name)) {
+        found.user.role = 'admin';
+        found.user.isOwner = true;
+        found.wallet = { totalPaid: 1000, totalMinutesPurchased: 9999, minutesRemaining: 9999, billingType: 'unlimited_owner' };
+      }
+      onSuccessLogin(found.user, found.wallet);
+      onClose();
+      return;
+    }
+
+    // 3. Certified Interpreter Logins
+    if (query.includes('interp') || query.includes('elena') || query.includes('alex') || query.includes('wali') || query.includes('sally') || query.includes('mehran')) {
       const interpUser = {
         id: `usr-int-${Date.now().toString(36)}`,
         name: query.includes('@') ? query.split('@')[0] : 'Certified Linguist',
@@ -181,7 +213,7 @@ export default function AuthModal({
       saveLocalAccount(interpUser, null);
       onSuccessLogin(interpUser, null);
     } else {
-      // 3. Default to Client account
+      // 4. Default to Client account
       const customUser = {
         id: `usr-${Date.now().toString(36)}`,
         name: query.includes('@') ? query.split('@')[0] : query,
