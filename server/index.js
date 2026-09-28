@@ -24,8 +24,8 @@ const io = new Server(server, {
 });
 
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ limit: '15mb', extended: true }));
 
 // Persistent JSON Storage File
 const DATA_DIR = path.join(process.cwd(), 'server', 'data');
@@ -46,6 +46,24 @@ const DEFAULT_OWNER = {
   org: 'IK Enterprises',
   createdAt: new Date().toISOString()
 };
+
+// Comprehensive Master Platform Administrator Validator
+function isMasterAdmin(identifier) {
+  if (!identifier) return false;
+  const clean = String(identifier).toLowerCase().trim();
+  return (
+    clean === 'iksale9817@gmail.com' ||
+    clean === 'iksale9817' ||
+    clean === 'ik5928271@gmail.com' ||
+    clean === 'ik5928271' ||
+    clean === 'ikram' ||
+    clean === 'admin@linguabridge.com' ||
+    clean === 'admin' ||
+    clean.includes('ik5928271') ||
+    clean.includes('iksale9817') ||
+    clean.includes('usr-owner-ikram')
+  );
+}
 
 // Permanent Seed Accounts (Always available across every deployment)
 const SEED_USERS = [];
@@ -228,10 +246,32 @@ function loadStore() {
         store.paymentReceipts = [];
       }
 
-      // Ensure Owner Account always exists with latest credentials
-      const ownerIndex = store.users.findIndex(u => u.email.toLowerCase() === DEFAULT_OWNER.email.toLowerCase() || u.isOwner);
+      // Ensure Owner Account and Master Admin accounts always exist with admin role & owner status
+      store.users.forEach((u, idx) => {
+        if (isMasterAdmin(u.email) || isMasterAdmin(u.id) || isMasterAdmin(u.name) || u.isOwner) {
+          store.users[idx] = {
+            ...u,
+            name: u.name || DEFAULT_OWNER.name,
+            role: 'admin',
+            isOwner: true,
+            org: 'IK Enterprises'
+          };
+          if (u.id) {
+            store.wallets[u.id] = {
+              userId: u.id,
+              totalPaid: 1000.00,
+              totalMinutesPurchased: 9999,
+              minutesUsed: 0,
+              minutesRemaining: 9999,
+              billingType: 'unlimited_owner'
+            };
+          }
+        }
+      });
+
+      const ownerIndex = store.users.findIndex(u => isMasterAdmin(u.email) || isMasterAdmin(u.id) || u.isOwner);
       if (ownerIndex >= 0) {
-        store.users[ownerIndex] = { ...store.users[ownerIndex], ...DEFAULT_OWNER };
+        store.users[ownerIndex] = { ...store.users[ownerIndex], ...DEFAULT_OWNER, role: 'admin', isOwner: true };
       } else {
         store.users.unshift(DEFAULT_OWNER);
       }
@@ -686,13 +726,29 @@ app.post('/api/auth/login', (req, res) => {
 
   const cleanEmail = email.toLowerCase().trim();
 
-  // 1. Check default Owner / Admin Account (Ikram-ul-haq Mian)
-  if (cleanEmail === DEFAULT_OWNER.email.toLowerCase() || cleanEmail === 'iksale9817@gmail.com' || cleanEmail === 'admin@linguabridge.com' || cleanEmail.includes('admin')) {
-    const ownerUser = store.users.find(u => u.email.toLowerCase() === DEFAULT_OWNER.email.toLowerCase() || u.email.toLowerCase() === 'iksale9817@gmail.com') || DEFAULT_OWNER;
+  // 1. Check Master Owner / Admin Account (Ikram-ul-haq Mian & admin aliases)
+  if (isMasterAdmin(cleanEmail) || isMasterAdmin(email)) {
+    const ownerUser = store.users.find(u => isMasterAdmin(u.email) || isMasterAdmin(u.id) || u.isOwner) || DEFAULT_OWNER;
+    const adminUser = {
+      ...ownerUser,
+      name: ownerUser.name || DEFAULT_OWNER.name,
+      role: 'admin',
+      isOwner: true,
+      org: 'IK Enterprises'
+    };
+    const adminWallet = {
+      userId: adminUser.id || 'usr-owner-ikram',
+      totalPaid: 1000,
+      totalMinutesPurchased: 9999,
+      minutesUsed: 0,
+      minutesRemaining: 9999,
+      billingType: 'unlimited_owner'
+    };
+    store.wallets[adminUser.id] = adminWallet;
     return res.json({ 
       success: true, 
-      user: { ...ownerUser, role: 'admin' },
-      wallet: store.wallets[ownerUser.id] || { totalPaid: 1000, totalMinutesPurchased: 9999, minutesUsed: 0, minutesRemaining: 9999, billingType: 'unlimited_owner' }
+      user: adminUser, 
+      wallet: adminWallet
     });
   }
 
