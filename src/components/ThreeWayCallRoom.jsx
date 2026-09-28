@@ -180,9 +180,16 @@ export default function ThreeWayCallRoom({
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: { 
-          echoCancellation: true, 
-          noiseSuppression: true, 
-          autoGainControl: true 
+          echoCancellation: { ideal: true }, 
+          noiseSuppression: { ideal: true }, 
+          autoGainControl: { ideal: true },
+          googEchoCancellation: true,
+          googAutoGainControl: true,
+          googNoiseSuppression: true,
+          googHighpassFilter: true,
+          googTypingNoiseDetection: true,
+          channelCount: 1,
+          sampleRate: 48000
         }, 
         video: false 
       });
@@ -537,13 +544,22 @@ export default function ThreeWayCallRoom({
         }
       });
 
-      // Enterprise Live Web Audio PCM Stream Receiver (100% Guaranteed Unblockable Audio)
+      // Enterprise Live Web Audio PCM Stream Receiver (100% Guaranteed Unblockable Audio Fallback)
       socket.on('live-pcm-audio-chunk', ({ senderSocketId, pcmData, sampleRate, senderRole, senderName }) => {
         if (!pcmData || senderSocketId === socket.id) return;
 
         // Visual active speaker highlight
         if (senderRole) {
           setActiveSpeaker(senderRole);
+        }
+
+        // PREVENT DOUBLE-VOICE & ECHO: If WebRTC direct peer stream is already active and playing for this sender, skip redundant PCM chunk
+        const peerPc = peersRef.current[senderSocketId];
+        const isWebRtcConnected = peerPc && (peerPc.iceConnectionState === 'connected' || peerPc.iceConnectionState === 'completed');
+        const remoteAudioEl = remoteAudiosRef.current[senderSocketId];
+        const isDirectAudioPlaying = remoteAudioEl && !remoteAudioEl.paused && remoteAudioEl.srcObject;
+        if (isWebRtcConnected && isDirectAudioPlaying) {
+          return;
         }
 
         try {
@@ -674,24 +690,48 @@ export default function ThreeWayCallRoom({
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       navigator.mediaDevices.getUserMedia({ 
         audio: { 
-          echoCancellation: true, 
-          noiseSuppression: true, 
-          autoGainControl: true 
+          echoCancellation: { ideal: true }, 
+          noiseSuppression: { ideal: true }, 
+          autoGainControl: { ideal: true },
+          googEchoCancellation: true,
+          googAutoGainControl: true,
+          googNoiseSuppression: true,
+          googHighpassFilter: true,
+          googTypingNoiseDetection: true,
+          channelCount: 1,
+          sampleRate: 48000
         }, 
         video: false 
       })
         .then((stream) => {
           mediaStreamRef.current = stream;
 
-          // Attach newly acquired local stream to any established peer connections
-          Object.values(peersRef.current).forEach(pc => {
+          // Attach newly acquired local stream to any established peer connections and trigger offer renegotiation
+          Object.entries(peersRef.current).forEach(([peerId, pc]) => {
             stream.getAudioTracks().forEach(track => {
               const senders = pc.getSenders();
               const audioSender = senders.find(s => (s.track && s.track.kind === 'audio') || (!s.track));
               if (audioSender) {
                 audioSender.replaceTrack(track).catch(() => {});
               } else {
-                try { pc.addTrack(track, stream); } catch(e){}
+                try { 
+                  pc.addTrack(track, stream); 
+                  if (pc.signalingState === 'stable' && pc._isInitiator) {
+                    pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false })
+                      .then(offer => pc.setLocalDescription(offer))
+                      .then(() => {
+                        const socket = getSocket();
+                        if (socket) {
+                          socket.emit('webrtc-offer', {
+                            targetSocketId: peerId,
+                            offer: pc.localDescription,
+                            senderInfo: { role, name: role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName }
+                          });
+                        }
+                      })
+                      .catch(() => {});
+                  }
+                } catch(e){}
               }
             });
           });
@@ -725,7 +765,8 @@ export default function ThreeWayCallRoom({
                   let hasVoice = false;
                   for (let i = 0; i < len; i++) {
                     const s = Math.max(-1, Math.min(1, inputData[i]));
-                    if (Math.abs(s) > 0.0003) hasVoice = true;
+                    // Noise floor filter: ignore low-amplitude background noise/fan hum (< 0.008)
+                    if (Math.abs(s) > 0.008) hasVoice = true;
                     pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
                   }
 
