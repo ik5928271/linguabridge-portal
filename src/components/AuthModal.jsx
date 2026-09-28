@@ -82,7 +82,7 @@ export default function AuthModal({
       });
   };
 
-  // Comprehensive Master Platform Administrator Validator
+  // Comprehensive Master Platform Administrator Validator (Exact matching)
   const isMasterAdmin = (identifier) => {
     if (!identifier) return false;
     const clean = String(identifier).toLowerCase().trim();
@@ -91,13 +91,9 @@ export default function AuthModal({
       clean === 'iksale9817' ||
       clean === 'ik5928271@gmail.com' ||
       clean === 'ik5928271' ||
-      clean === 'ikram' ||
       clean === 'admin@linguabridge.com' ||
       clean === 'admin' ||
-      clean.includes('ik5928271') ||
-      clean.includes('iksale9817') ||
-      clean.includes('admin') ||
-      clean.includes('ikram')
+      clean === 'usr-owner-ikram'
     );
   };
 

@@ -6659,7 +6659,7 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
       )}
 
       {/* ========================================================== */}
-      {/* MODAL 4: EDIT PROFILE, RATES & SHIFT SCHEDULE MODAL */}
+      {/* MODAL 4: EDIT ACCOUNT (CLIENT / INTERPRETER / ADMIN) */}
       {/* ========================================================== */}
       {isEditModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
@@ -6667,12 +6667,26 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
             
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
-                  <Edit className="w-5 h-5" />
+                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${
+                  editRole === 'host' || editRole === 'client'
+                    ? 'bg-blue-500/20 text-blue-400'
+                    : editRole === 'interpreter'
+                      ? 'bg-emerald-500/20 text-emerald-400'
+                      : 'bg-purple-500/20 text-purple-400'
+                }`}>
+                  {editRole === 'host' || editRole === 'client' ? <Building2 className="w-5 h-5" /> : editRole === 'interpreter' ? <Headphones className="w-5 h-5" /> : <ShieldAlert className="w-5 h-5" />}
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold text-white">Edit Profile, Rates & Schedule</h3>
-                  <p className="text-xs text-slate-400">Update account terms and settings for <span className="text-blue-300 font-bold">{editName || editEmail}</span></p>
+                  <h3 className="text-base font-extrabold text-white">
+                    {editRole === 'host' || editRole === 'client' 
+                      ? 'Edit Client Account & Minute Balance' 
+                      : editRole === 'interpreter' 
+                        ? 'Edit Interpreter Profile, Rates & Schedule' 
+                        : 'Edit Platform Administrator Account'}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Account: <span className="text-blue-300 font-bold">{editName || editEmail}</span>
+                  </p>
                 </div>
               </div>
               <button 
@@ -6692,21 +6706,67 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
             )}
 
             <form onSubmit={handleSaveEdit} className="space-y-4 text-xs">
-              {/* Basic Details */}
+              
+              {/* Account Role Selector / Classifier */}
+              <div className="space-y-1">
+                <label className="font-semibold text-slate-300">Account Role & Classification:</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditRole('host')}
+                    className={`p-2.5 rounded-xl border text-center transition ${
+                      editRole === 'host' || editRole === 'client'
+                        ? 'bg-blue-600/30 border-blue-500 text-white font-bold ring-1 ring-blue-500'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-[11px] font-bold">🏢 Client Host</p>
+                    <p className="text-[9px] text-slate-400 mt-0.5">Hospital / Payer</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditRole('interpreter')}
+                    className={`p-2.5 rounded-xl border text-center transition ${
+                      editRole === 'interpreter'
+                        ? 'bg-emerald-600/30 border-emerald-500 text-white font-bold ring-1 ring-emerald-500'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-[11px] font-bold">🌐 Interpreter</p>
+                    <p className="text-[9px] text-slate-400 mt-0.5">Certified Pool</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditRole('admin')}
+                    className={`p-2.5 rounded-xl border text-center transition ${
+                      editRole === 'admin'
+                        ? 'bg-purple-600/30 border-purple-500 text-white font-bold ring-1 ring-purple-500'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <p className="text-[11px] font-bold">🛡️ Administrator</p>
+                    <p className="text-[9px] text-slate-400 mt-0.5">Full Control</p>
+                  </button>
+                </div>
+              </div>
+
+              {/* Basic Details: Name & Email */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-300">Full Name:</label>
+                  <label className="font-semibold text-slate-300">Full Name / Contact Person:</label>
                   <input
                     type="text"
                     required
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-blue-500"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-blue-500 font-medium"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-300">Email Address:</label>
+                  <label className="font-semibold text-slate-300">Email Address (Login ID):</label>
                   <input
                     type="email"
                     required
@@ -6734,397 +6794,557 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                 </div>
 
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-300">Organization / Pool:</label>
+                  <label className="font-semibold text-slate-300">
+                    {editRole === 'host' || editRole === 'client' ? 'Hospital / Clinic / Organization Name:' : 'Organization / Group:'}
+                  </label>
                   <input
                     type="text"
                     value={editOrg}
                     onChange={(e) => setEditOrg(e.target.value)}
-                    placeholder="e.g. Certified Linguist Pool"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-blue-500"
+                    placeholder={editRole === 'host' ? 'e.g. Judisary Hospital' : 'e.g. Certified Linguist Pool'}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-blue-500 font-medium"
                   />
                 </div>
               </div>
 
-              {/* Selected & Verified Languages with Delete & Add Controls */}
-              <div className="space-y-2 p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
-                <div className="flex items-center justify-between">
-                  <label className="font-semibold text-slate-200 flex items-center gap-1.5 text-xs">
-                    <Globe className="w-4 h-4 text-blue-400" />
-                    <span>Approved / Spoken Languages ({editLanguages.length}):</span>
-                  </label>
-                  <span className="text-[10px] text-slate-400">Click ✕ to delete any language</span>
-                </div>
+              {/* ======================================================= */}
+              {/* SECTION A: CLIENT / HOSPITAL SETTINGS & WALLET BALANCE */}
+              {/* ======================================================= */}
+              {(editRole === 'host' || editRole === 'client') && (
+                <div className="space-y-4 pt-2 border-t border-slate-800">
+                  
+                  {/* Client Primary Language & Specialty Focus */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="font-semibold text-slate-300 flex items-center gap-1">
+                        <Globe className="w-3.5 h-3.5 text-blue-400" />
+                        <span>Primary Language Requested:</span>
+                      </label>
+                      <select
+                        value={editLang}
+                        onChange={(e) => setEditLang(e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-blue-500"
+                      >
+                        {LANGUAGES.map((l, i) => (
+                          <option key={i} value={l.name}>{l.flag} {l.name}</option>
+                        ))}
+                      </select>
+                    </div>
 
-                <div className="flex flex-wrap gap-1.5 min-h-[36px] p-2 rounded-xl bg-slate-900 border border-slate-800/80 items-center">
-                  {editLanguages.length === 0 ? (
-                    <span className="text-red-400 text-xs italic">No languages selected. Add at least one below.</span>
-                  ) : (
-                    editLanguages.map((lang, idx) => {
-                      const match = LANGUAGES.find(l => l.name.toLowerCase() === lang.toLowerCase());
-                      const isPrimary = idx === 0;
-                      return (
-                        <span 
-                          key={idx} 
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition ${
-                            isPrimary ? 'bg-blue-600/30 text-blue-200 border-blue-500/50' : 'bg-slate-800 text-slate-200 border-slate-700'
-                          }`}
+                    <div className="space-y-1">
+                      <label className="font-semibold text-slate-300 flex items-center gap-1">
+                        <Briefcase className="w-3.5 h-3.5 text-blue-400" />
+                        <span>Department / Specialty:</span>
+                      </label>
+                      <select
+                        value={editSpecialty}
+                        onChange={(e) => setEditSpecialty(e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-blue-500"
+                      >
+                        {SPECIALTY_DOMAINS.map((d, i) => (
+                          <option key={i} value={d.name}>{d.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Client Minute Wallet & Billing Management */}
+                  <div className="p-4 rounded-2xl bg-slate-950 border border-blue-500/30 space-y-3.5 shadow-inner">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="w-4 h-4 text-blue-400" />
+                        <span className="font-bold text-white text-xs">Client Minute Balance & Billing Terms</span>
+                      </div>
+                      <span className="text-[10px] uppercase font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20">
+                        {editBillingType === 'postpaid_hospital' ? 'Net 30 Postpaid' : editBillingType === 'unlimited_owner' ? 'VIP Unlimited' : 'Prepaid Wallet'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {/* Billing Plan Type */}
+                      <div className="space-y-1">
+                        <label className="font-semibold text-slate-300 text-[11px]">Billing Model:</label>
+                        <select
+                          value={editBillingType}
+                          onChange={(e) => setEditBillingType(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-blue-500 font-medium"
                         >
-                          <span>{match ? match.flag : '🌐'}</span>
-                          <span>{lang}</span>
-                          {isPrimary && <span className="text-[9px] uppercase px-1 rounded bg-blue-500/30 text-blue-300 font-extrabold">Primary</span>}
-                          <button
-                            type="button"
-                            onClick={() => setEditLanguages(prev => prev.filter((_, i) => i !== idx))}
-                            className="w-4 h-4 rounded-full bg-red-500/20 hover:bg-red-500 text-red-300 hover:text-white flex items-center justify-center transition ml-1"
-                            title={`Delete ${lang}`}
-                          >
-                            <X className="w-2.5 h-2.5" />
-                          </button>
-                        </span>
-                      );
-                    })
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2 pt-1">
-                  <select
-                    value={newLangToAdd}
-                    onChange={(e) => setNewLangToAdd(e.target.value)}
-                    className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="">-- Choose language to add --</option>
-                    {LANGUAGES.filter(l => !editLanguages.some(el => el.toLowerCase() === l.name.toLowerCase())).map((l, i) => (
-                      <option key={i} value={l.name}>{l.flag} {l.name}</option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    disabled={!newLangToAdd}
-                    onClick={() => {
-                      if (newLangToAdd && !editLanguages.includes(newLangToAdd)) {
-                        setEditLanguages(prev => [...prev, newLangToAdd]);
-                        setNewLangToAdd('');
-                      }
-                    }}
-                    className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-bold text-xs flex items-center gap-1 transition shrink-0"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add Language</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Specialty Domain */}
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-300">Specialty Domain:</label>
-                <select
-                  value={editSpecialty}
-                  onChange={(e) => setEditSpecialty(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-blue-500"
-                >
-                  {SPECIALTY_DOMAINS.map((d, i) => (
-                    <option key={i} value={d.name}>{d.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Compensation Model Selector */}
-              <div className="space-y-2 pt-2 border-t border-slate-800">
-                <label className="font-semibold text-slate-300">Compensation Model & Pay Rate:</label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setEditEmploymentType('hourly')}
-                    className={`p-2.5 rounded-xl border text-center transition ${
-                      editEmploymentType === 'hourly'
-                        ? 'bg-blue-600/30 border-blue-500 text-white font-bold ring-1 ring-blue-500'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <p className="text-[11px] font-bold">💼 Hourly Shift</p>
-                    <p className="text-[9px] text-slate-400 mt-0.5">Scheduled Queue</p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setEditEmploymentType('per_minute')}
-                    className={`p-2.5 rounded-xl border text-center transition ${
-                      editEmploymentType === 'per_minute'
-                        ? 'bg-emerald-600/30 border-emerald-500 text-white font-bold ring-1 ring-emerald-500'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <p className="text-[11px] font-bold">⏱️ Per-Minute</p>
-                    <p className="text-[9px] text-slate-400 mt-0.5">Live Talk</p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setEditEmploymentType('salary_base')}
-                    className={`p-2.5 rounded-xl border text-center transition ${
-                      editEmploymentType === 'salary_base'
-                        ? 'bg-purple-600/30 border-purple-500 text-white font-bold ring-1 ring-purple-500'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <p className="text-[11px] font-bold">🏢 Monthly Salary</p>
-                    <p className="text-[9px] text-slate-400 mt-0.5">Fixed Base</p>
-                  </button>
-                </div>
-              </div>
-
-              {/* Dynamic Rate Setting based on Model */}
-              {editEmploymentType === 'hourly' && (
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-300">Hourly Shift Rate ($/hr):</label>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-2.5 font-bold text-blue-400">$</span>
-                    <input
-                      type="number"
-                      min="5"
-                      max="300"
-                      required
-                      value={editHourlyRate}
-                      onChange={(e) => setEditHourlyRate(e.target.value)}
-                      className="w-full pl-8 pr-12 py-2.5 rounded-xl bg-slate-950 border border-blue-500/50 text-xs text-white font-bold focus:outline-none focus:border-blue-500"
-                    />
-                    <span className="absolute right-3.5 top-2.5 text-xs text-slate-400">/ hr</span>
-                  </div>
-                </div>
-              )}
-
-              {editEmploymentType === 'per_minute' && (
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-300">Live Talk Rate ($/min):</label>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-2.5 font-bold text-emerald-400">$</span>
-                    <input
-                      type="number"
-                      step="0.05"
-                      min="0.10"
-                      max="5.00"
-                      required
-                      value={editMinuteRate}
-                      onChange={(e) => setEditMinuteRate(parseFloat(e.target.value) || 0)}
-                      className="w-full pl-8 pr-12 py-2.5 rounded-xl bg-slate-950 border border-emerald-500/50 text-xs text-white font-bold focus:outline-none focus:border-emerald-500"
-                    />
-                    <span className="absolute right-3.5 top-2.5 text-xs text-slate-400">/ min</span>
-                  </div>
-                </div>
-              )}
-
-              {editEmploymentType === 'salary_base' && (
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-300">Monthly Fixed Salary ($/mo):</label>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-2.5 font-bold text-purple-400">$</span>
-                    <input
-                      type="number"
-                      min="300"
-                      max="15000"
-                      step="50"
-                      required
-                      value={editMonthlySalary}
-                      onChange={(e) => setEditMonthlySalary(e.target.value)}
-                      className="w-full pl-8 pr-12 py-2.5 rounded-xl bg-slate-950 border border-purple-500/50 text-xs text-white font-bold focus:outline-none focus:border-purple-500"
-                    />
-                    <span className="absolute right-3.5 top-2.5 text-xs text-slate-400">/ mo</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Working Schedule & Daily Shift Timing */}
-              <div className="space-y-3 pt-2.5 border-t border-slate-800">
-                <div className="flex items-center justify-between">
-                  <label className="font-semibold text-slate-200 flex items-center gap-1.5 text-xs">
-                    <Clock className="w-4 h-4 text-amber-400" />
-                    <span>Interpreter Shift Timing & Working Hours:</span>
-                  </label>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                    editShiftType === 'open_unlimited'
-                      ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
-                      : 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                  }`}>
-                    {editShiftType === 'open_unlimited' ? '⚡ Open 24/7 Unlimited' : `⏰ ${editDailyHours}h / Day`}
-                  </span>
-                </div>
-
-                {/* Shift Timing Mode Selector */}
-                <div className="grid grid-cols-2 sm:grid-cols-6 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditShiftType('fixed_12h');
-                      setEditDailyHours(12);
-                      setEditStartTime('09:00');
-                      setEditEndTime('21:00');
-                    }}
-                    className={`p-2 rounded-xl border text-center transition ${
-                      editShiftType === 'fixed_12h'
-                        ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <p className="text-[11px] font-bold">12 Hours</p>
-                    <p className="text-[9px] text-slate-400">Long Shift</p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditShiftType('fixed_9h');
-                      setEditDailyHours(9);
-                      setEditStartTime('09:00');
-                      setEditEndTime('18:00');
-                    }}
-                    className={`p-2 rounded-xl border text-center transition ${
-                      editShiftType === 'fixed_9h'
-                        ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <p className="text-[11px] font-bold">9 Hours</p>
-                    <p className="text-[9px] text-slate-400">Standard</p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditShiftType('fixed_6h');
-                      setEditDailyHours(6);
-                      setEditStartTime('09:00');
-                      setEditEndTime('15:00');
-                    }}
-                    className={`p-2 rounded-xl border text-center transition ${
-                      editShiftType === 'fixed_6h'
-                        ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <p className="text-[11px] font-bold">6 Hours</p>
-                    <p className="text-[9px] text-slate-400">Half Shift</p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditShiftType('fixed_3h');
-                      setEditDailyHours(3);
-                      setEditStartTime('09:00');
-                      setEditEndTime('12:00');
-                    }}
-                    className={`p-2 rounded-xl border text-center transition ${
-                      editShiftType === 'fixed_3h'
-                        ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <p className="text-[11px] font-bold">3 Hours</p>
-                    <p className="text-[9px] text-slate-400">Part-Time</p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditShiftType('custom');
-                    }}
-                    className={`p-2 rounded-xl border text-center transition ${
-                      editShiftType === 'custom'
-                        ? 'bg-blue-500/20 border-blue-500 text-blue-300 font-bold'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <p className="text-[11px] font-bold">Custom</p>
-                    <p className="text-[9px] text-slate-400">Flexible</p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditShiftType('open_unlimited');
-                      setEditDailyHours('Unlimited');
-                    }}
-                    className={`p-2 rounded-xl border text-center transition ${
-                      editShiftType === 'open_unlimited'
-                        ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-bold'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <p className="text-[11px] font-bold">Open 24/7</p>
-                    <p className="text-[9px] text-emerald-400">Unlimited</p>
-                  </button>
-                </div>
-
-                {/* Timezone Selector */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase block">Duty Working Timezone:</label>
-                  <select
-                    value={editTimeZone}
-                    onChange={(e) => setEditTimeZone(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-amber-500 font-medium"
-                  >
-                    {TIMEZONES.map((tz, idx) => (
-                      <option key={idx} value={tz.value}>{tz.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Shift Hours / Window Details (When not unlimited) */}
-                {editShiftType !== 'open_unlimited' && (
-                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80 space-y-2.5">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-center">
-                      {editShiftType === 'custom' && (
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Daily Hours:</label>
-                          <input
-                            type="number"
-                            min="1"
-                            max="24"
-                            value={editDailyHours}
-                            onChange={(e) => setEditDailyHours(parseInt(e.target.value) || 1)}
-                            className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white font-bold focus:outline-none focus:border-amber-500"
-                          />
-                        </div>
-                      )}
-
-                      <div className={editShiftType === 'custom' ? '' : 'sm:col-span-1.5'}>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Shift Start Time:</label>
-                        <input
-                          type="time"
-                          value={editStartTime}
-                          onChange={(e) => setEditStartTime(e.target.value)}
-                          className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white font-mono focus:outline-none focus:border-amber-500"
-                        />
+                          <option value="prepaid">Prepaid Wallet</option>
+                          <option value="postpaid_hospital">Postpaid Hospital (Net 30)</option>
+                          <option value="unlimited_owner">VIP / Partner (Unlimited)</option>
+                        </select>
                       </div>
 
-                      <div className={editShiftType === 'custom' ? '' : 'sm:col-span-1.5'}>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Shift End Time:</label>
-                        <input
-                          type="time"
-                          value={editEndTime}
-                          onChange={(e) => setEditEndTime(e.target.value)}
-                          className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white font-mono focus:outline-none focus:border-amber-500"
-                        />
+                      {/* Available Minutes Balance */}
+                      <div className="space-y-1">
+                        <label className="font-semibold text-slate-300 text-[11px]">Remaining Minutes Balance:</label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={editMinutes}
+                            onChange={(e) => setEditMinutes(parseInt(e.target.value) || 0)}
+                            className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-blue-500/50 text-xs text-white font-extrabold focus:outline-none focus:border-blue-500"
+                          />
+                          <span className="absolute right-3 top-2 text-slate-400 font-medium text-[11px]">mins</span>
+                        </div>
+                      </div>
+
+                      {/* Total Amount Paid */}
+                      <div className="space-y-1">
+                        <label className="font-semibold text-slate-300 text-[11px]">Total Paid ($ USD):</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2 text-slate-400 font-bold">$</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={editTotalPaid}
+                            onChange={(e) => setEditTotalPaid(parseFloat(e.target.value) || 0)}
+                            className="w-full pl-7 pr-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white font-bold focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Quick Add Minutes Shortcuts */}
+                    <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        ⚡ Quick Add Minutes to Client Account:
+                      </label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[30, 60, 120, 300, 600].map((mins) => (
+                          <button
+                            key={mins}
+                            type="button"
+                            onClick={() => {
+                              setEditMinutes(prev => (parseInt(prev) || 0) + mins);
+                              setEditTotalPaid(prev => (parseFloat(prev) || 0) + (mins * 0.90));
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-blue-600/20 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-500/30 font-bold text-[11px] transition transform hover:scale-105"
+                          >
+                            +{mins} mins
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditMinutes(9999);
+                            setEditBillingType('unlimited_owner');
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white border border-purple-500/30 font-bold text-[11px] transition"
+                        >
+                          ♾️ Grant Unlimited
+                        </button>
                       </div>
                     </div>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
+
+              {/* ======================================================= */}
+              {/* SECTION B: INTERPRETER SETTINGS, RATES & SHIFTS */}
+              {/* ======================================================= */}
+              {editRole === 'interpreter' && (
+                <div className="space-y-4 pt-2 border-t border-slate-800">
+                  {/* Selected & Verified Languages with Delete & Add Controls */}
+                  <div className="space-y-2 p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
+                    <div className="flex items-center justify-between">
+                      <label className="font-semibold text-slate-200 flex items-center gap-1.5 text-xs">
+                        <Globe className="w-4 h-4 text-emerald-400" />
+                        <span>Approved / Spoken Languages ({editLanguages.length}):</span>
+                      </label>
+                      <span className="text-[10px] text-slate-400">Click ✕ to delete any language</span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5 min-h-[36px] p-2 rounded-xl bg-slate-900 border border-slate-800/80 items-center">
+                      {editLanguages.length === 0 ? (
+                        <span className="text-red-400 text-xs italic">No languages selected. Add at least one below.</span>
+                      ) : (
+                        editLanguages.map((lang, idx) => {
+                          const match = LANGUAGES.find(l => l.name.toLowerCase() === lang.toLowerCase());
+                          const isPrimary = idx === 0;
+                          return (
+                            <span 
+                              key={idx} 
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition ${
+                                isPrimary ? 'bg-emerald-600/30 text-emerald-200 border-emerald-500/50' : 'bg-slate-800 text-slate-200 border-slate-700'
+                              }`}
+                            >
+                              <span>{match ? match.flag : '🌐'}</span>
+                              <span>{lang}</span>
+                              {isPrimary && <span className="text-[9px] uppercase px-1 rounded bg-emerald-500/30 text-emerald-300 font-extrabold">Primary</span>}
+                              <button
+                                type="button"
+                                onClick={() => setEditLanguages(prev => prev.filter((_, i) => i !== idx))}
+                                className="w-4 h-4 rounded-full bg-red-500/20 hover:bg-red-500 text-red-300 hover:text-white flex items-center justify-center transition ml-1"
+                                title={`Delete ${lang}`}
+                              >
+                                <X className="w-2.5 h-2.5" />
+                              </button>
+                            </span>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1">
+                      <select
+                        value={newLangToAdd}
+                        onChange={(e) => setNewLangToAdd(e.target.value)}
+                        className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500"
+                      >
+                        <option value="">-- Choose language to add --</option>
+                        {LANGUAGES.filter(l => !editLanguages.some(el => el.toLowerCase() === l.name.toLowerCase())).map((l, i) => (
+                          <option key={i} value={l.name}>{l.flag} {l.name}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        disabled={!newLangToAdd}
+                        onClick={() => {
+                          if (newLangToAdd && !editLanguages.includes(newLangToAdd)) {
+                            setEditLanguages(prev => [...prev, newLangToAdd]);
+                            setNewLangToAdd('');
+                          }
+                        }}
+                        className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-bold text-xs flex items-center gap-1 transition shrink-0"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add Language</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Specialty Domain */}
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-300">Specialty Domain:</label>
+                    <select
+                      value={editSpecialty}
+                      onChange={(e) => setEditSpecialty(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    >
+                      {SPECIALTY_DOMAINS.map((d, i) => (
+                        <option key={i} value={d.name}>{d.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Compensation Model Selector */}
+                  <div className="space-y-2 pt-2 border-t border-slate-800">
+                    <label className="font-semibold text-slate-300">Compensation Model & Pay Rate:</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setEditEmploymentType('hourly')}
+                        className={`p-2.5 rounded-xl border text-center transition ${
+                          editEmploymentType === 'hourly'
+                            ? 'bg-blue-600/30 border-blue-500 text-white font-bold ring-1 ring-blue-500'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <p className="text-[11px] font-bold">💼 Hourly Shift</p>
+                        <p className="text-[9px] text-slate-400 mt-0.5">Scheduled Queue</p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setEditEmploymentType('per_minute')}
+                        className={`p-2.5 rounded-xl border text-center transition ${
+                          editEmploymentType === 'per_minute'
+                            ? 'bg-emerald-600/30 border-emerald-500 text-white font-bold ring-1 ring-emerald-500'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <p className="text-[11px] font-bold">⏱️ Per-Minute</p>
+                        <p className="text-[9px] text-slate-400 mt-0.5">Live Talk</p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setEditEmploymentType('salary_base')}
+                        className={`p-2.5 rounded-xl border text-center transition ${
+                          editEmploymentType === 'salary_base'
+                            ? 'bg-purple-600/30 border-purple-500 text-white font-bold ring-1 ring-purple-500'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <p className="text-[11px] font-bold">🏢 Monthly Salary</p>
+                        <p className="text-[9px] text-slate-400 mt-0.5">Fixed Base</p>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Dynamic Rate Setting based on Model */}
+                  {editEmploymentType === 'hourly' && (
+                    <div className="space-y-1">
+                      <label className="font-semibold text-slate-300">Hourly Shift Rate ($/hr):</label>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-2.5 font-bold text-blue-400">$</span>
+                        <input
+                          type="number"
+                          min="5"
+                          max="300"
+                          required
+                          value={editHourlyRate}
+                          onChange={(e) => setEditHourlyRate(e.target.value)}
+                          className="w-full pl-8 pr-12 py-2.5 rounded-xl bg-slate-950 border border-blue-500/50 text-xs text-white font-bold focus:outline-none focus:border-blue-500"
+                        />
+                        <span className="absolute right-3.5 top-2.5 text-xs text-slate-400">/ hr</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {editEmploymentType === 'per_minute' && (
+                    <div className="space-y-1">
+                      <label className="font-semibold text-slate-300">Live Talk Rate ($/min):</label>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-2.5 font-bold text-emerald-400">$</span>
+                        <input
+                          type="number"
+                          step="0.05"
+                          min="0.10"
+                          max="5.00"
+                          required
+                          value={editMinuteRate}
+                          onChange={(e) => setEditMinuteRate(parseFloat(e.target.value) || 0)}
+                          className="w-full pl-8 pr-12 py-2.5 rounded-xl bg-slate-950 border border-emerald-500/50 text-xs text-white font-bold focus:outline-none focus:border-emerald-500"
+                        />
+                        <span className="absolute right-3.5 top-2.5 text-xs text-slate-400">/ min</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {editEmploymentType === 'salary_base' && (
+                    <div className="space-y-1">
+                      <label className="font-semibold text-slate-300">Monthly Fixed Salary ($/mo):</label>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-2.5 font-bold text-purple-400">$</span>
+                        <input
+                          type="number"
+                          min="300"
+                          max="15000"
+                          step="50"
+                          required
+                          value={editMonthlySalary}
+                          onChange={(e) => setEditMonthlySalary(e.target.value)}
+                          className="w-full pl-8 pr-12 py-2.5 rounded-xl bg-slate-950 border border-purple-500/50 text-xs text-white font-bold focus:outline-none focus:border-purple-500"
+                        />
+                        <span className="absolute right-3.5 top-2.5 text-xs text-slate-400">/ mo</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Working Schedule & Daily Shift Timing */}
+                  <div className="space-y-3 pt-2.5 border-t border-slate-800">
+                    <div className="flex items-center justify-between">
+                      <label className="font-semibold text-slate-200 flex items-center gap-1.5 text-xs">
+                        <Clock className="w-4 h-4 text-amber-400" />
+                        <span>Interpreter Shift Timing & Working Hours:</span>
+                      </label>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                        editShiftType === 'open_unlimited'
+                          ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                          : 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                      }`}>
+                        {editShiftType === 'open_unlimited' ? '⚡ Open 24/7 Unlimited' : `⏰ ${editDailyHours}h / Day`}
+                      </span>
+                    </div>
+
+                    {/* Shift Timing Mode Selector */}
+                    <div className="grid grid-cols-2 sm:grid-cols-6 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditShiftType('fixed_12h');
+                          setEditDailyHours(12);
+                          setEditStartTime('09:00');
+                          setEditEndTime('21:00');
+                        }}
+                        className={`p-2 rounded-xl border text-center transition ${
+                          editShiftType === 'fixed_12h'
+                            ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <p className="text-[11px] font-bold">12 Hours</p>
+                        <p className="text-[9px] text-slate-400">Long Shift</p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditShiftType('fixed_9h');
+                          setEditDailyHours(9);
+                          setEditStartTime('09:00');
+                          setEditEndTime('18:00');
+                        }}
+                        className={`p-2 rounded-xl border text-center transition ${
+                          editShiftType === 'fixed_9h'
+                            ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <p className="text-[11px] font-bold">9 Hours</p>
+                        <p className="text-[9px] text-slate-400">Standard</p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditShiftType('fixed_6h');
+                          setEditDailyHours(6);
+                          setEditStartTime('09:00');
+                          setEditEndTime('15:00');
+                        }}
+                        className={`p-2 rounded-xl border text-center transition ${
+                          editShiftType === 'fixed_6h'
+                            ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <p className="text-[11px] font-bold">6 Hours</p>
+                        <p className="text-[9px] text-slate-400">Half Shift</p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditShiftType('fixed_3h');
+                          setEditDailyHours(3);
+                          setEditStartTime('09:00');
+                          setEditEndTime('12:00');
+                        }}
+                        className={`p-2 rounded-xl border text-center transition ${
+                          editShiftType === 'fixed_3h'
+                            ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <p className="text-[11px] font-bold">3 Hours</p>
+                        <p className="text-[9px] text-slate-400">Part-Time</p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditShiftType('custom');
+                        }}
+                        className={`p-2 rounded-xl border text-center transition ${
+                          editShiftType === 'custom'
+                            ? 'bg-blue-500/20 border-blue-500 text-blue-300 font-bold'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <p className="text-[11px] font-bold">Custom</p>
+                        <p className="text-[9px] text-slate-400">Flexible</p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditShiftType('open_unlimited');
+                          setEditDailyHours('Unlimited');
+                        }}
+                        className={`p-2 rounded-xl border text-center transition ${
+                          editShiftType === 'open_unlimited'
+                            ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-bold'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <p className="text-[11px] font-bold">Open 24/7</p>
+                        <p className="text-[9px] text-emerald-400">Unlimited</p>
+                      </button>
+                    </div>
+
+                    {/* Timezone Selector */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase block">Duty Working Timezone:</label>
+                      <select
+                        value={editTimeZone}
+                        onChange={(e) => setEditTimeZone(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-amber-500 font-medium"
+                      >
+                        {TIMEZONES.map((tz, idx) => (
+                          <option key={idx} value={tz.value}>{tz.label}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Shift Hours / Window Details (When not unlimited) */}
+                    {editShiftType !== 'open_unlimited' && (
+                      <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80 space-y-2.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-center">
+                          {editShiftType === 'custom' && (
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Daily Hours:</label>
+                              <input
+                                type="number"
+                                min="1"
+                                max="24"
+                                value={editDailyHours}
+                                onChange={(e) => setEditDailyHours(parseInt(e.target.value) || 1)}
+                                className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white font-bold focus:outline-none focus:border-amber-500"
+                              />
+                            </div>
+                          )}
+
+                          <div className={editShiftType === 'custom' ? '' : 'sm:col-span-1.5'}>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Shift Start Time:</label>
+                            <input
+                              type="time"
+                              value={editStartTime}
+                              onChange={(e) => setEditStartTime(e.target.value)}
+                              className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white font-mono focus:outline-none focus:border-amber-500"
+                            />
+                          </div>
+
+                          <div className={editShiftType === 'custom' ? '' : 'sm:col-span-1.5'}>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Shift End Time:</label>
+                            <input
+                              type="time"
+                              value={editEndTime}
+                              onChange={(e) => setEditEndTime(e.target.value)}
+                              className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white font-mono focus:outline-none focus:border-amber-500"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* ======================================================= */}
+              {/* SECTION C: ADMINISTRATOR ACCOUNT INFO */}
+              {/* ======================================================= */}
+              {editRole === 'admin' && (
+                <div className="p-4 rounded-2xl bg-purple-950/40 border border-purple-500/30 space-y-2 text-xs">
+                  <div className="flex items-center gap-2 text-purple-300 font-bold">
+                    <ShieldCheck className="w-4 h-4 text-purple-400" />
+                    <span>Master Administrator Privileges</span>
+                  </div>
+                  <p className="text-slate-300 leading-relaxed text-[11px]">
+                    This account possesses unrestricted full system control across live conference rooms, client wallets, interpreter applications, and financial analytics.
+                  </p>
+                </div>
+              )}
 
               {/* Action Buttons */}
-              <div className="pt-3 flex items-center justify-between gap-3 border-t border-slate-800">
+              <div className="pt-3 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => handleDispatchCredentialsEmail(editingUserId)}
                   disabled={isSendingCredentials}
-                  className="px-4 py-2.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 font-bold text-xs flex items-center gap-1.5 transition disabled:opacity-50"
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 font-bold text-xs flex items-center justify-center gap-1.5 transition disabled:opacity-50"
                   title="Send login credentials email"
                 >
                   <Send className="w-3.5 h-3.5" />
                   <span>{isSendingCredentials ? 'Sending...' : 'Dispatch Credentials Email'}</span>
                 </button>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                   <button
                     type="button"
                     onClick={() => setIsEditModalOpen(false)}

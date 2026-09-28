@@ -44,15 +44,22 @@ export default function App() {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark');
   };
 
-  // Comprehensive Master Platform Administrator Validator
+  // Comprehensive Master Platform Administrator Validator (Exact matching)
   const isMasterAdminUser = (u) => {
     if (!u) return false;
-    const str = `${u.email || ''} ${u.name || ''} ${u.id || ''}`.toLowerCase();
+    const cleanEmail = (u.email || '').toLowerCase().trim();
+    const cleanId = (u.id || '').toLowerCase().trim();
+    const cleanName = (u.name || '').toLowerCase().trim();
     return (
-      str.includes('ik5928271') ||
-      str.includes('iksale9817') ||
-      str.includes('ikram') ||
-      str.includes('admin@linguabridge') ||
+      cleanEmail === 'iksale9817@gmail.com' ||
+      cleanEmail === 'iksale9817' ||
+      cleanEmail === 'ik5928271@gmail.com' ||
+      cleanEmail === 'ik5928271' ||
+      cleanEmail === 'admin@linguabridge.com' ||
+      cleanEmail === 'admin' ||
+      cleanId === 'usr-owner-ikram' ||
+      cleanName === 'ik5928271' ||
+      cleanName === 'iksale9817' ||
       u.isOwner === true
     );
   };
