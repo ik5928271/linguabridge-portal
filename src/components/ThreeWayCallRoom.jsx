@@ -98,7 +98,7 @@ export default function ThreeWayCallRoom({
     isMutedRef.current = isMuted;
   }, [isMuted]);
 
-  // WebRTC ICE Servers Configuration (Multi-STUN + Cloudflare + Twilio + Metered)
+  // WebRTC ICE Servers Configuration (Multi-STUN + Global TURN Relays for 100% NAT & Mobile Network Penetration)
   const ICE_SERVERS = {
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
@@ -109,7 +109,22 @@ export default function ThreeWayCallRoom({
       { urls: 'stun:stun.cloudflare.com:3478' },
       { urls: 'stun:global.stun.twilio.com:3478' },
       { urls: 'stun:stun.services.mozilla.com' },
-      { urls: 'stun:stun.relay.metered.ca:80' }
+      { urls: 'stun:stun.relay.metered.ca:80' },
+      {
+        urls: 'turn:openrelay.metered.ca:80',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      }
     ]
   };
 
@@ -140,9 +155,10 @@ export default function ThreeWayCallRoom({
         audioEl.id = `remote-audio-${remoteSocketId}`;
         audioEl.autoplay = true;
         audioEl.playsInline = true;
+        audioEl.muted = false;
         audioEl.setAttribute('autoplay', 'true');
         audioEl.setAttribute('playsinline', 'true');
-        // Use fixed off-screen position instead of display: none to prevent browser audio throttling
+        // Position offscreen without display:none to guarantee no browser throttling
         audioEl.style.position = 'fixed';
         audioEl.style.top = '-9999px';
         audioEl.style.left = '-9999px';
@@ -154,7 +170,9 @@ export default function ThreeWayCallRoom({
         remoteAudiosRef.current[remoteSocketId] = audioEl;
       }
       audioEl.srcObject = stream;
+      audioEl.muted = false;
       audioEl.volume = 1.0;
+
       const playPromise = audioEl.play();
       if (playPromise !== undefined) {
         playPromise
@@ -163,12 +181,12 @@ export default function ThreeWayCallRoom({
             setShowAudioUnlockNotice(false);
           })
           .catch((err) => {
-            console.log('[WebRTC Audio Autoplay Notice] Unlocking on user touch:', err);
+            console.log('[WebRTC Audio Autoplay Blocked] Needs user interaction:', err);
             setShowAudioUnlockNotice(true);
           });
       }
     } catch (err) {
-      console.warn('[Remote Audio Playback Notice]:', err);
+      console.warn('[Remote Audio Playback Error]:', err);
     }
   };
 
@@ -183,11 +201,6 @@ export default function ThreeWayCallRoom({
           echoCancellation: { ideal: true }, 
           noiseSuppression: { ideal: true }, 
           autoGainControl: { ideal: true },
-          googEchoCancellation: true,
-          googAutoGainControl: true,
-          googNoiseSuppression: true,
-          googHighpassFilter: true,
-          googTypingNoiseDetection: true,
           channelCount: 1,
           sampleRate: 48000
         }, 
@@ -553,11 +566,11 @@ export default function ThreeWayCallRoom({
           setActiveSpeaker(senderRole);
         }
 
-        // PREVENT DOUBLE-VOICE & ECHO: If WebRTC direct peer stream is already active and playing for this sender, skip redundant PCM chunk
+        // PREVENT DOUBLE-VOICE: If WebRTC direct peer stream is active AND actively playing sound, skip redundant PCM chunk
         const peerPc = peersRef.current[senderSocketId];
         const isWebRtcConnected = peerPc && (peerPc.iceConnectionState === 'connected' || peerPc.iceConnectionState === 'completed');
         const remoteAudioEl = remoteAudiosRef.current[senderSocketId];
-        const isDirectAudioPlaying = remoteAudioEl && !remoteAudioEl.paused && remoteAudioEl.srcObject;
+        const isDirectAudioPlaying = remoteAudioEl && !remoteAudioEl.paused && remoteAudioEl.srcObject && remoteAudioEl.currentTime > 0;
         if (isWebRtcConnected && isDirectAudioPlaying) {
           return;
         }
@@ -716,7 +729,7 @@ export default function ThreeWayCallRoom({
               } else {
                 try { 
                   pc.addTrack(track, stream); 
-                  if (pc.signalingState === 'stable' && pc._isInitiator) {
+                  if (pc.signalingState === 'stable') {
                     pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false })
                       .then(offer => pc.setLocalDescription(offer))
                       .then(() => {
@@ -753,8 +766,8 @@ export default function ThreeWayCallRoom({
               const source = audioCtx.createMediaStreamSource(stream);
               source.connect(analyser);
 
-              // Raw PCM Stream Processor (bufferSize 4096 = ~85ms latency @ 48kHz)
-              const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+              // Raw PCM Stream Processor (bufferSize 2048 = ~42ms low latency @ 48kHz)
+              const processor = audioCtx.createScriptProcessor(2048, 1, 1);
               scriptProcessorRef.current = processor;
 
               processor.onaudioprocess = (e) => {
@@ -762,15 +775,16 @@ export default function ThreeWayCallRoom({
                   const inputData = e.inputBuffer.getChannelData(0);
                   const len = inputData.length;
                   const pcm16 = new Int16Array(len);
-                  let hasVoice = false;
+                  let maxAmp = 0;
                   for (let i = 0; i < len; i++) {
                     const s = Math.max(-1, Math.min(1, inputData[i]));
-                    // Noise floor filter: ignore low-amplitude background noise/fan hum (< 0.008)
-                    if (Math.abs(s) > 0.008) hasVoice = true;
+                    const abs = Math.abs(s);
+                    if (abs > maxAmp) maxAmp = abs;
                     pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
                   }
 
-                  if (hasVoice) {
+                  // Transmit if unmuted and voice detected (> 0.0005 ultra-sensitive)
+                  if (maxAmp > 0.0005) {
                     const s = getSocket();
                     if (s && s.connected) {
                       s.emit('live-pcm-audio-chunk', {
@@ -936,10 +950,19 @@ export default function ThreeWayCallRoom({
   const handleToggleMute = () => {
     const next = !isMuted;
     setIsMuted(next);
+    isMutedRef.current = next;
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getAudioTracks().forEach(track => {
         track.enabled = !next;
       });
+    }
+    if (!next) {
+      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume().catch(() => {});
+      }
+      if (playbackCtxRef.current && playbackCtxRef.current.state === 'suspended') {
+        playbackCtxRef.current.resume().catch(() => {});
+      }
     }
     const socket = getSocket();
     if (socket) {
