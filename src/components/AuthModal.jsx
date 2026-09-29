@@ -86,9 +86,10 @@ export default function AuthModal({
   const isMasterAdmin = (identifier) => {
     if (!identifier) return false;
     const clean = String(identifier).toLowerCase().trim();
+    if (clean.includes('iksale9817') || clean.includes('jasmin') || clean.includes('kamila') || clean.includes('kuzmina')) {
+      return false;
+    }
     return (
-      clean === 'iksale9817@gmail.com' ||
-      clean === 'iksale9817' ||
       clean === 'ik5928271@gmail.com' ||
       clean === 'ik5928271' ||
       clean === 'admin@linguabridge.com' ||
@@ -143,8 +144,8 @@ export default function AuthModal({
       .then(data => {
         setIsSubmitting(false);
         if (data.success && data.user) {
-          const isOwnerAdmin = isMasterAdmin(data.user.email) || isMasterAdmin(data.user.id) || isMasterAdmin(query) || data.user.isOwner;
-          const finalUser = isOwnerAdmin ? { ...data.user, role: 'admin', isOwner: true, org: 'IK Enterprises', name: data.user.name || 'Ikram-ul-haq Mian' } : data.user;
+          const isOwnerAdmin = isMasterAdmin(data.user.email) || isMasterAdmin(data.user.id) || isMasterAdmin(query) || (data.user.isOwner && !data.user.email?.includes('iksale9817'));
+          const finalUser = isOwnerAdmin ? { ...data.user, role: 'admin', isOwner: true, org: 'IK Enterprises', name: data.user.name || 'ik5928271' } : data.user;
           const finalWallet = isOwnerAdmin ? { totalPaid: 1000, totalMinutesPurchased: 9999, minutesRemaining: 9999, billingType: 'unlimited_owner' } : data.wallet;
           saveLocalAccount(finalUser, finalWallet);
           onSuccessLogin(finalUser, finalWallet);
@@ -164,8 +165,8 @@ export default function AuthModal({
     if (isMasterAdmin(query)) {
       const ownerUser = {
         id: 'usr-owner-ikram',
-        name: 'Ikram-ul-haq Mian',
-        email: query.includes('@') ? query : 'iksale9817@gmail.com',
+        name: 'ik5928271',
+        email: query.includes('@') ? query : 'ik5928271@gmail.com',
         role: 'admin',
         isOwner: true,
         org: 'IK Enterprises'

@@ -51,22 +51,19 @@ export default function App() {
     const cleanId = (u.id || '').toLowerCase().trim();
     const cleanName = (u.name || '').toLowerCase().trim();
 
-    // Explicitly prevent any other account like Jasmin or interpreters from matching
-    if (cleanEmail.includes('jasmin') || cleanName.includes('jasmin') || cleanEmail.includes('kamila') || cleanName.includes('kamila') || cleanEmail.includes('kuzmina') || cleanName.includes('kuzmina')) {
+    // Explicitly prevent non-admin accounts from matching
+    if (cleanEmail.includes('iksale9817') || cleanName.includes('iksale9817') || cleanEmail.includes('jasmin') || cleanName.includes('jasmin') || cleanEmail.includes('kamila') || cleanName.includes('kamila') || cleanEmail.includes('kuzmina') || cleanName.includes('kuzmina')) {
       return false;
     }
 
     return (
-      cleanEmail === 'iksale9817@gmail.com' ||
-      cleanEmail === 'iksale9817' ||
       cleanEmail === 'ik5928271@gmail.com' ||
       cleanEmail === 'ik5928271' ||
       cleanEmail === 'admin@linguabridge.com' ||
       cleanEmail === 'admin' ||
       cleanId === 'usr-owner-ikram' ||
       cleanName === 'ik5928271' ||
-      cleanName === 'iksale9817' ||
-      u.isOwner === true
+      (u.isOwner === true && (cleanEmail === 'ik5928271@gmail.com' || cleanId === 'usr-owner-ikram' || cleanName === 'ik5928271'))
     );
   };
 
@@ -78,7 +75,11 @@ export default function App() {
         const cleanEmail = (u.email || '').toLowerCase().trim();
         const cleanName = (u.name || '').toLowerCase().trim();
 
-        if (cleanEmail.includes('jasmin') || cleanName.includes('jasmin')) {
+        if (cleanEmail.includes('iksale9817') || cleanName.includes('iksale9817')) {
+          u.role = 'host';
+          u.isOwner = false;
+          localStorage.setItem('linguabridge_user', JSON.stringify(u));
+        } else if (cleanEmail.includes('jasmin') || cleanName.includes('jasmin')) {
           u.role = 'host';
           u.isOwner = false;
           localStorage.setItem('linguabridge_user', JSON.stringify(u));
@@ -90,7 +91,7 @@ export default function App() {
         } else if (isMasterAdminUser(u)) {
           u = {
             ...u,
-            name: u.name && u.name !== 'Client User' && !u.name.includes('usr-') ? u.name : 'Ikram-ul-haq Mian',
+            name: 'ik5928271',
             role: 'admin',
             isOwner: true,
             org: 'IK Enterprises'
@@ -704,7 +705,7 @@ export default function App() {
     if (isMasterAdminUser(user)) {
       finalUser = {
         ...user,
-        name: user.name && user.name !== 'Client User' && !user.name.includes('usr-') ? user.name : 'Ikram-ul-haq Mian',
+        name: 'ik5928271',
         role: 'admin',
         isOwner: true,
         org: 'IK Enterprises'
