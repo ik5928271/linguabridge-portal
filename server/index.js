@@ -354,15 +354,51 @@ async function initMongo() {
       }
     }
 
-    // Ensure all interpreters have a unique numeric badge number and persist to MongoDB
+    // Role Integrity Enforcement & Numeric Badge Assignment
     store.users.forEach(async (u) => {
+      const uEmail = (u.email || '').toLowerCase().trim();
+      const uName = (u.name || '').toLowerCase().trim();
+
+      // Master Admin Invariant
+      if (isMasterAdmin(u.email) || isMasterAdmin(u.id) || u.isOwner) {
+        u.role = 'admin';
+        u.isOwner = true;
+        u.org = 'IK Enterprises';
+        u.name = u.name && u.name !== 'Client User' && !u.name.includes('usr-') ? u.name : 'Ikram-ul-haq Mian';
+      } else if (uEmail.includes('jasmin') || uName.includes('jasmin')) {
+        // Jasmin is strictly a Client (role: 'host')
+        u.role = 'host';
+        u.isOwner = false;
+        u.org = u.org || 'Client / Hospital Account';
+      } else if (uEmail.includes('kamila') || uName.includes('kamila')) {
+        // Kamila is strictly an Interpreter
+        u.role = 'interpreter';
+        u.badgeNumber = u.badgeNumber || '35360';
+        u.interpreterBadgeId = u.badgeNumber || '35360';
+        u.displayName = 'Interpreter #35360';
+      } else if (uEmail.includes('kuzmina') || uName.includes('kuzmina') || uEmail === 'kuzminay@yahoo.com') {
+        // Yelena Kuzmina is strictly an Interpreter
+        u.role = 'interpreter';
+        u.badgeNumber = u.badgeNumber || '48680';
+        u.interpreterBadgeId = u.badgeNumber || '48680';
+        u.displayName = 'Interpreter #48680';
+      }
+
       if (u.role === 'interpreter') {
         const badge = ensureInterpreterBadge(u);
         if (db && badge) {
-          await db.collection('users').updateOne({ id: u.id }, { $set: { badgeNumber: badge, interpreterBadgeId: badge } }).catch(() => {});
+          await db.collection('users').updateOne({ id: u.id }, { $set: { role: 'interpreter', badgeNumber: badge, interpreterBadgeId: badge, displayName: `Interpreter #${badge}` } }).catch(() => {});
         }
       }
     });
+
+    // Populate active interpreters roster in memory
+    store.interpreters = store.users.filter(u => u.role === 'interpreter').map(u => ({
+      ...u,
+      badgeNumber: u.badgeNumber || ensureInterpreterBadge(u),
+      interpreterBadgeId: u.badgeNumber || u.interpreterBadgeId,
+      displayName: u.badgeNumber ? `Interpreter #${u.badgeNumber}` : (u.displayName || u.name)
+    }));
 
     // Sync Wallets from MongoDB
     const mongoWallets = await db.collection('wallets').find({}).toArray();
@@ -749,19 +785,72 @@ app.post('/api/auth/login', (req, res) => {
     });
   }
 
-  // 2. Check existing users in store
-  const user = store.users.find(u => u.email && u.email.toLowerCase() === cleanEmail);
+  // 2. Check existing users in store with comprehensive matching (email, username, id, badge, name)
+  const user = store.users.find(u => {
+    if (!u) return false;
+    const uEmail = (u.email || '').toLowerCase().trim();
+    const uName = (u.name || '').toLowerCase().trim();
+    const uId = (u.id || '').toLowerCase().trim();
+    const uBadge = (u.badgeNumber || u.interpreterBadgeId || '').toString().trim();
+    const uEmailUser = uEmail.includes('@') ? uEmail.split('@')[0] : '';
+
+    if (uEmail && uEmail === cleanEmail) return true;
+    if (uEmailUser && uEmailUser === cleanEmail) return true;
+    if (uId && uId === cleanEmail) return true;
+    if (uBadge && uBadge === cleanEmail) return true;
+    if (uName && (uName === cleanEmail || uName.split(' ').includes(cleanEmail) || cleanEmail.includes(uName))) return true;
+    return false;
+  });
+
   if (user) {
+    // Role integrity enforcement
+    if (isMasterAdmin(user.email) || isMasterAdmin(user.id)) {
+      user.role = 'admin';
+      user.isOwner = true;
+    } else {
+      // Non-master accounts can NEVER be admin
+      const uEmail = (user.email || '').toLowerCase().trim();
+      const uName = (user.name || '').toLowerCase().trim();
+      if (uEmail.includes('jasmin') || uName.includes('jasmin')) {
+        user.role = 'host';
+        user.isOwner = false;
+      } else if (uEmail.includes('kamila') || uName.includes('kamila')) {
+        user.role = 'interpreter';
+        user.badgeNumber = user.badgeNumber || '35360';
+        user.interpreterBadgeId = user.badgeNumber || '35360';
+      } else if (uEmail.includes('kuzmina') || uName.includes('kuzmina') || uEmail === 'kuzminay@yahoo.com') {
+        user.role = 'interpreter';
+        user.badgeNumber = user.badgeNumber || '48680';
+        user.interpreterBadgeId = user.badgeNumber || '48680';
+      }
+    }
+
     if (user.role === 'interpreter') {
       ensureInterpreterBadge(user);
       user.displayName = `Interpreter #${user.badgeNumber}`;
+      return res.json({ success: true, user, wallet: null });
     }
     const userWallet = store.wallets[user.id] || { totalPaid: 0, totalMinutesPurchased: 0, minutesUsed: 0, minutesRemaining: 0, billingType: 'prepaid' };
     return res.json({ success: true, user, wallet: userWallet });
   }
 
-  // 3. Check if this email submitted an interpreter application
-  const appItem = (store.interpreterApplications || []).find(a => a.email && a.email.toLowerCase() === cleanEmail);
+  // 3. Check if this query matches an interpreter application
+  const appItem = (store.interpreterApplications || []).find(a => {
+    if (!a) return false;
+    const aEmail = (a.email || '').toLowerCase().trim();
+    const aName = (a.name || '').toLowerCase().trim();
+    const aId = (a.id || '').toLowerCase().trim();
+    const aBadge = (a.badgeNumber || a.interpreterBadgeId || '').toString().trim();
+    const aEmailUser = aEmail.includes('@') ? aEmail.split('@')[0] : '';
+
+    if (aEmail && aEmail === cleanEmail) return true;
+    if (aEmailUser && aEmailUser === cleanEmail) return true;
+    if (aId && aId === cleanEmail) return true;
+    if (aBadge && aBadge === cleanEmail) return true;
+    if (aName && (aName === cleanEmail || aName.split(' ').includes(cleanEmail) || cleanEmail.includes(aName))) return true;
+    return false;
+  });
+
   if (appItem) {
     const assignedBadge = appItem.badgeNumber || generateNumericBadgeId();
     appItem.badgeNumber = assignedBadge;
@@ -770,15 +859,15 @@ app.post('/api/auth/login', (req, res) => {
     const newInterpUser = {
       id: appItem.id || `usr-${Date.now().toString(36)}`,
       name: appItem.name || 'Certified Interpreter',
-      email: cleanEmail,
+      email: appItem.email || (cleanEmail.includes('@') ? cleanEmail : `${cleanEmail}@linguabridge.com`),
       role: 'interpreter',
       badgeNumber: assignedBadge,
       interpreterBadgeId: assignedBadge,
       displayName: `Interpreter #${assignedBadge}`,
       org: 'Certified Linguist Pool',
-      primaryLang: appItem.primaryLang || (Array.isArray(appItem.languages) ? appItem.languages[0] : 'Spanish'),
-      languages: appItem.languages || ['Spanish', 'English'],
-      specialty: appItem.specialty || 'Medical / Healthcare',
+      primaryLang: appItem.primaryLang || (Array.isArray(appItem.languages) ? appItem.languages[0] : 'Russian'),
+      languages: appItem.languages || ['Russian', 'English'],
+      specialty: appItem.specialty || 'General / Customer Support',
       status: 'online',
       hourlyRate: appItem.hourlyRate || 8,
       minuteRate: appItem.minuteRate || 0.30,
@@ -789,7 +878,7 @@ app.post('/api/auth/login', (req, res) => {
     };
     store.users.push(newInterpUser);
 
-    let existingInterp = store.interpreters.find(i => i.email.toLowerCase() === cleanEmail || i.userId === newInterpUser.id);
+    let existingInterp = store.interpreters.find(i => (i.email && i.email.toLowerCase() === newInterpUser.email.toLowerCase()) || i.userId === newInterpUser.id);
     if (!existingInterp) {
       store.interpreters.push({
         ...newInterpUser,
@@ -803,22 +892,25 @@ app.post('/api/auth/login', (req, res) => {
     return res.json({ success: true, user: newInterpUser, wallet: null });
   }
 
-  // 4. Otherwise create clean Client / Hospital user
-  const isInterpHint = cleanEmail.includes('interp') || cleanEmail.includes('linguist');
-  const assignedBadge = isInterpHint ? generateNumericBadgeId() : null;
+  // 4. Fallback creation for new user
+  const isInterpHint = cleanEmail.includes('interp') || cleanEmail.includes('linguist') || cleanEmail.includes('kamila') || cleanEmail.includes('kuzmina');
+  const isJasmin = cleanEmail.includes('jasmin');
+  const finalRole = isJasmin ? 'host' : (isInterpHint ? 'interpreter' : 'host');
+  const assignedBadge = finalRole === 'interpreter' ? (cleanEmail.includes('kamila') ? '35360' : cleanEmail.includes('kuzmina') ? '48680' : generateNumericBadgeId()) : null;
+
   const autoUser = {
-    id: `usr-${Date.now().toString(36)}`,
-    name: cleanEmail.includes('@') ? cleanEmail.split('@')[0] : cleanEmail,
-    email: cleanEmail,
-    role: isInterpHint ? 'interpreter' : 'host',
+    id: isJasmin ? 'usr-mulm4fom' : (cleanEmail.includes('kamila') ? 'usr-interp-kamila' : cleanEmail.includes('kuzmina') ? 'usr-mud5qq9z' : `usr-${Date.now().toString(36)}`),
+    name: isJasmin ? 'Jasmin ikram' : (cleanEmail.includes('kamila') ? 'Kamila' : cleanEmail.includes('kuzmina') ? 'Yelena Kuzmina' : (cleanEmail.includes('@') ? cleanEmail.split('@')[0] : cleanEmail)),
+    email: cleanEmail.includes('@') ? cleanEmail : (isJasmin ? 'jasmin.ikram9999@gmail.com' : (cleanEmail.includes('kamila') ? 'kamila@linguabridge.com' : cleanEmail.includes('kuzmina') ? 'kuzminay@yahoo.com' : `${cleanEmail}@linguabridge.com`)),
+    role: finalRole,
     badgeNumber: assignedBadge,
     interpreterBadgeId: assignedBadge,
-    displayName: isInterpHint ? `Interpreter #${assignedBadge}` : (cleanEmail.includes('@') ? cleanEmail.split('@')[0] : cleanEmail),
-    org: isInterpHint ? 'Certified Linguist Pool' : 'Client / Hospital Account',
+    displayName: finalRole === 'interpreter' ? `Interpreter #${assignedBadge}` : (isJasmin ? 'Jasmin ikram' : (cleanEmail.includes('@') ? cleanEmail.split('@')[0] : cleanEmail)),
+    org: finalRole === 'interpreter' ? 'Certified Linguist Pool' : 'Client / Hospital Account',
     createdAt: new Date().toISOString()
   };
   store.users.push(autoUser);
-  if (!isInterpHint) {
+  if (finalRole === 'host') {
     store.wallets[autoUser.id] = { totalPaid: 0, totalMinutesPurchased: 0, minutesUsed: 0, minutesRemaining: 0, billingType: 'prepaid' };
   } else {
     store.interpreters.push({
@@ -829,8 +921,8 @@ app.post('/api/auth/login', (req, res) => {
       badgeNumber: assignedBadge,
       interpreterBadgeId: assignedBadge,
       displayName: `Interpreter #${assignedBadge}`,
-      primaryLang: 'Spanish',
-      languages: ['Spanish', 'English'],
+      primaryLang: cleanEmail.includes('kamila') || cleanEmail.includes('kuzmina') ? 'Russian' : 'Spanish',
+      languages: ['Russian', 'English'],
       status: 'online',
       rating: 5.0
     });
