@@ -1585,7 +1585,7 @@ app.get('/api/admin/interpreter-applications/:id/file/:fileType', (req, res) => 
 });
 
 // 3. Admin: Approve Application & Provision Active Account
-app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
+app.post('/api/admin/interpreter-applications/:id/approve', async (req, res) => {
   const { id } = req.params;
   const { 
     approvedEmploymentType, 
@@ -1597,12 +1597,18 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
     shiftSchedule
   } = req.body;
 
-  let appItem = store.interpreterApplications.find(a => a.id === id);
+  const targetEmail = (req.body.email || req.body.loginEmail || '').toLowerCase().trim();
+  let appItem = store.interpreterApplications.find(a => 
+    (a.id && a.id === id) || 
+    (a._id && a._id.toString() === id) || 
+    (a.email && (a.email.toLowerCase().trim() === id.toLowerCase().trim() || (targetEmail && a.email.toLowerCase().trim() === targetEmail)))
+  );
+
   if (!appItem) {
     return res.status(404).json({ error: 'Application not found.' });
   }
 
-  const cleanEmail = (appItem.email || '').toLowerCase().trim();
+  const cleanEmail = (appItem.email || targetEmail).toLowerCase().trim();
   const finalType = approvedEmploymentType || appItem.employmentType || 'hourly';
   const finalHourlyRate = approvedHourlyRate !== undefined ? parseInt(approvedHourlyRate) : (appItem.hourlyRate || 8);
   const finalMinuteRate = approvedMinuteRate !== undefined ? parseFloat(approvedMinuteRate) : (appItem.minuteRate || 0.30);
@@ -1628,7 +1634,7 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
   };
 
   // Generate or preserve assigned pure numeric ID
-  let existingUser = store.users.find(u => u.email.toLowerCase().trim() === cleanEmail);
+  let existingUser = store.users.find(u => u.email && u.email.toLowerCase().trim() === cleanEmail);
   const assignedBadgeNumber = appItem.badgeNumber || (existingUser && existingUser.badgeNumber) || generateNumericBadgeId();
 
   // Mark all matching application entries as approved
@@ -1667,7 +1673,7 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
     displayName: `Interpreter #${assignedBadgeNumber}`,
     org: finalType === 'salary_base' ? 'In-House Linguist Team (Salaried)' : 'Certified Linguist Pool (Verified)',
     primaryLang: appItem.primaryLang,
-    languages: appItem.languages,
+    languages: appItem.languages || [appItem.primaryLang, 'English'],
     specialty: appItem.specialties?.[0] || 'General / Customer Support',
     employmentType: finalType,
     hourlyRate: finalHourlyRate,
@@ -1690,7 +1696,7 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
   }
 
   // Create or Update Interpreter Roster Item
-  let existingInterp = store.interpreters.find(i => i.email.toLowerCase().trim() === cleanEmail || i.userId === userId);
+  let existingInterp = store.interpreters.find(i => (i.email && i.email.toLowerCase().trim() === cleanEmail) || i.userId === userId);
   const interpProfile = {
     id: existingInterp ? existingInterp.id : `int-${Date.now().toString(36)}`,
     userId: userId,
@@ -1700,7 +1706,7 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
     interpreterBadgeId: assignedBadgeNumber,
     displayName: `Interpreter #${assignedBadgeNumber}`,
     avatar: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 900000000)}?w=150&auto=format&fit=crop&q=80`,
-    languages: appItem.languages,
+    languages: appItem.languages || [appItem.primaryLang, 'English'],
     primaryLang: appItem.primaryLang,
     specialties: appItem.specialties,
     status: 'online',
@@ -1744,12 +1750,34 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
 
   appItem.emailDispatch = emailDispatch;
 
-  // Clean up duplicate application records in MongoDB collection
+  // Persist immediately to MongoDB Cloud Database (Ground Truth)
   if (db && cleanEmail) {
-    db.collection('interpreter_applications').deleteMany({
-      email: { $regex: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
-      id: { $ne: appItem.id }
-    }).catch(() => {});
+    try {
+      await db.collection('interpreter_applications').updateMany(
+        { email: { $regex: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },
+        { 
+          $set: { 
+            status: 'approved', 
+            badgeNumber: assignedBadgeNumber, 
+            interpreterBadgeId: assignedBadgeNumber, 
+            displayName: `Interpreter #${assignedBadgeNumber}`,
+            employmentType: finalType,
+            hourlyRate: finalHourlyRate,
+            minuteRate: finalMinuteRate,
+            monthlySalary: finalMonthlySalary,
+            rateLabel: finalRateLabel,
+            shiftSchedule: resolvedShiftSchedule,
+            adminNotes: adminNotes || 'Approved by IK Enterprises Administration',
+            approvedAt: new Date().toISOString(),
+            emailDispatch: emailDispatch
+          } 
+        }
+      );
+      await db.collection('users').updateOne({ id: userAccount.id }, { $set: userAccount }, { upsert: true });
+      await db.collection('interpreters').updateOne({ id: interpProfile.id }, { $set: interpProfile }, { upsert: true });
+    } catch (e) {
+      console.error('MongoDB Application Approval update error:', e.message);
+    }
   }
 
   saveStore();
@@ -1784,7 +1812,7 @@ app.post('/api/admin/interpreter-applications/:id/approve', (req, res) => {
 // Admin: Revert Approved Application back to Pending Review
 app.post('/api/admin/interpreter-applications/:id/revert-to-pending', async (req, res) => {
   const { id } = req.params;
-  const appItem = store.interpreterApplications.find(a => a.id === id);
+  const appItem = store.interpreterApplications.find(a => a.id === id || (a.email && a.email.toLowerCase().trim() === id.toLowerCase().trim()));
   if (!appItem) {
     return res.status(404).json({ error: 'Application not found.' });
   }
@@ -1830,11 +1858,11 @@ app.post('/api/admin/interpreter-applications/:id/revert-to-pending', async (req
 });
 
 // 4. Admin: Reject Application
-app.post('/api/admin/interpreter-applications/:id/reject', (req, res) => {
+app.post('/api/admin/interpreter-applications/:id/reject', async (req, res) => {
   const { id } = req.params;
   const { rejectReason } = req.body;
 
-  const appItem = store.interpreterApplications.find(a => a.id === id);
+  const appItem = store.interpreterApplications.find(a => a.id === id || (a.email && a.email.toLowerCase().trim() === id.toLowerCase().trim()));
   if (!appItem) {
     return res.status(404).json({ error: 'Application not found.' });
   }
@@ -1847,6 +1875,17 @@ app.post('/api/admin/interpreter-applications/:id/reject', (req, res) => {
       a.rejectedAt = new Date().toISOString();
     }
   });
+
+  if (db && cleanEmail) {
+    try {
+      await db.collection('interpreter_applications').updateMany(
+        { email: { $regex: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },
+        { $set: { status: 'rejected', adminNotes: rejectReason || 'Application does not meet current credentialing requirements.', rejectedAt: new Date().toISOString() } }
+      );
+    } catch (e) {
+      console.error('MongoDB reject error:', e.message);
+    }
+  }
 
   store.interpreterApplications = deduplicateApplications(store.interpreterApplications);
   saveStore();
