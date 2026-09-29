@@ -50,6 +50,12 @@ export default function App() {
     const cleanEmail = (u.email || '').toLowerCase().trim();
     const cleanId = (u.id || '').toLowerCase().trim();
     const cleanName = (u.name || '').toLowerCase().trim();
+
+    // Explicitly prevent any other account like Jasmin or interpreters from matching
+    if (cleanEmail.includes('jasmin') || cleanName.includes('jasmin') || cleanEmail.includes('kamila') || cleanName.includes('kamila') || cleanEmail.includes('kuzmina') || cleanName.includes('kuzmina')) {
+      return false;
+    }
+
     return (
       cleanEmail === 'iksale9817@gmail.com' ||
       cleanEmail === 'iksale9817' ||
@@ -69,7 +75,19 @@ export default function App() {
       const saved = localStorage.getItem('linguabridge_user');
       if (saved) {
         let u = JSON.parse(saved);
-        if (isMasterAdminUser(u)) {
+        const cleanEmail = (u.email || '').toLowerCase().trim();
+        const cleanName = (u.name || '').toLowerCase().trim();
+
+        if (cleanEmail.includes('jasmin') || cleanName.includes('jasmin')) {
+          u.role = 'host';
+          u.isOwner = false;
+          localStorage.setItem('linguabridge_user', JSON.stringify(u));
+        } else if (cleanEmail.includes('kamila') || cleanName.includes('kamila') || cleanEmail.includes('kuzmina') || cleanName.includes('kuzmina')) {
+          u.role = 'interpreter';
+          u.badgeNumber = cleanEmail.includes('kamila') || cleanName.includes('kamila') ? (u.badgeNumber || '35360') : (u.badgeNumber || '48680');
+          u.interpreterBadgeId = u.badgeNumber;
+          localStorage.setItem('linguabridge_user', JSON.stringify(u));
+        } else if (isMasterAdminUser(u)) {
           u = {
             ...u,
             name: u.name && u.name !== 'Client User' && !u.name.includes('usr-') ? u.name : 'Ikram-ul-haq Mian',
@@ -319,18 +337,39 @@ export default function App() {
   // Fetch real data from backend on mount & sanitize local storage accounts
   useEffect(() => {
     try {
-      // Auto-migrate any previously stored client accounts for admin
+      // Auto-migrate and sanitize stored local accounts
       const savedAccounts = localStorage.getItem('linguabridge_accounts');
       if (savedAccounts) {
         const accounts = JSON.parse(savedAccounts);
         let modified = false;
         accounts.forEach(a => {
-          if (a?.user && isMasterAdminUser(a.user)) {
+          if (!a?.user) return;
+          const uEmail = (a.user.email || '').toLowerCase().trim();
+          const uName = (a.user.name || '').toLowerCase().trim();
+
+          if (isMasterAdminUser(a.user)) {
             a.user.role = 'admin';
             a.user.isOwner = true;
             a.user.name = a.user.name && a.user.name !== 'Client User' && !a.user.name.includes('usr-') ? a.user.name : 'Ikram-ul-haq Mian';
             a.user.org = 'IK Enterprises';
             a.wallet = { totalPaid: 1000, totalMinutesPurchased: 9999, minutesRemaining: 9999, billingType: 'unlimited_owner' };
+            modified = true;
+          } else if (uEmail.includes('jasmin') || uName.includes('jasmin')) {
+            a.user.role = 'host';
+            a.user.isOwner = false;
+            a.user.org = a.user.org || 'Client / Hospital Account';
+            modified = true;
+          } else if (uEmail.includes('kamila') || uName.includes('kamila')) {
+            a.user.role = 'interpreter';
+            a.user.badgeNumber = a.user.badgeNumber || '35360';
+            a.user.interpreterBadgeId = a.user.badgeNumber || '35360';
+            a.user.displayName = 'Interpreter #35360';
+            modified = true;
+          } else if (uEmail.includes('kuzmina') || uName.includes('kuzmina') || uEmail === 'kuzminay@yahoo.com') {
+            a.user.role = 'interpreter';
+            a.user.badgeNumber = a.user.badgeNumber || '48680';
+            a.user.interpreterBadgeId = a.user.badgeNumber || '48680';
+            a.user.displayName = 'Interpreter #48680';
             modified = true;
           }
         });
@@ -342,6 +381,9 @@ export default function App() {
       const savedUser = localStorage.getItem('linguabridge_user');
       if (savedUser) {
         const u = JSON.parse(savedUser);
+        const uEmail = (u.email || '').toLowerCase().trim();
+        const uName = (u.name || '').toLowerCase().trim();
+
         if (isMasterAdminUser(u) && u.role !== 'admin') {
           u.role = 'admin';
           u.isOwner = true;
@@ -351,6 +393,21 @@ export default function App() {
           setCurrentUser(u);
           setCurrentRole('admin');
           setCurrentView('admin');
+        } else if ((uEmail.includes('jasmin') || uName.includes('jasmin')) && u.role !== 'host') {
+          u.role = 'host';
+          u.isOwner = false;
+          localStorage.setItem('linguabridge_user', JSON.stringify(u));
+          setCurrentUser(u);
+          setCurrentRole('host');
+          setCurrentView('landing');
+        } else if ((uEmail.includes('kamila') || uName.includes('kamila') || uEmail.includes('kuzmina') || uName.includes('kuzmina')) && u.role !== 'interpreter') {
+          u.role = 'interpreter';
+          u.badgeNumber = (uEmail.includes('kamila') || uName.includes('kamila')) ? '35360' : '48680';
+          u.interpreterBadgeId = u.badgeNumber;
+          localStorage.setItem('linguabridge_user', JSON.stringify(u));
+          setCurrentUser(u);
+          setCurrentRole('interpreter');
+          setCurrentView('interpreter');
         }
       }
     } catch {}

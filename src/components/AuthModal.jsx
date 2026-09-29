@@ -181,14 +181,31 @@ export default function AuthModal({
     const localAccounts = getLocalAccounts();
     const found = localAccounts.find(a => 
       (a.user.email && a.user.email.toLowerCase() === query) ||
-      (a.user.name && a.user.name.toLowerCase() === query)
+      (a.user.name && a.user.name.toLowerCase() === query) ||
+      (a.user.email && a.user.email.toLowerCase().includes(query)) ||
+      (a.user.name && a.user.name.toLowerCase().includes(query))
     );
 
     if (found) {
-      if (isMasterAdmin(found.user.email) || isMasterAdmin(found.user.name)) {
+      if (isMasterAdmin(found.user.email) || isMasterAdmin(found.user.name) || isMasterAdmin(found.user.id)) {
         found.user.role = 'admin';
         found.user.isOwner = true;
         found.wallet = { totalPaid: 1000, totalMinutesPurchased: 9999, minutesRemaining: 9999, billingType: 'unlimited_owner' };
+      } else {
+        const uEmail = (found.user.email || '').toLowerCase();
+        const uName = (found.user.name || '').toLowerCase();
+        if (uEmail.includes('jasmin') || uName.includes('jasmin')) {
+          found.user.role = 'host';
+          found.user.isOwner = false;
+        } else if (uEmail.includes('kamila') || uName.includes('kamila')) {
+          found.user.role = 'interpreter';
+          found.user.badgeNumber = found.user.badgeNumber || '35360';
+          found.user.interpreterBadgeId = found.user.badgeNumber || '35360';
+        } else if (uEmail.includes('kuzmina') || uName.includes('kuzmina') || uEmail === 'kuzminay@yahoo.com') {
+          found.user.role = 'interpreter';
+          found.user.badgeNumber = found.user.badgeNumber || '48680';
+          found.user.interpreterBadgeId = found.user.badgeNumber || '48680';
+        }
       }
       onSuccessLogin(found.user, found.wallet);
       onClose();
@@ -196,25 +213,42 @@ export default function AuthModal({
     }
 
     // 3. Certified Interpreter Logins
-    if (query.includes('interp') || query.includes('elena') || query.includes('alex') || query.includes('wali') || query.includes('sally') || query.includes('mehran')) {
+    const isInterpQuery = 
+      query.includes('kamila') ||
+      query.includes('kuzmina') ||
+      query.includes('elena') ||
+      query.includes('yelena') ||
+      query.includes('alex') ||
+      query.includes('wali') ||
+      query.includes('sally') ||
+      query.includes('mehran') ||
+      query.includes('interp') ||
+      query.includes('linguist');
+
+    if (isInterpQuery) {
+      const badgeNum = query.includes('kamila') ? '35360' : query.includes('kuzmina') ? '48680' : Math.floor(10000 + Math.random() * 90000).toString();
       const interpUser = {
-        id: `usr-int-${Date.now().toString(36)}`,
-        name: query.includes('@') ? query.split('@')[0] : 'Certified Linguist',
-        email: query,
+        id: query.includes('kamila') ? 'usr-interp-kamila' : query.includes('kuzmina') ? 'usr-mud5qq9z' : `usr-int-${Date.now().toString(36)}`,
+        name: query.includes('kamila') ? 'Kamila' : query.includes('kuzmina') ? 'Yelena Kuzmina' : (query.includes('@') ? query.split('@')[0] : 'Certified Linguist'),
+        email: query.includes('kamila') ? 'kamila@linguabridge.com' : query.includes('kuzmina') ? 'kuzminay@yahoo.com' : (query.includes('@') ? query : `${query}@linguabridge.com`),
         role: 'interpreter',
+        badgeNumber: badgeNum,
+        interpreterBadgeId: badgeNum,
+        displayName: `Interpreter #${badgeNum}`,
         org: 'Certified Linguist Pool',
-        primaryLang: 'Spanish',
+        primaryLang: query.includes('kamila') || query.includes('kuzmina') ? 'Russian' : 'Spanish',
         rating: 4.98
       };
       saveLocalAccount(interpUser, null);
       onSuccessLogin(interpUser, null);
     } else {
-      // 4. Default to Client account
+      // 4. Client / Hospital Account (Jasmin is strictly a Client)
+      const isJasmin = query.includes('jasmin');
       const customUser = {
-        id: `usr-${Date.now().toString(36)}`,
-        name: query.includes('@') ? query.split('@')[0] : query,
-        email: query.includes('@') ? query : `${query}@linguabridge.com`,
-        role: 'host',
+        id: isJasmin ? 'usr-mulm4fom' : `usr-${Date.now().toString(36)}`,
+        name: isJasmin ? 'Jasmin ikram' : (query.includes('@') ? query.split('@')[0] : query),
+        email: isJasmin ? 'jasmin.ikram9999@gmail.com' : (query.includes('@') ? query : `${query}@linguabridge.com`),
+        role: 'host', // Strict Client role
         org: 'Client / Hospital Account'
       };
       const customWallet = { totalPaid: 0, totalMinutesPurchased: 0, minutesRemaining: 0, billingType: 'prepaid' };
