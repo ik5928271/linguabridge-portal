@@ -38,8 +38,8 @@ if (!fs.existsSync(DATA_DIR)) {
 // Default Master Owner & Platform Administrator
 const DEFAULT_OWNER = {
   id: 'usr-owner-ikram',
-  name: 'Ikram-ul-haq Mian',
-  email: 'iksale9817@gmail.com',
+  name: 'ik5928271',
+  email: 'ik5928271@gmail.com',
   password: 'admin123',
   role: 'admin',
   isOwner: true,
@@ -51,9 +51,10 @@ const DEFAULT_OWNER = {
 function isMasterAdmin(identifier) {
   if (!identifier) return false;
   const clean = String(identifier).toLowerCase().trim();
+  if (clean.includes('iksale9817') || clean.includes('iksale9815') || clean.includes('jasmin') || clean.includes('kamila') || clean.includes('kuzmina')) {
+    return false;
+  }
   return (
-    clean === 'iksale9817@gmail.com' ||
-    clean === 'iksale9817' ||
     clean === 'ik5928271@gmail.com' ||
     clean === 'ik5928271' ||
     clean === 'admin@linguabridge.com' ||
@@ -245,10 +246,14 @@ function loadStore() {
 
       // Ensure Owner Account and Master Admin accounts always exist with admin role & owner status
       store.users.forEach((u, idx) => {
-        if (isMasterAdmin(u.email) || isMasterAdmin(u.id) || isMasterAdmin(u.name) || u.isOwner) {
+        const uEmail = (u.email || '').toLowerCase().trim();
+        const uName = (u.name || '').toLowerCase().trim();
+
+        if (isMasterAdmin(u.email) || isMasterAdmin(u.id)) {
           store.users[idx] = {
             ...u,
-            name: u.name || DEFAULT_OWNER.name,
+            name: 'ik5928271',
+            email: 'ik5928271@gmail.com',
             role: 'admin',
             isOwner: true,
             org: 'IK Enterprises'
@@ -263,10 +268,27 @@ function loadStore() {
               billingType: 'unlimited_owner'
             };
           }
+        } else if (uEmail.includes('iksale9817') || uName.includes('iksale9817')) {
+          store.users[idx] = {
+            ...u,
+            role: 'host',
+            isOwner: false,
+            org: 'IK Enterprises'
+          };
+        } else if (uEmail.includes('iksale9815') || uName.includes('iksale9815')) {
+          store.users[idx] = {
+            ...u,
+            role: 'interpreter',
+            isOwner: false,
+            badgeNumber: u.badgeNumber || '87265',
+            interpreterBadgeId: u.badgeNumber || '87265',
+            displayName: 'Interpreter #87265',
+            org: 'Certified Linguist Pool'
+          };
         }
       });
 
-      const ownerIndex = store.users.findIndex(u => isMasterAdmin(u.email) || isMasterAdmin(u.id) || u.isOwner);
+      const ownerIndex = store.users.findIndex(u => isMasterAdmin(u.email) || isMasterAdmin(u.id));
       if (ownerIndex >= 0) {
         store.users[ownerIndex] = { ...store.users[ownerIndex], ...DEFAULT_OWNER, role: 'admin', isOwner: true };
       } else {
@@ -360,16 +382,41 @@ async function initMongo() {
       const uName = (u.name || '').toLowerCase().trim();
 
       // Master Admin Invariant
-      if (isMasterAdmin(u.email) || isMasterAdmin(u.id) || u.isOwner) {
+      if (isMasterAdmin(u.email) || isMasterAdmin(u.id)) {
         u.role = 'admin';
         u.isOwner = true;
         u.org = 'IK Enterprises';
-        u.name = u.name && u.name !== 'Client User' && !u.name.includes('usr-') ? u.name : 'Ikram-ul-haq Mian';
+        u.name = 'ik5928271';
+        if (db) {
+          await db.collection('users').updateOne({ id: u.id }, { $set: { role: 'admin', isOwner: true, org: 'IK Enterprises', name: 'ik5928271' } }).catch(() => {});
+        }
+      } else if (uEmail.includes('iksale9817') || uName.includes('iksale9817')) {
+        // iksale9817 is strictly a Client (role: 'host')
+        u.role = 'host';
+        u.isOwner = false;
+        u.org = u.org || 'IK Enterprises';
+        if (db) {
+          await db.collection('users').updateOne({ id: u.id }, { $set: { role: 'host', isOwner: false, org: u.org } }).catch(() => {});
+        }
+      } else if (uEmail.includes('iksale9815') || uName.includes('iksale9815')) {
+        // iksale9815 is strictly an Interpreter
+        u.role = 'interpreter';
+        u.isOwner = false;
+        u.badgeNumber = u.badgeNumber || '87265';
+        u.interpreterBadgeId = u.badgeNumber || '87265';
+        u.displayName = 'Interpreter #87265';
+        u.org = 'Certified Linguist Pool';
+        if (db) {
+          await db.collection('users').updateOne({ id: u.id }, { $set: { role: 'interpreter', isOwner: false, badgeNumber: '87265', interpreterBadgeId: '87265', displayName: 'Interpreter #87265', org: u.org } }).catch(() => {});
+        }
       } else if (uEmail.includes('jasmin') || uName.includes('jasmin')) {
         // Jasmin is strictly a Client (role: 'host')
         u.role = 'host';
         u.isOwner = false;
         u.org = u.org || 'Client / Hospital Account';
+        if (db) {
+          await db.collection('users').updateOne({ id: u.id }, { $set: { role: 'host', isOwner: false, org: u.org } }).catch(() => {});
+        }
       } else if (uEmail.includes('kamila') || uName.includes('kamila')) {
         // Kamila is strictly an Interpreter
         u.role = 'interpreter';
