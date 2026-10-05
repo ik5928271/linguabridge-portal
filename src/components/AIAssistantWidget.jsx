@@ -252,25 +252,34 @@ export default function AIAssistantWidget({ currentUser = null, currentRole = 'h
     setInputQuery('');
     setIsTyping(true);
 
-    // Query Google Gemini 1.5 Flash API with local rule-engine fallback
+    // Mandatory Identification Gate: Check if user is signed in or has provided email/phone
+    const effectiveEmail = ticketEmail || (emailMatch ? emailMatch[0] : (currentUser?.email || ''));
+    const effectivePhone = ticketPhone || (phoneMatch ? phoneMatch[0] : '');
+    const isAuthenticated = !!(currentUser && currentUser.email && currentUser.role !== 'guest');
+
     let botResponseText = '';
-    try {
-      const aiRes = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: userText,
-          messages: updatedMessages
-        })
-      });
-      const aiData = await aiRes.json();
-      if (aiData && aiData.success && aiData.reply) {
-        botResponseText = aiData.reply;
-      } else {
+    if (!isAuthenticated && !effectiveEmail && !effectivePhone) {
+      botResponseText = `👋 Welcome to **LinguaBridge Support & Admin Dispatch**!\n\nTo proceed with your inquiry, rate quote, or live dispatch assistance, please **sign in to your account** or provide your **email address** or **contact phone / WhatsApp number** below.`;
+    } else {
+      // Query Google Gemini 1.5 Flash API with local rule-engine fallback
+      try {
+        const aiRes = await fetch('/api/ai/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: userText,
+            messages: updatedMessages
+          })
+        });
+        const aiData = await aiRes.json();
+        if (aiData && aiData.success && aiData.reply) {
+          botResponseText = aiData.reply;
+        } else {
+          botResponseText = generateBotResponse(userText);
+        }
+      } catch {
         botResponseText = generateBotResponse(userText);
       }
-    } catch {
-      botResponseText = generateBotResponse(userText);
     }
 
     const botMsg = {

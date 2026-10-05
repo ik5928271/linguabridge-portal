@@ -292,8 +292,8 @@ export default function AdminDashboard({
   const [usersList, setUsersList] = useState([
     {
       id: 'usr-owner-ikram',
-      name: 'Ikram-ul-haq Mian',
-      email: 'iksale9817@gmail.com',
+      name: 'ik5928271',
+      email: 'ik5928271@gmail.com',
       role: 'admin',
       isOwner: true,
       org: 'IK Enterprises',
@@ -303,6 +303,40 @@ export default function AdminDashboard({
       monthlySalary: 5000,
       hourlyRate: 0,
       wallet: { totalPaid: 1000, totalMinutesPurchased: 9999, minutesRemaining: 9999, billingType: 'unlimited_owner' },
+      createdAt: '2026-08-30'
+    },
+    {
+      id: 'usr-interp-iksale9815',
+      name: 'Ikram ul haq',
+      email: 'iksale9815@gmail.com',
+      role: 'interpreter',
+      isOwner: false,
+      badgeNumber: '87265',
+      interpreterBadgeId: '87265',
+      displayName: 'Interpreter #87265',
+      org: 'Certified Linguist Pool',
+      primaryLang: 'Urdu',
+      specialty: 'General / Customer Support',
+      hourlyRate: 5,
+      minuteRate: 0.20,
+      monthlySalary: 1200,
+      employmentType: 'per_minute',
+      rateLabel: '$0.20 / min (On-Demand Talk)',
+      createdAt: '2026-08-30'
+    },
+    {
+      id: 'usr-client-iksale9817',
+      name: 'Clients test',
+      email: 'iksale9817@gmail.com',
+      role: 'host',
+      isOwner: false,
+      org: 'IK Enterprises',
+      primaryLang: 'English',
+      specialty: 'Medical / Healthcare',
+      hourlyRate: 5,
+      employmentType: 'hourly',
+      rateLabel: '$5 / hr (Shift)',
+      wallet: { totalPaid: 500, totalMinutesPurchased: 500, minutesRemaining: 500, billingType: 'prepaid' },
       createdAt: '2026-08-30'
     },
     {
@@ -3063,7 +3097,7 @@ Platform Security Clearance Hash: LB-VERIFIED-${Date.now().toString(36).toUpperC
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
                   {filteredUsers.map((u) => {
-                    const isMasterOwner = u.isOwner || u.email === 'ik5928271@gmail.com' || u.email === 'iksale9817@gmail.com' || u.email === 'iksale9815@gmail.com';
+                    const isMasterOwner = (u.isOwner && (u.email === 'ik5928271@gmail.com' || u.id === 'usr-owner-ikram' || u.email === 'admin@linguabridge.com')) || u.email === 'ik5928271@gmail.com';
                     const activeRate = u.hourlyRate !== undefined ? u.hourlyRate : (u.interpreterProfile?.hourlyRate !== undefined ? u.interpreterProfile.hourlyRate : 5);
 
                     return (

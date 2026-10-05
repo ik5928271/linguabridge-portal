@@ -52,7 +52,7 @@ export default function App() {
     const cleanName = (u.name || '').toLowerCase().trim();
 
     // Explicitly prevent non-admin accounts from matching
-    if (cleanEmail.includes('iksale9817') || cleanName.includes('iksale9817') || cleanEmail.includes('jasmin') || cleanName.includes('jasmin') || cleanEmail.includes('kamila') || cleanName.includes('kamila') || cleanEmail.includes('kuzmina') || cleanName.includes('kuzmina')) {
+    if (cleanEmail.includes('iksale9817') || cleanName.includes('iksale9817') || cleanEmail.includes('iksale9815') || cleanName.includes('iksale9815') || cleanEmail.includes('jasmin') || cleanName.includes('jasmin') || cleanEmail.includes('kamila') || cleanName.includes('kamila') || cleanEmail.includes('kuzmina') || cleanName.includes('kuzmina')) {
       return false;
     }
 
@@ -78,6 +78,12 @@ export default function App() {
         if (cleanEmail.includes('iksale9817') || cleanName.includes('iksale9817')) {
           u.role = 'host';
           u.isOwner = false;
+          localStorage.setItem('linguabridge_user', JSON.stringify(u));
+        } else if (cleanEmail.includes('iksale9815') || cleanName.includes('iksale9815')) {
+          u.role = 'interpreter';
+          u.isOwner = false;
+          u.badgeNumber = u.badgeNumber || '87265';
+          u.interpreterBadgeId = u.badgeNumber || '87265';
           localStorage.setItem('linguabridge_user', JSON.stringify(u));
         } else if (cleanEmail.includes('jasmin') || cleanName.includes('jasmin')) {
           u.role = 'host';
