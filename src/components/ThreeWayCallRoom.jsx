@@ -196,18 +196,27 @@ export default function ThreeWayCallRoom({
       return mediaStreamRef.current;
     }
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: { 
-          echoCancellation: { ideal: true }, 
-          noiseSuppression: { ideal: true }, 
-          autoGainControl: { ideal: true },
-          channelCount: 1,
-          sampleRate: 48000
-        }, 
-        video: false 
-      });
-      mediaStreamRef.current = stream;
-      return stream;
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: { 
+            echoCancellation: { ideal: true }, 
+            noiseSuppression: { ideal: true }, 
+            autoGainControl: { ideal: true }
+          }, 
+          video: false 
+        });
+        mediaStreamRef.current = stream;
+        return stream;
+      } catch (err) {
+        console.warn('[Microphone Standard Stream Failed - Trying Raw Audio Fallback]:', err);
+        try {
+          const fallbackStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          mediaStreamRef.current = fallbackStream;
+          return fallbackStream;
+        } catch (e) {
+          console.warn('[Microphone Permission Denied or Unavailable]:', e);
+        }
+      }
     }
     return null;
   };
@@ -700,149 +709,153 @@ export default function ThreeWayCallRoom({
     }
 
     // Initialize real microphone audio stream, volume meter & live PCM streaming engine
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      navigator.mediaDevices.getUserMedia({ 
-        audio: { 
-          echoCancellation: { ideal: true }, 
-          noiseSuppression: { ideal: true }, 
-          autoGainControl: { ideal: true },
-          googEchoCancellation: true,
-          googAutoGainControl: true,
-          googNoiseSuppression: true,
-          googHighpassFilter: true,
-          googTypingNoiseDetection: true,
-          channelCount: 1,
-          sampleRate: 48000
-        }, 
-        video: false 
-      })
-        .then((stream) => {
-          mediaStreamRef.current = stream;
+    const initLocalMicrophone = async () => {
+      let stream = null;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: { 
+            echoCancellation: { ideal: true }, 
+            noiseSuppression: { ideal: true }, 
+            autoGainControl: { ideal: true }
+          }, 
+          video: false 
+        });
+      } catch (err) {
+        console.warn('[Microphone Standard Stream Failed - Trying Raw Audio Fallback]:', err);
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        } catch (e) {
+          console.warn('[Microphone Permission Denied or Unavailable]:', e);
+        }
+      }
 
-          // Attach newly acquired local stream to any established peer connections and trigger offer renegotiation
-          Object.entries(peersRef.current).forEach(([peerId, pc]) => {
-            stream.getAudioTracks().forEach(track => {
-              const senders = pc.getSenders();
-              const audioSender = senders.find(s => (s.track && s.track.kind === 'audio') || (!s.track));
-              if (audioSender) {
-                audioSender.replaceTrack(track).catch(() => {});
-              } else {
-                try { 
-                  pc.addTrack(track, stream); 
-                  if (pc.signalingState === 'stable') {
-                    pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false })
-                      .then(offer => pc.setLocalDescription(offer))
-                      .then(() => {
-                        const socket = getSocket();
-                        if (socket) {
-                          socket.emit('webrtc-offer', {
-                            targetSocketId: peerId,
-                            offer: pc.localDescription,
-                            senderInfo: { role, name: role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName }
-                          });
-                        }
-                      })
-                      .catch(() => {});
-                  }
-                } catch(e){}
-              }
-            });
-          });
+      if (!stream) return;
+      mediaStreamRef.current = stream;
 
-          // Initialize Web Audio API for visual meter and live PCM stream broadcaster
-          try {
-            const AudioCtx = window.AudioContext || window.webkitAudioContext;
-            if (AudioCtx) {
-              const audioCtx = new AudioCtx();
-              audioContextRef.current = audioCtx;
-              if (audioCtx.state === 'suspended') {
-                audioCtx.resume().catch(() => {});
-              }
-
-              const analyser = audioCtx.createAnalyser();
-              analyserRef.current = analyser;
-              analyser.fftSize = 64;
-
-              const source = audioCtx.createMediaStreamSource(stream);
-              source.connect(analyser);
-
-              // Raw PCM Stream Processor (bufferSize 2048 = ~42ms low latency @ 48kHz)
-              const processor = audioCtx.createScriptProcessor(2048, 1, 1);
-              scriptProcessorRef.current = processor;
-
-              processor.onaudioprocess = (e) => {
-                if (!isMutedRef.current) {
-                  const inputData = e.inputBuffer.getChannelData(0);
-                  const len = inputData.length;
-                  const pcm16 = new Int16Array(len);
-                  let maxAmp = 0;
-                  for (let i = 0; i < len; i++) {
-                    const s = Math.max(-1, Math.min(1, inputData[i]));
-                    const abs = Math.abs(s);
-                    if (abs > maxAmp) maxAmp = abs;
-                    pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-                  }
-
-                  // Transmit if unmuted and voice detected (> 0.0005 ultra-sensitive)
-                  if (maxAmp > 0.0005) {
-                    const s = getSocket();
-                    if (s && s.connected) {
-                      s.emit('live-pcm-audio-chunk', {
-                        roomId,
-                        pcmData: Array.from(pcm16),
-                        sampleRate: audioCtx.sampleRate,
-                        senderRole: role,
-                        senderName: role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName
+      // Attach newly acquired local stream to any established peer connections and trigger offer renegotiation
+      Object.entries(peersRef.current).forEach(([peerId, pc]) => {
+        stream.getAudioTracks().forEach(track => {
+          const senders = pc.getSenders();
+          const audioSender = senders.find(s => (s.track && s.track.kind === 'audio') || (!s.track));
+          if (audioSender) {
+            audioSender.replaceTrack(track).catch(() => {});
+          } else {
+            try { 
+              pc.addTrack(track, stream); 
+              if (pc.signalingState === 'stable') {
+                pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false })
+                  .then(offer => pc.setLocalDescription(offer))
+                  .then(() => {
+                    const socket = getSocket();
+                    if (socket) {
+                      socket.emit('webrtc-offer', {
+                        targetSocketId: peerId,
+                        offer: pc.localDescription,
+                        senderInfo: { role, name: role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName }
                       });
                     }
-                  }
-                }
-              };
-
-              analyser.connect(processor);
-              // Connect processor to a silent gain node to prevent hearing own voice locally
-              const silenceNode = audioCtx.createGain();
-              silenceNode.gain.value = 0;
-              processor.connect(silenceNode);
-              silenceNode.connect(audioCtx.destination);
-
-              const dataArray = new Uint8Array(analyser.frequencyBinCount);
-              const checkVolume = () => {
-                if (!analyserRef.current || isMutedRef.current) {
-                  setMicAudioLevel(0);
-                } else {
-                  analyserRef.current.getByteFrequencyData(dataArray);
-                  let sum = 0;
-                  for (let i = 0; i < dataArray.length; i++) {
-                    sum += dataArray[i];
-                  }
-                  const avg = sum / dataArray.length;
-                  const normalized = Math.min(100, Math.floor((avg / 128) * 100));
-                  setMicAudioLevel(normalized);
-
-                  if (normalized > 15 && !isMutedRef.current) {
-                    setActiveSpeaker(role);
-                    const now = Date.now();
-                    if (!lastSpeakingEmitRef.current || (now - lastSpeakingEmitRef.current > 1200)) {
-                      lastSpeakingEmitRef.current = now;
-                      const s = getSocket();
-                      if (s) {
-                        s.emit('update-media-state', { roomId, isSpeaking: true, role });
-                      }
-                    }
-                  }
-                }
-                requestAnimationFrame(checkVolume);
-              };
-              requestAnimationFrame(checkVolume);
-            }
-          } catch (e) {
-            console.warn('Web Audio meter not available in current environment:', e);
+                  })
+                  .catch(() => {});
+              }
+            } catch(e){}
           }
-        })
-        .catch((err) => {
-          console.log('Microphone permission not granted or running in simulation mode:', err);
         });
+      });
+
+      // Initialize Web Audio API for visual meter and live PCM stream broadcaster
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) {
+          const audioCtx = new AudioCtx();
+          audioContextRef.current = audioCtx;
+          if (audioCtx.state === 'suspended') {
+            audioCtx.resume().catch(() => {});
+          }
+
+          const analyser = audioCtx.createAnalyser();
+          analyserRef.current = analyser;
+          analyser.fftSize = 64;
+
+          const source = audioCtx.createMediaStreamSource(stream);
+          source.connect(analyser);
+
+          // Raw PCM Stream Processor (bufferSize 2048 = ~42ms low latency @ 48kHz)
+          const processor = audioCtx.createScriptProcessor(2048, 1, 1);
+          scriptProcessorRef.current = processor;
+
+          processor.onaudioprocess = (e) => {
+            if (!isMutedRef.current) {
+              const inputData = e.inputBuffer.getChannelData(0);
+              const len = inputData.length;
+              const pcm16 = new Int16Array(len);
+              let maxAmp = 0;
+              for (let i = 0; i < len; i++) {
+                const s = Math.max(-1, Math.min(1, inputData[i]));
+                const abs = Math.abs(s);
+                if (abs > maxAmp) maxAmp = abs;
+                pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+              }
+
+              // Transmit if unmuted and voice detected (> 0.0003 ultra-sensitive)
+              if (maxAmp > 0.0003) {
+                const s = getSocket();
+                if (s && s.connected) {
+                  s.emit('live-pcm-audio-chunk', {
+                    roomId,
+                    pcmData: Array.from(pcm16),
+                    sampleRate: audioCtx.sampleRate,
+                    senderRole: role,
+                    senderName: role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName
+                  });
+                }
+              }
+            }
+          };
+
+          source.connect(processor);
+          // Connect processor to a silent gain node to prevent hearing own voice locally
+          const silenceNode = audioCtx.createGain();
+          silenceNode.gain.value = 0;
+          processor.connect(silenceNode);
+          silenceNode.connect(audioCtx.destination);
+
+          const dataArray = new Uint8Array(analyser.frequencyBinCount);
+          const checkVolume = () => {
+            if (!analyserRef.current || isMutedRef.current) {
+              setMicAudioLevel(0);
+            } else {
+              analyserRef.current.getByteFrequencyData(dataArray);
+              let sum = 0;
+              for (let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+              }
+              const avg = sum / dataArray.length;
+              const normalized = Math.min(100, Math.floor((avg / 128) * 100));
+              setMicAudioLevel(normalized);
+
+              if (normalized > 15 && !isMutedRef.current) {
+                setActiveSpeaker(role);
+                const now = Date.now();
+                if (!lastSpeakingEmitRef.current || (now - lastSpeakingEmitRef.current > 1200)) {
+                  lastSpeakingEmitRef.current = now;
+                  const s = getSocket();
+                  if (s) {
+                    s.emit('update-media-state', { roomId, isSpeaking: true, role });
+                  }
+                }
+              }
+            }
+            requestAnimationFrame(checkVolume);
+          };
+          requestAnimationFrame(checkVolume);
+        }
+      } catch (err) {
+        console.warn('[Web Audio Initialisation Error]:', err);
+      }
+    };
+
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      initLocalMicrophone();
     }
 
     // Initialize browser Web Speech Recognition if available
@@ -941,9 +954,14 @@ export default function ThreeWayCallRoom({
     }
     Object.values(remoteAudiosRef.current).forEach(audio => {
       if (audio) {
+        audio.muted = false;
+        audio.volume = 1.0;
         audio.play().catch(() => {});
       }
     });
+    if (!mediaStreamRef.current) {
+      getLocalAudioStream().catch(() => {});
+    }
     setShowAudioUnlockNotice(false);
   };
 
