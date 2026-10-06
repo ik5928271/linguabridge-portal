@@ -567,94 +567,94 @@ export default function InterpreterDashboard({
   const badgeId = profile.badgeNumber || profile.interpreterBadgeId || currentUser?.badgeNumber || currentUser?.interpreterBadgeId || (profile.id ? profile.id.replace(/\D/g, '').slice(-5) : '84921');
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+    <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8 space-y-6 sm:space-y-8">
       
       {/* Top Banner & Status Controls */}
-      <div className="glass-panel p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+      <div className="glass-panel p-4 sm:p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sm:gap-6">
         
         {/* Interpreter Info */}
-        <div className="flex items-center gap-4">
-          <div className="relative">
+        <div className="flex items-center gap-3.5 sm:gap-4">
+          <div className="relative shrink-0">
             {profile.avatar ? (
               <img 
                 src={profile.avatar} 
                 alt={profile.name}
-                className="w-16 h-16 rounded-2xl object-cover ring-2 ring-emerald-500/40 shadow-lg" 
+                className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover ring-2 ring-emerald-500/40 shadow-lg" 
               />
             ) : (
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-600 via-teal-600 to-cyan-700 text-white font-black text-2xl flex items-center justify-center ring-2 ring-emerald-500/40 shadow-lg select-none">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-tr from-emerald-600 via-teal-600 to-cyan-700 text-white font-black text-xl sm:text-2xl flex items-center justify-center ring-2 ring-emerald-500/40 shadow-lg select-none">
                 {profile.name?.charAt(0)?.toUpperCase() || 'L'}
               </div>
             )}
-            <span className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-slate-950 ${
+            <span className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border-2 border-slate-950 ${
               isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'
             }`} />
           </div>
 
           <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-extrabold text-white">{profile.name}</h1>
-              <span className="text-xs font-mono font-black px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-sm">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <h1 className="text-lg sm:text-2xl font-extrabold text-white">{profile.name}</h1>
+              <span className="text-[10px] sm:text-xs font-mono font-black px-2 sm:px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-sm">
                 ID: #{badgeId}
               </span>
-              <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
+              <span className={`text-[10px] sm:text-xs font-bold px-2 sm:px-2.5 py-0.5 rounded-full border ${
                 profile.employmentType === 'salary_base' 
                   ? 'bg-purple-500/10 text-purple-400 border-purple-500/20'
                   : profile.employmentType === 'per_minute'
                     ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                     : 'bg-brand-500/10 text-brand-300 border-brand-500/20'
               }`}>
-                {profile.employmentType === 'salary_base' ? '🏢 Full-Time Salaried' : profile.employmentType === 'per_minute' ? '⏱️ On-Demand Live Talk' : '💼 Scheduled Shift Linguist'}
+                {profile.employmentType === 'salary_base' ? '🏢 Salaried' : profile.employmentType === 'per_minute' ? '⏱️ Live Talk' : '💼 Scheduled'}
               </span>
             </div>
-            <p className="text-xs text-slate-300 font-medium mt-0.5">
+            <p className="text-[11px] sm:text-xs text-slate-300 font-medium mt-0.5">
               {(profile.languages || ['English']).join(' ⟷ ')} • {Array.isArray(profile.certifications) ? profile.certifications[0] : (profile.certifications || 'Certified Professional Linguist')}
             </p>
-            <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-400">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-1 text-[11px] sm:text-xs text-slate-400">
               <span className="flex items-center gap-1 text-amber-400 font-bold">
-                <Star className="w-3.5 h-3.5 fill-amber-400" />
+                <Star className="w-3.5 h-3.5 fill-amber-400 shrink-0" />
                 <span>{totalLifetimeSessions > 0 ? `${Number(profile.rating || 5.0).toFixed(1)} / 5.0` : 'Verified Linguist'}</span>
               </span>
               <span>•</span>
-              <span>{totalLifetimeSessions} Lifetime Sessions</span>
+              <span>{totalLifetimeSessions} Sessions</span>
               <span>•</span>
               <span className="font-semibold text-emerald-400">
                 {profile.employmentType === 'salary_base' 
                   ? `$${profile.monthlySalary || 1200}/mo Salary` 
                   : profile.employmentType === 'per_minute' 
-                    ? `$${(profile.minuteRate || 0.30).toFixed(2)}/min Live Talk`
-                    : `$${profile.hourlyRate || 8}/hr Shift Billing`}
+                    ? `$${(profile.minuteRate || 0.30).toFixed(2)}/min`
+                    : `$${profile.hourlyRate || 8}/hr`}
               </span>
             </div>
           </div>
         </div>
 
         {/* Status Toggle & Action Buttons */}
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-start md:justify-end">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-3 w-full md:w-auto">
           
           {/* Edit Profile Button */}
           <button
             onClick={openEditModal}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition cursor-pointer shadow-sm"
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition cursor-pointer shadow-sm"
           >
             <Edit className="w-3.5 h-3.5 text-brand-400" />
             <span>Edit Profile</span>
           </button>
 
           {/* Online Toggle */}
-          <div className="flex items-center gap-3 bg-slate-900/90 px-4 py-2 rounded-xl border border-slate-800">
-            <span className="text-xs font-bold text-slate-300">
-              {isOnline ? 'Queue Status: Online' : 'Queue Status: Paused'}
+          <div className="flex items-center justify-between gap-2 bg-slate-900/90 px-3 py-2 rounded-xl border border-slate-800">
+            <span className="text-[11px] font-bold text-slate-300">
+              {isOnline ? 'Online' : 'Paused'}
             </span>
             <button
               onClick={() => setIsOnline(!isOnline)}
-              className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-300 cursor-pointer ${
+              className={`w-10 h-5 flex items-center rounded-full p-0.5 transition-colors duration-300 cursor-pointer shrink-0 ${
                 isOnline ? 'bg-emerald-600' : 'bg-slate-700'
               }`}
             >
               <div
                 className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${
-                  isOnline ? 'translate-x-6' : 'translate-x-0'
+                  isOnline ? 'translate-x-5' : 'translate-x-0'
                 }`}
               />
             </button>
@@ -664,24 +664,24 @@ export default function InterpreterDashboard({
           <button
             onClick={startMicTest}
             title="Test microphone and see live voice level meter"
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border transition cursor-pointer bg-brand-600/20 hover:bg-brand-600/30 text-brand-300 border-brand-500/40"
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition cursor-pointer bg-brand-600/20 hover:bg-brand-600/30 text-brand-300 border-brand-500/40"
           >
             <Mic className="w-3.5 h-3.5 text-brand-400" />
-            <span>Test Microphone</span>
+            <span>Test Mic</span>
           </button>
 
           {/* Hardware & Audio Check Button */}
           <button
             onClick={testAudioRinger}
             title="Test speaker output and incoming ringer sound"
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
+            className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
               testAudioActive 
                 ? 'bg-emerald-600 text-white border-emerald-500 ring-2 ring-emerald-400' 
                 : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
             }`}
           >
             <Volume2 className={`w-3.5 h-3.5 ${testAudioActive ? 'animate-bounce text-white' : 'text-emerald-400'}`} />
-            <span>{testAudioActive ? 'Testing Audio...' : 'Test Audio Ringer'}</span>
+            <span>{testAudioActive ? 'Testing...' : 'Test Sound'}</span>
           </button>
 
         </div>

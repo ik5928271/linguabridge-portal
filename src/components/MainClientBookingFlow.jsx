@@ -649,15 +649,15 @@ END:VCALENDAR`;
 
       {/* STEP 1: LANGUAGE & SPECIALTY */}
       {currentStep === 1 && (
-        <div className="max-w-4xl mx-auto glass-panel p-6 sm:p-8 rounded-3xl border border-slate-800 space-y-6">
-          <div className="border-b border-slate-800 pb-4">
-            <h2 className="text-xl font-bold text-white">Step 1: Select Language & Specialty Domain</h2>
+        <div className="max-w-4xl mx-auto glass-panel p-4 sm:p-8 rounded-2xl sm:rounded-3xl border border-slate-800 space-y-5 sm:space-y-6">
+          <div className="border-b border-slate-800 pb-3 sm:pb-4">
+            <h2 className="text-lg sm:text-xl font-bold text-white">Step 1: Select Language & Specialty Domain</h2>
             <p className="text-xs text-slate-400 mt-1">Choose the target language assistance needed for your session</p>
           </div>
 
           {/* 🔒 INITIAL CLIENT SIGN-IN / SIGN-UP GATE */}
           {!currentUser && (
-            <div className="p-5 rounded-2xl bg-gradient-to-r from-brand-950/90 via-slate-900 to-indigo-950/90 border-2 border-brand-500/50 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-brand-950/90 via-slate-900 to-indigo-950/90 border-2 border-brand-500/50 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-brand-500/20 text-brand-400 flex items-center justify-center shrink-0 ring-2 ring-brand-500/30">
                   <Lock className="w-5 h-5" />
@@ -698,7 +698,7 @@ END:VCALENDAR`;
 
           <div className="space-y-3">
             <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-300">Target Language:</label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 sm:gap-3">
               {LANGUAGES.map((lang) => {
                 const isSelected = selectedLanguage === lang.name;
                 const stats = getLanguageInterpreterStats(lang.name);
@@ -713,23 +713,23 @@ END:VCALENDAR`;
                         setSelectedInterpreter(matched[0]);
                       }
                     }}
-                    className={`language-card ${isSelected ? 'is-selected' : ''} p-3.5 rounded-2xl border text-left transition flex flex-col justify-between gap-2.5 cursor-pointer ${
+                    className={`language-card ${isSelected ? 'is-selected' : ''} p-3 sm:p-3.5 rounded-2xl border text-left transition flex flex-col justify-between gap-2 cursor-pointer ${
                       isSelected 
                         ? 'bg-brand-600/25 border-brand-400 ring-2 ring-brand-500/60 shadow-lg shadow-brand-500/20' 
                         : 'bg-slate-900/80 border-slate-800 hover:border-slate-700 hover:bg-slate-800/80'
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-2 w-full">
+                    <div className="flex items-start justify-between gap-1.5 w-full">
                       <div className="overflow-hidden min-w-0 flex-1">
-                        <p className={`text-sm font-extrabold truncate ${isSelected ? 'text-brand-300' : 'text-white'}`}>
+                        <p className={`text-xs sm:text-sm font-extrabold truncate ${isSelected ? 'text-brand-300' : 'text-white'}`}>
                           {lang.name}
                         </p>
-                        <p className="text-[11px] text-slate-400 font-medium truncate mt-0.5">
+                        <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium truncate mt-0.5">
                           {lang.nativeName}
                         </p>
                       </div>
                       {isSelected && (
-                        <span className="w-5 h-5 rounded-full bg-brand-500 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow">
+                        <span className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-brand-500 text-white flex items-center justify-center font-bold text-[10px] sm:text-xs shrink-0 shadow">
                           ✓
                         </span>
                       )}
@@ -893,16 +893,16 @@ END:VCALENDAR`;
 
       {/* STEP 2: CHOOSE INTERPRETER */}
       {currentStep === 2 && (
-        <div className="max-w-4xl mx-auto glass-panel p-6 sm:p-8 rounded-3xl border border-slate-800 space-y-6">
-          <div className="border-b border-slate-800 pb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+        <div className="max-w-4xl mx-auto glass-panel p-4 sm:p-8 rounded-2xl sm:rounded-3xl border border-slate-800 space-y-5 sm:space-y-6">
+          <div className="border-b border-slate-800 pb-3 sm:pb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
             <div>
-              <h2 className="text-xl font-bold text-white">Step 2: Choose Certified {selectedLanguage} Interpreter</h2>
+              <h2 className="text-lg sm:text-xl font-bold text-white">Step 2: Choose Certified {selectedLanguage} Interpreter</h2>
               <p className="text-xs text-slate-400 mt-0.5">
                 Found {availableInterpreters.length} live online {selectedLanguage} interpreter(s) ready for assignment
               </p>
             </div>
 
-            <div className="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs">
+            <div className="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs w-full sm:w-auto justify-center">
               <button
                 type="button"
                 onClick={() => {
@@ -911,30 +911,30 @@ END:VCALENDAR`;
                     setSelectedInterpreter(availableInterpreters[0]);
                   }
                 }}
-                className={`px-3 py-1 rounded-lg font-bold transition ${
+                className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg font-bold transition text-center ${
                   matchMode === 'auto' ? 'bg-brand-600 text-white shadow' : 'text-slate-400 hover:text-white'
                 }`}
               >
-                Instant Best Match
+                Instant Match
               </button>
 
               <button
                 type="button"
                 onClick={() => setMatchMode('specific')}
-                className={`px-3 py-1 rounded-lg font-bold transition ${
+                className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg font-bold transition text-center ${
                   matchMode === 'specific' ? 'bg-brand-600 text-white shadow' : 'text-slate-400 hover:text-white'
                 }`}
               >
-                Browse & Pick ({availableInterpreters.length})
+                Pick ({availableInterpreters.length})
               </button>
             </div>
           </div>
 
           {/* Interpreter Cards Grid */}
           {availableInterpreters.length === 0 ? (
-            <div className="p-10 rounded-3xl bg-slate-900/60 border border-slate-800 text-center space-y-4">
-              <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center mx-auto border border-amber-500/20">
-                <Radio className="w-7 h-7 animate-pulse" />
+            <div className="p-6 sm:p-10 rounded-2xl sm:rounded-3xl bg-slate-900/60 border border-slate-800 text-center space-y-4">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center mx-auto border border-amber-500/20">
+                <Radio className="w-6 h-6 sm:w-7 sm:h-7 animate-pulse" />
               </div>
               <div>
                 <h4 className="text-base font-bold text-white">No Live {selectedLanguage} Interpreters Online Right Now</h4>
@@ -942,7 +942,7 @@ END:VCALENDAR`;
                   All registered {selectedLanguage} linguists are currently on standby or offline. As soon as a verified interpreter connects to their portal, they will appear here live in real-time.
                 </p>
               </div>
-              <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+              <div className="pt-2 flex flex-wrap items-center justify-center gap-2.5 sm:gap-3">
                 <button
                   type="button"
                   onClick={() => setCurrentStep(1)}
@@ -964,7 +964,7 @@ END:VCALENDAR`;
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
               {availableInterpreters.map((interp) => {
                 const badgeNum = interp.badgeNumber || interp.interpreterBadgeId || interp.id?.replace(/\D/g, '') || '84920';
                 const onCall = isInterpreterOnCall(interp);
@@ -972,7 +972,7 @@ END:VCALENDAR`;
                   <div
                     key={interp.id}
                     onClick={() => setSelectedInterpreter(interp)}
-                    className={`p-5 rounded-2xl border transition-all cursor-pointer space-y-3 relative ${
+                    className={`p-4 sm:p-5 rounded-2xl border transition-all cursor-pointer space-y-3 relative ${
                       selectedInterpreter?.id === interp.id
                         ? 'bg-brand-600/15 border-brand-500 ring-2 ring-brand-500/50 shadow-xl'
                         : onCall 
@@ -980,21 +980,21 @@ END:VCALENDAR`;
                           : 'bg-slate-900/70 border-slate-800 hover:border-slate-700'
                     }`}
                   >
-                    <div className="flex items-start gap-3.5">
-                      <div className={`w-14 h-14 rounded-2xl font-black text-white flex flex-col items-center justify-center text-xs shrink-0 shadow-lg ring-2 ${
+                    <div className="flex items-start gap-3">
+                      <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl font-black text-white flex flex-col items-center justify-center text-xs shrink-0 shadow-lg ring-2 ${
                         onCall
                           ? 'bg-gradient-to-tr from-amber-600 to-rose-600 shadow-amber-500/20 ring-amber-500/30'
                           : 'bg-gradient-to-tr from-emerald-600 to-teal-500 shadow-emerald-500/20 ring-emerald-500/30'
                       }`}>
-                        <Award className="w-5 h-5 mb-0.5 text-white" />
+                        <Award className="w-4 h-4 sm:w-5 sm:h-5 mb-0.5 text-white" />
                         <span className="text-[9px] font-mono font-bold leading-tight">#{badgeNum}</span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <h4 className="text-sm font-extrabold text-white truncate">
+                          <h4 className="text-xs sm:text-sm font-extrabold text-white truncate">
                             Interpreter #{badgeNum}
                           </h4>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${
+                          <span className={`text-[9.5px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${
                             onCall 
                               ? 'text-amber-300 bg-amber-500/15 border-amber-500/30' 
                               : 'text-brand-300 bg-brand-500/15 border-brand-500/30'
@@ -1002,26 +1002,26 @@ END:VCALENDAR`;
                             ID: #{badgeNum}
                           </span>
                         </div>
-                        <p className="text-[11px] text-emerald-400 font-semibold mt-0.5">
+                        <p className="text-[10.5px] sm:text-[11px] text-emerald-400 font-semibold mt-0.5 truncate">
                           {(interp.languages || [interp.primaryLang || selectedLanguage, 'English']).join(' ⟷ ')}
                         </p>
-                        <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-400">
+                        <div className="flex items-center gap-1.5 sm:gap-2 mt-1 text-[10px] text-slate-400">
                           {onCall ? (
-                            <span className="flex items-center gap-1.5 text-amber-400 font-extrabold bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/30 animate-pulse">
-                              <span className="relative flex h-2 w-2">
+                            <span className="flex items-center gap-1 text-amber-400 font-extrabold bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/30 animate-pulse">
+                              <span className="relative flex h-1.5 w-1.5">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
                               </span>
-                              <span>On Call (In Session)</span>
+                              <span>On Call</span>
                             </span>
                           ) : (
-                            <span className="flex items-center gap-1.5 text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                            <span className="flex items-center gap-1 text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                              <span>● Live & Ready</span>
+                              <span>Ready</span>
                             </span>
                           )}
                           <span>•</span>
-                          <span className="truncate">{interp.specialty || interp.specialties?.[0] || 'General / Healthcare'}</span>
+                          <span className="truncate">{interp.specialty || interp.specialties?.[0] || 'General'}</span>
                         </div>
                       </div>
                     </div>
@@ -1031,8 +1031,8 @@ END:VCALENDAR`;
                     </p>
 
                     <div className="flex items-center justify-between pt-1">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        {Array.isArray(interp.certifications) ? interp.certifications[0] : (interp.certifications || 'Certified Professional Linguist')}
+                      <span className="text-[9.5px] sm:text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 truncate max-w-[180px]">
+                        {Array.isArray(interp.certifications) ? interp.certifications[0] : (interp.certifications || 'Certified Linguist')}
                       </span>
                       {selectedInterpreter?.id === interp.id ? (
                         <span className="text-xs font-bold text-brand-400 flex items-center gap-1">
@@ -1048,11 +1048,11 @@ END:VCALENDAR`;
             </div>
           )}
 
-          <div className="pt-4 border-t border-slate-800 flex justify-between">
+          <div className="pt-4 border-t border-slate-800 flex justify-between gap-3">
             <button
               type="button"
               onClick={() => setCurrentStep(1)}
-              className="px-5 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold"
+              className="px-4 sm:px-5 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold"
             >
               Back
             </button>
@@ -1060,13 +1060,13 @@ END:VCALENDAR`;
               type="button"
               disabled={availableInterpreters.length === 0}
               onClick={() => setCurrentStep(3)}
-              className={`px-6 py-3 rounded-xl font-bold text-xs flex items-center gap-2 transition shadow-lg ${
+              className={`px-5 sm:px-6 py-3 rounded-xl font-bold text-xs flex items-center gap-2 transition shadow-lg ${
                 availableInterpreters.length === 0
                   ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
                   : 'bg-brand-600 hover:bg-brand-500 text-white shadow-brand-500/30'
               }`}
             >
-              <span>Continue: Timing & Modality</span>
+              <span>Continue</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
@@ -1075,9 +1075,9 @@ END:VCALENDAR`;
 
       {/* STEP 3: SCHEDULE, DATE/TIME PICKER, MODALITY & PARTIES */}
       {currentStep === 3 && (
-        <div className="max-w-4xl mx-auto glass-panel p-6 sm:p-8 rounded-3xl border border-slate-800 space-y-6">
-          <div className="border-b border-slate-800 pb-4">
-            <h2 className="text-xl font-bold text-white">Step 3: Timing, Call Modality & Participants</h2>
+        <div className="max-w-4xl mx-auto glass-panel p-4 sm:p-8 rounded-2xl sm:rounded-3xl border border-slate-800 space-y-5 sm:space-y-6">
+          <div className="border-b border-slate-800 pb-3 sm:pb-4">
+            <h2 className="text-lg sm:text-xl font-bold text-white">Step 3: Timing, Call Modality & Participants</h2>
             <p className="text-xs text-slate-400 mt-1">Specify session duration, schedule date & time, call modality (Audio by default), and participant names</p>
           </div>
 
