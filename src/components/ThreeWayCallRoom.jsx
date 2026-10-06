@@ -77,6 +77,7 @@ export default function ThreeWayCallRoom({
   const [focusParticipant, setFocusParticipant] = useState('interpreter');
   const [showAudioUnlockNotice, setShowAudioUnlockNotice] = useState(false);
   const [remoteAudioCount, setRemoteAudioCount] = useState(0);
+  const [remoteStreamsMap, setRemoteStreamsMap] = useState({});
 
   // Real microphone audio level detection, WebRTC Multi-Peer Mesh & Web Audio PCM Streaming
   const [micAudioLevel, setMicAudioLevel] = useState(0);
@@ -566,22 +567,13 @@ export default function ThreeWayCallRoom({
         }
       });
 
-      // Enterprise Live Web Audio PCM Stream Receiver (100% Guaranteed Unblockable Audio Fallback)
+      // Enterprise Live Web Audio PCM Stream Receiver (100% Guaranteed Unblockable Audio)
       socket.on('live-pcm-audio-chunk', ({ senderSocketId, pcmData, sampleRate, senderRole, senderName }) => {
         if (!pcmData || senderSocketId === socket.id) return;
 
         // Visual active speaker highlight
         if (senderRole) {
           setActiveSpeaker(senderRole);
-        }
-
-        // PREVENT DOUBLE-VOICE: If WebRTC direct peer stream is active AND actively playing sound, skip redundant PCM chunk
-        const peerPc = peersRef.current[senderSocketId];
-        const isWebRtcConnected = peerPc && (peerPc.iceConnectionState === 'connected' || peerPc.iceConnectionState === 'completed');
-        const remoteAudioEl = remoteAudiosRef.current[senderSocketId];
-        const isDirectAudioPlaying = remoteAudioEl && !remoteAudioEl.paused && remoteAudioEl.srcObject && remoteAudioEl.currentTime > 0;
-        if (isWebRtcConnected && isDirectAudioPlaying) {
-          return;
         }
 
         try {
@@ -623,8 +615,8 @@ export default function ThreeWayCallRoom({
 
           const currentTime = playCtx.currentTime;
           let nextTime = nextPlayTimesRef.current[senderSocketId] || currentTime;
-          if (nextTime < currentTime) {
-            nextTime = currentTime + 0.020; // 20ms lead for jitter smoothing
+          if (nextTime < currentTime || nextTime > currentTime + 0.1) {
+            nextTime = currentTime + 0.005;
           }
           sourceNode.start(nextTime);
           nextPlayTimesRef.current[senderSocketId] = nextTime + audioBuffer.duration;
@@ -1855,6 +1847,24 @@ export default function ThreeWayCallRoom({
           </div>
         </div>
       )}
+
+      {/* Mounted Remote Audio Streams in React DOM */}
+      {Object.entries(remoteStreamsMap).map(([peerId, st]) => (
+        <audio
+          key={peerId}
+          autoPlay
+          playsInline
+          ref={(el) => {
+            if (el && st && el.srcObject !== st) {
+              el.srcObject = st;
+              el.muted = false;
+              el.volume = 1.0;
+              el.play().catch(() => {});
+            }
+          }}
+          style={{ position: 'fixed', top: -9999, left: -9999, width: '1px', height: '1px', opacity: 0, pointerEvents: 'none' }}
+        />
+      ))}
 
     </div>
   );
