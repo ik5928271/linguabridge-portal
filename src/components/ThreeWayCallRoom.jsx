@@ -78,6 +78,7 @@ export default function ThreeWayCallRoom({
   const [showAudioUnlockNotice, setShowAudioUnlockNotice] = useState(false);
   const [remoteAudioCount, setRemoteAudioCount] = useState(0);
   const [remoteStreamsMap, setRemoteStreamsMap] = useState({});
+  const [micPermissionState, setMicPermissionState] = useState('prompt'); // 'granted', 'denied', 'prompt'
 
   // Real microphone audio level detection, WebRTC Multi-Peer Mesh & Web Audio PCM Streaming
   const [micAudioLevel, setMicAudioLevel] = useState(0);
@@ -588,15 +589,17 @@ export default function ThreeWayCallRoom({
             playCtx.resume().catch(() => {});
           }
 
-          let int16Array;
+          let int16Array = null;
           if (pcmData instanceof ArrayBuffer) {
             int16Array = new Int16Array(pcmData);
-          } else if (pcmData && pcmData.buffer instanceof ArrayBuffer) {
-            int16Array = new Int16Array(pcmData.buffer);
+          } else if (pcmData && pcmData.buffer instanceof ArrayBuffer && pcmData.byteLength !== undefined) {
+            int16Array = new Int16Array(pcmData.buffer, pcmData.byteOffset || 0, pcmData.length || (pcmData.byteLength / 2));
           } else if (Array.isArray(pcmData)) {
             int16Array = new Int16Array(pcmData);
-          } else {
-            int16Array = new Int16Array(pcmData);
+          } else if (pcmData && pcmData.type === 'Buffer' && Array.isArray(pcmData.data)) {
+            int16Array = new Int16Array(new Uint8Array(pcmData.data).buffer);
+          } else if (typeof pcmData === 'object' && pcmData !== null) {
+            int16Array = new Int16Array(Object.values(pcmData));
           }
 
           if (!int16Array || int16Array.length === 0) return;
@@ -701,153 +704,168 @@ export default function ThreeWayCallRoom({
     }
 
     // Initialize real microphone audio stream, volume meter & live PCM streaming engine
-    const initLocalMicrophone = async () => {
+    const requestMicrophoneAccess = async () => {
       let stream = null;
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ 
-          audio: { 
-            echoCancellation: { ideal: true }, 
-            noiseSuppression: { ideal: true }, 
-            autoGainControl: { ideal: true }
-          }, 
-          video: false 
-        });
-      } catch (err) {
-        console.warn('[Microphone Standard Stream Failed - Trying Raw Audio Fallback]:', err);
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        } catch (e) {
-          console.warn('[Microphone Permission Denied or Unavailable]:', e);
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          setMicPermissionState('denied');
+          return null;
         }
-      }
 
-      if (!stream) return;
-      mediaStreamRef.current = stream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ 
+            audio: { 
+              echoCancellation: { ideal: true }, 
+              noiseSuppression: { ideal: true }, 
+              autoGainControl: { ideal: true }
+            }, 
+            video: false 
+          });
+        } catch (err) {
+          console.warn('[Microphone Standard Stream Failed - Trying Raw Audio Fallback]:', err);
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        }
 
-      // Attach newly acquired local stream to any established peer connections and trigger offer renegotiation
-      Object.entries(peersRef.current).forEach(([peerId, pc]) => {
-        stream.getAudioTracks().forEach(track => {
-          const senders = pc.getSenders();
-          const audioSender = senders.find(s => (s.track && s.track.kind === 'audio') || (!s.track));
-          if (audioSender) {
-            audioSender.replaceTrack(track).catch(() => {});
-          } else {
-            try { 
-              pc.addTrack(track, stream); 
-              if (pc.signalingState === 'stable') {
-                pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false })
-                  .then(offer => pc.setLocalDescription(offer))
-                  .then(() => {
-                    const socket = getSocket();
-                    if (socket) {
-                      socket.emit('webrtc-offer', {
-                        targetSocketId: peerId,
-                        offer: pc.localDescription,
-                        senderInfo: { role, name: role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName }
+        if (stream) {
+          mediaStreamRef.current = stream;
+          setMicPermissionState('granted');
+
+          // Attach newly acquired local stream to any established peer connections and trigger offer renegotiation
+          Object.entries(peersRef.current).forEach(([peerId, pc]) => {
+            stream.getAudioTracks().forEach(track => {
+              const senders = pc.getSenders();
+              const audioSender = senders.find(s => (s.track && s.track.kind === 'audio') || (!s.track));
+              if (audioSender) {
+                audioSender.replaceTrack(track).catch(() => {});
+              } else {
+                try { 
+                  pc.addTrack(track, stream); 
+                  if (pc.signalingState === 'stable') {
+                    pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false })
+                      .then(offer => pc.setLocalDescription(offer))
+                      .then(() => {
+                        const socket = getSocket();
+                        if (socket) {
+                          socket.emit('webrtc-offer', {
+                            targetSocketId: peerId,
+                            offer: pc.localDescription,
+                            senderInfo: { role, name: role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName }
+                          });
+                        }
+                      })
+                      .catch(() => {});
+                  }
+                } catch(e){}
+              }
+            });
+          });
+
+          // Initialize Web Audio API for visual meter and live PCM stream broadcaster
+          try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) {
+              if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+                try { audioContextRef.current.close(); } catch(e){}
+              }
+              const audioCtx = new AudioCtx();
+              audioContextRef.current = audioCtx;
+              if (audioCtx.state === 'suspended') {
+                audioCtx.resume().catch(() => {});
+              }
+
+              const analyser = audioCtx.createAnalyser();
+              analyserRef.current = analyser;
+              analyser.fftSize = 64;
+
+              const source = audioCtx.createMediaStreamSource(stream);
+              source.connect(analyser);
+
+              // Raw PCM Stream Processor (bufferSize 2048 = ~42ms low latency @ 48kHz)
+              const processor = audioCtx.createScriptProcessor(2048, 1, 1);
+              scriptProcessorRef.current = processor;
+
+              processor.onaudioprocess = (e) => {
+                if (!isMutedRef.current) {
+                  const inputData = e.inputBuffer.getChannelData(0);
+                  const len = inputData.length;
+                  const pcm16 = new Int16Array(len);
+                  let maxAmp = 0;
+                  for (let i = 0; i < len; i++) {
+                    const s = Math.max(-1, Math.min(1, inputData[i]));
+                    const abs = Math.abs(s);
+                    if (abs > maxAmp) maxAmp = abs;
+                    pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                  }
+
+                  // Transmit if unmuted and voice detected (> 0.0003 ultra-sensitive)
+                  if (maxAmp > 0.0003) {
+                    const s = getSocket();
+                    if (s && s.connected) {
+                      s.emit('live-pcm-audio-chunk', {
+                        roomId,
+                        pcmData: Array.from(pcm16),
+                        sampleRate: audioCtx.sampleRate,
+                        senderRole: role,
+                        senderName: role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName
                       });
                     }
-                  })
-                  .catch(() => {});
-              }
-            } catch(e){}
-          }
-        });
-      });
-
-      // Initialize Web Audio API for visual meter and live PCM stream broadcaster
-      try {
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        if (AudioCtx) {
-          const audioCtx = new AudioCtx();
-          audioContextRef.current = audioCtx;
-          if (audioCtx.state === 'suspended') {
-            audioCtx.resume().catch(() => {});
-          }
-
-          const analyser = audioCtx.createAnalyser();
-          analyserRef.current = analyser;
-          analyser.fftSize = 64;
-
-          const source = audioCtx.createMediaStreamSource(stream);
-          source.connect(analyser);
-
-          // Raw PCM Stream Processor (bufferSize 2048 = ~42ms low latency @ 48kHz)
-          const processor = audioCtx.createScriptProcessor(2048, 1, 1);
-          scriptProcessorRef.current = processor;
-
-          processor.onaudioprocess = (e) => {
-            if (!isMutedRef.current) {
-              const inputData = e.inputBuffer.getChannelData(0);
-              const len = inputData.length;
-              const pcm16 = new Int16Array(len);
-              let maxAmp = 0;
-              for (let i = 0; i < len; i++) {
-                const s = Math.max(-1, Math.min(1, inputData[i]));
-                const abs = Math.abs(s);
-                if (abs > maxAmp) maxAmp = abs;
-                pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-              }
-
-              // Transmit if unmuted and voice detected (> 0.0003 ultra-sensitive)
-              if (maxAmp > 0.0003) {
-                const s = getSocket();
-                if (s && s.connected) {
-                  s.emit('live-pcm-audio-chunk', {
-                    roomId,
-                    pcmData: Array.from(pcm16),
-                    sampleRate: audioCtx.sampleRate,
-                    senderRole: role,
-                    senderName: role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName
-                  });
-                }
-              }
-            }
-          };
-
-          source.connect(processor);
-          // Connect processor to a silent gain node to prevent hearing own voice locally
-          const silenceNode = audioCtx.createGain();
-          silenceNode.gain.value = 0;
-          processor.connect(silenceNode);
-          silenceNode.connect(audioCtx.destination);
-
-          const dataArray = new Uint8Array(analyser.frequencyBinCount);
-          const checkVolume = () => {
-            if (!analyserRef.current || isMutedRef.current) {
-              setMicAudioLevel(0);
-            } else {
-              analyserRef.current.getByteFrequencyData(dataArray);
-              let sum = 0;
-              for (let i = 0; i < dataArray.length; i++) {
-                sum += dataArray[i];
-              }
-              const avg = sum / dataArray.length;
-              const normalized = Math.min(100, Math.floor((avg / 128) * 100));
-              setMicAudioLevel(normalized);
-
-              if (normalized > 15 && !isMutedRef.current) {
-                setActiveSpeaker(role);
-                const now = Date.now();
-                if (!lastSpeakingEmitRef.current || (now - lastSpeakingEmitRef.current > 1200)) {
-                  lastSpeakingEmitRef.current = now;
-                  const s = getSocket();
-                  if (s) {
-                    s.emit('update-media-state', { roomId, isSpeaking: true, role });
                   }
                 }
-              }
+              };
+
+              source.connect(processor);
+              // Connect processor to a silent gain node to prevent hearing own voice locally
+              const silenceNode = audioCtx.createGain();
+              silenceNode.gain.value = 0;
+              processor.connect(silenceNode);
+              silenceNode.connect(audioCtx.destination);
+
+              const dataArray = new Uint8Array(analyser.frequencyBinCount);
+              const checkVolume = () => {
+                if (!analyserRef.current || isMutedRef.current) {
+                  setMicAudioLevel(0);
+                } else {
+                  analyserRef.current.getByteFrequencyData(dataArray);
+                  let sum = 0;
+                  for (let i = 0; i < dataArray.length; i++) {
+                    sum += dataArray[i];
+                  }
+                  const avg = sum / dataArray.length;
+                  const normalized = Math.min(100, Math.floor((avg / 128) * 100));
+                  setMicAudioLevel(normalized);
+
+                  if (normalized > 10 && !isMutedRef.current) {
+                    setActiveSpeaker(role);
+                    const now = Date.now();
+                    if (!lastSpeakingEmitRef.current || (now - lastSpeakingEmitRef.current > 1200)) {
+                      lastSpeakingEmitRef.current = now;
+                      const s = getSocket();
+                      if (s) {
+                        s.emit('update-media-state', { roomId, isSpeaking: true, role });
+                      }
+                    }
+                  }
+                }
+                requestAnimationFrame(checkVolume);
+              };
+              requestAnimationFrame(checkVolume);
             }
-            requestAnimationFrame(checkVolume);
-          };
-          requestAnimationFrame(checkVolume);
+          } catch (err) {
+            console.warn('[Web Audio Initialisation Error]:', err);
+          }
         }
+        return stream;
       } catch (err) {
-        console.warn('[Web Audio Initialisation Error]:', err);
+        console.warn('[Microphone Permission Denied or Insecure Context]:', err);
+        setMicPermissionState('denied');
+        return null;
       }
     };
 
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      initLocalMicrophone();
+      requestMicrophoneAccess();
+    } else {
+      setMicPermissionState('denied');
     }
 
     // Initialize browser Web Speech Recognition if available
@@ -965,6 +983,8 @@ export default function ThreeWayCallRoom({
       mediaStreamRef.current.getAudioTracks().forEach(track => {
         track.enabled = !next;
       });
+    } else if (!next) {
+      requestMicrophoneAccess();
     }
     if (!next) {
       if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
@@ -1262,6 +1282,29 @@ export default function ThreeWayCallRoom({
         </div>
 
       </div>
+
+      {/* Microphone Permission Warning / Action Banner */}
+      {micPermissionState === 'denied' && (
+        <div 
+          onClick={requestMicrophoneAccess}
+          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 text-xs font-extrabold flex flex-col sm:flex-row items-center justify-between gap-2 cursor-pointer transition shadow-2xl z-40 border-b border-red-400 animate-pulse"
+        >
+          <div className="flex items-center gap-2">
+            <MicOff className="w-5 h-5 text-yellow-300 shrink-0" />
+            <span>⚠️ <strong>Microphone Not Connected:</strong> Browser blocked mic or permission needed. Tap here to connect microphone.</span>
+          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              requestMicrophoneAccess();
+            }}
+            className="px-3.5 py-1 rounded-lg bg-yellow-400 text-slate-950 text-xs font-black uppercase tracking-wider hover:bg-yellow-300 shadow transition shrink-0"
+          >
+            Allow & Enable Mic
+          </button>
+        </div>
+      )}
 
       {/* Autoplay Audio Output Unlock Banner for Mobile Browsers */}
       {showAudioUnlockNotice && (

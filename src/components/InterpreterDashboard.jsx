@@ -33,7 +33,9 @@ import {
   Sunset,
   Moon,
   Video,
-  AlertCircle
+  AlertCircle,
+  Mic,
+  MicOff
 } from 'lucide-react';
 import { playTelephoneRing, playConnectedChime } from '../services/audioService';
 import { getSocket } from '../services/socket';
@@ -106,6 +108,11 @@ export default function InterpreterDashboard({
   const [incomingCall, setIncomingCall] = useState(null);
   const [countdown, setCountdown] = useState(30);
   const [testAudioActive, setTestAudioActive] = useState(false);
+  const [isMicTestModalOpen, setIsMicTestModalOpen] = useState(false);
+  const [micTestVolume, setMicTestVolume] = useState(0);
+  const [micTestStatus, setMicTestStatus] = useState('idle'); // 'idle', 'listening', 'active', 'denied'
+  const [micTestStream, setMicTestStream] = useState(null);
+  const [micAudioContext, setMicAudioContext] = useState(null);
   const [activeLiveRooms, setActiveLiveRooms] = useState([]);
   const [dismissedLiveRooms, setDismissedLiveRooms] = useState(new Set());
 
@@ -444,11 +451,81 @@ export default function InterpreterDashboard({
     }, 3000);
   };
 
-  const handleAccept = () => {
+  const startMicTest = async () => {
+    setIsMicTestModalOpen(true);
+    setMicTestStatus('listening');
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setMicTestStatus('denied');
+        return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        },
+        video: false
+      });
+      setMicTestStream(stream);
+      setMicTestStatus('active');
+
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) {
+        const ctx = new AudioCtx();
+        setMicAudioContext(ctx);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 64;
+        const source = ctx.createMediaStreamSource(stream);
+        source.connect(analyser);
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        const checkVol = () => {
+          if (!stream.active) return;
+          analyser.getByteFrequencyData(dataArray);
+          let sum = 0;
+          for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+          const avg = sum / dataArray.length;
+          const normalized = Math.min(100, Math.floor((avg / 128) * 100));
+          setMicTestVolume(normalized);
+          requestAnimationFrame(checkVol);
+        };
+        requestAnimationFrame(checkVol);
+      }
+    } catch (err) {
+      console.warn('[Mic Test Error]:', err);
+      setMicTestStatus('denied');
+    }
+  };
+
+  const stopMicTest = () => {
+    if (micTestStream) {
+      micTestStream.getTracks().forEach(t => t.stop());
+      setMicTestStream(null);
+    }
+    if (micAudioContext && micAudioContext.state !== 'closed') {
+      micAudioContext.close().catch(() => {});
+      setMicAudioContext(null);
+    }
+    setMicTestVolume(0);
+    setMicTestStatus('idle');
+    setIsMicTestModalOpen(false);
+  };
+
+  const handleAccept = async () => {
     playConnectedChime();
     const callData = incomingCall;
     setIncomingCall(null);
     
+    // Warm up microphone permission immediately on user gesture
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      } catch (e) {
+        console.warn('[Microphone Prompt Warning on Accept]:', e);
+      }
+    }
+
     const socket = getSocket();
     if (socket && callData?.dispatchId) {
       socket.emit('accept-dispatch', {
@@ -582,6 +659,16 @@ export default function InterpreterDashboard({
               />
             </button>
           </div>
+
+          {/* Microphone Test Button */}
+          <button
+            onClick={startMicTest}
+            title="Test microphone and see live voice level meter"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border transition cursor-pointer bg-brand-600/20 hover:bg-brand-600/30 text-brand-300 border-brand-500/40"
+          >
+            <Mic className="w-3.5 h-3.5 text-brand-400" />
+            <span>Test Microphone</span>
+          </button>
 
           {/* Hardware & Audio Check Button */}
           <button
@@ -1287,6 +1374,95 @@ export default function InterpreterDashboard({
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Microphone Hardware Test Modal */}
+      {isMicTestModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="max-w-md w-full glass-panel p-6 sm:p-7 rounded-3xl border border-slate-700 shadow-2xl space-y-5 bg-slate-900 text-white">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-brand-500/20 text-brand-400 flex items-center justify-center">
+                  <Mic className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white">Interpreter Microphone Test</h3>
+                  <p className="text-[11px] text-slate-400">Speak into your mic to verify sound pickup</p>
+                </div>
+              </div>
+              <button
+                onClick={stopMicTest}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {micTestStatus === 'active' && (
+              <div className="space-y-4 py-2">
+                <div className="text-center space-y-1">
+                  <p className="text-xs font-bold text-slate-300">Live Voice Input Level</p>
+                  <div className="w-full bg-slate-800 rounded-full h-4 overflow-hidden p-0.5 border border-slate-700">
+                    <div
+                      className={`h-full rounded-full transition-all duration-75 ${
+                        micTestVolume > 15 ? 'bg-emerald-500 shadow-lg shadow-emerald-500/50' : 'bg-brand-500'
+                      }`}
+                      style={{ width: `${Math.max(4, micTestVolume)}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[10px] text-slate-400 font-mono pt-1">
+                    <span>Silent (0%)</span>
+                    <span className="font-bold text-white">{micTestVolume}%</span>
+                    <span>Max (100%)</span>
+                  </div>
+                </div>
+
+                <div className={`p-3.5 rounded-2xl border flex items-center gap-3 ${
+                  micTestVolume > 10 
+                    ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300'
+                    : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                }`}>
+                  {micTestVolume > 10 ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 animate-pulse" />
+                  )}
+                  <p className="text-xs font-semibold">
+                    {micTestVolume > 10 
+                      ? '✅ Voice Detected! Your microphone is working perfectly.' 
+                      : 'Please speak into your microphone or headset now.'}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {micTestStatus === 'denied' && (
+              <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/40 text-red-300 space-y-2">
+                <div className="flex items-center gap-2">
+                  <MicOff className="w-5 h-5 text-red-400 shrink-0" />
+                  <h4 className="text-xs font-extrabold text-red-200">Microphone Permission Blocked</h4>
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  Your browser or phone is blocking microphone access.
+                </p>
+                <ol className="text-[11px] text-slate-300 list-decimal list-inside space-y-1 pt-1">
+                  <li>Click the <strong>🔒 lock icon</strong> on the left side of your browser URL bar.</li>
+                  <li>Toggle <strong>Microphone</strong> to <strong>"Allow"</strong>.</li>
+                  <li>Refresh this page and test again.</li>
+                </ol>
+              </div>
+            )}
+
+            <div className="pt-2 flex gap-3">
+              <button
+                onClick={stopMicTest}
+                className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30"
+              >
+                Done & Ready for Calls
+              </button>
+            </div>
           </div>
         </div>
       )}
