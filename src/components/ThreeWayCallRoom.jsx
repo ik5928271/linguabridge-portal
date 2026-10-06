@@ -134,10 +134,30 @@ export default function ThreeWayCallRoom({
   const localScreenVideoRef = useRef(null);
   const localCameraVideoRef = useRef(null);
   const lastSpeakingEmitRef = useRef(0);
+  const secondsRef = useRef(0);
+  const sessionNotesRef = useRef(sessionNotes);
+  const callRatingRef = useRef(callRating);
+  const onEndCallRef = useRef(onEndCall);
 
   useEffect(() => {
     isMutedRef.current = isMuted;
   }, [isMuted]);
+
+  useEffect(() => {
+    secondsRef.current = seconds;
+  }, [seconds]);
+
+  useEffect(() => {
+    sessionNotesRef.current = sessionNotes;
+  }, [sessionNotes]);
+
+  useEffect(() => {
+    callRatingRef.current = callRating;
+  }, [callRating]);
+
+  useEffect(() => {
+    onEndCallRef.current = onEndCall;
+  }, [onEndCall]);
 
   // Call Duration Timer
   useEffect(() => {
@@ -597,18 +617,20 @@ export default function ThreeWayCallRoom({
 
       socket.on('call-session-ended', ({ roomId: endedRoomId }) => {
         if (endedRoomId === roomId) {
-          onEndCall({
-            roomId,
-            duration: formatTimer(seconds),
-            seconds: seconds,
-            notes: sessionNotes,
-            rating: callRating,
-            targetLanguage,
-            specialty,
-            patientName,
-            hostName,
-            interpreterName
-          });
+          if (onEndCallRef.current) {
+            onEndCallRef.current({
+              roomId,
+              duration: formatTimer(secondsRef.current),
+              seconds: secondsRef.current,
+              notes: sessionNotesRef.current,
+              rating: callRatingRef.current,
+              targetLanguage,
+              specialty,
+              patientName,
+              hostName,
+              interpreterName
+            });
+          }
         }
       });
     }
@@ -633,7 +655,7 @@ export default function ThreeWayCallRoom({
         try { audioContextRef.current.close(); } catch (e) {}
       }
     };
-  }, [roomId, role, hostName, interpreterName, patientName, targetLanguage, specialty, createPeerConnection, startMicrophone, onEndCall, seconds, sessionNotes, callRating]);
+  }, [roomId]);
 
   // Global Click / Tap listener to unlock browser audio automatically
   useEffect(() => {
