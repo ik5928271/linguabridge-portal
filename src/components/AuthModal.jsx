@@ -195,17 +195,21 @@ export default function AuthModal({
       } else {
         const uEmail = (found.user.email || '').toLowerCase();
         const uName = (found.user.name || '').toLowerCase();
-        if (uEmail.includes('iksale9817') || uName.includes('iksale9817')) {
+        if (uEmail.includes('iksale9817') || uName.includes('iksale9817') || uEmail.includes('iksale9815') || uName.includes('iksale9815')) {
           found.user.role = 'host';
           found.user.isOwner = false;
-          found.user.org = 'IK Enterprises';
-        } else if (uEmail.includes('iksale9815') || uName.includes('iksale9815')) {
-          found.user.role = 'interpreter';
-          found.user.isOwner = false;
-          found.user.badgeNumber = found.user.badgeNumber || '87265';
-          found.user.interpreterBadgeId = found.user.badgeNumber || '87265';
-          found.user.displayName = 'Interpreter #87265';
-          found.user.org = 'Certified Linguist Pool';
+          found.user.org = 'IK Enterprises Client';
+          if (!found.wallet || found.wallet.minutesRemaining === 0) {
+            found.wallet = {
+              userId: found.user.id || 'usr-client-iksale9815',
+              totalPaid: 100.00,
+              totalMinutesPurchased: 120,
+              minutesUsed: 0,
+              minutesRemaining: 120,
+              billingType: 'prepaid',
+              paymentStatus: 'verified'
+            };
+          }
         } else if (uEmail.includes('jasmin') || uName.includes('jasmin')) {
           found.user.role = 'host';
           found.user.isOwner = false;
@@ -226,7 +230,6 @@ export default function AuthModal({
 
     // 3. Certified Interpreter Logins
     const isInterpQuery = 
-      query.includes('iksale9815') ||
       query.includes('kamila') ||
       query.includes('kuzmina') ||
       query.includes('elena') ||
@@ -239,36 +242,44 @@ export default function AuthModal({
       query.includes('linguist');
 
     if (isInterpQuery) {
-      const isIksale9815 = query.includes('iksale9815');
-      const badgeNum = isIksale9815 ? '87265' : (query.includes('kamila') ? '35360' : query.includes('kuzmina') ? '48680' : Math.floor(10000 + Math.random() * 90000).toString());
+      const badgeNum = query.includes('kamila') ? '35360' : query.includes('kuzmina') ? '48680' : Math.floor(10000 + Math.random() * 90000).toString();
       const interpUser = {
-        id: isIksale9815 ? 'usr-interp-iksale9815' : (query.includes('kamila') ? 'usr-interp-kamila' : query.includes('kuzmina') ? 'usr-mud5qq9z' : `usr-int-${Date.now().toString(36)}`),
-        name: isIksale9815 ? 'Ikram ul haq' : (query.includes('kamila') ? 'Kamila' : query.includes('kuzmina') ? 'Yelena Kuzmina' : (query.includes('@') ? query.split('@')[0] : 'Certified Linguist')),
-        email: isIksale9815 ? 'iksale9815@gmail.com' : (query.includes('kamila') ? 'kamila@linguabridge.com' : query.includes('kuzmina') ? 'kuzminay@yahoo.com' : (query.includes('@') ? query : `${query}@linguabridge.com`)),
+        id: query.includes('kamila') ? 'usr-interp-kamila' : query.includes('kuzmina') ? 'usr-mud5qq9z' : `usr-int-${Date.now().toString(36)}`,
+        name: query.includes('kamila') ? 'Kamila' : query.includes('kuzmina') ? 'Yelena Kuzmina' : (query.includes('@') ? query.split('@')[0] : 'Certified Linguist'),
+        email: query.includes('kamila') ? 'kamila@linguabridge.com' : query.includes('kuzmina') ? 'kuzminay@yahoo.com' : (query.includes('@') ? query : `${query}@linguabridge.com`),
         role: 'interpreter',
         isOwner: false,
         badgeNumber: badgeNum,
         interpreterBadgeId: badgeNum,
         displayName: `Interpreter #${badgeNum}`,
         org: 'Certified Linguist Pool',
-        primaryLang: isIksale9815 ? 'Urdu' : (query.includes('kamila') || query.includes('kuzmina') ? 'Russian' : 'Spanish'),
+        primaryLang: query.includes('kamila') || query.includes('kuzmina') ? 'Russian' : 'Spanish',
         rating: 4.98
       };
       saveLocalAccount(interpUser, null);
       onSuccessLogin(interpUser, null);
     } else {
       // 4. Client / Hospital Account
+      const isIksale9815 = query.includes('iksale9815');
       const isIksale9817 = query.includes('iksale9817');
       const isJasmin = query.includes('jasmin');
       const customUser = {
-        id: isIksale9817 ? 'usr-client-iksale9817' : (isJasmin ? 'usr-mulm4fom' : `usr-${Date.now().toString(36)}`),
-        name: isIksale9817 ? 'Clients test' : (isJasmin ? 'Jasmin ikram' : (query.includes('@') ? query.split('@')[0] : query)),
-        email: isIksale9817 ? 'iksale9817@gmail.com' : (isJasmin ? 'jasmin.ikram9999@gmail.com' : (query.includes('@') ? query : `${query}@linguabridge.com`)),
+        id: isIksale9815 ? 'usr-client-iksale9815' : (isIksale9817 ? 'usr-client-iksale9817' : (isJasmin ? 'usr-mulm4fom' : `usr-${Date.now().toString(36)}`)),
+        name: isIksale9815 ? 'Ikram ul haq' : (isIksale9817 ? 'Ikram ul haq' : (isJasmin ? 'Jasmin ikram' : (query.includes('@') ? query.split('@')[0] : query))),
+        email: isIksale9815 ? 'iksale9815@gmail.com' : (isIksale9817 ? 'iksale9817@gmail.com' : (isJasmin ? 'jasmin.ikram9999@gmail.com' : (query.includes('@') ? query : `${query}@linguabridge.com`))),
         role: 'host', // Strict Client role
         isOwner: false,
-        org: isIksale9817 ? 'IK Enterprises' : 'Client / Hospital Account'
+        org: (isIksale9815 || isIksale9817) ? 'IK Enterprises Client' : 'Client / Hospital Account'
       };
-      const customWallet = { totalPaid: isIksale9817 ? 500 : 0, totalMinutesPurchased: isIksale9817 ? 500 : 0, minutesRemaining: isIksale9817 ? 500 : 0, billingType: 'prepaid' };
+      const customWallet = {
+        userId: customUser.id,
+        totalPaid: (isIksale9815 || isIksale9817) ? 100 : 0,
+        totalMinutesPurchased: (isIksale9815 || isIksale9817) ? 120 : 0,
+        minutesUsed: 0,
+        minutesRemaining: (isIksale9815 || isIksale9817) ? 120 : 0,
+        billingType: 'prepaid',
+        paymentStatus: 'verified'
+      };
       saveLocalAccount(customUser, customWallet);
       onSuccessLogin(customUser, customWallet);
     }

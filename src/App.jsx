@@ -75,15 +75,10 @@ export default function App() {
         const cleanEmail = (u.email || '').toLowerCase().trim();
         const cleanName = (u.name || '').toLowerCase().trim();
 
-        if (cleanEmail.includes('iksale9817') || cleanName.includes('iksale9817')) {
+        if (cleanEmail.includes('iksale9817') || cleanName.includes('iksale9817') || cleanEmail.includes('iksale9815') || cleanName.includes('iksale9815')) {
           u.role = 'host';
           u.isOwner = false;
-          localStorage.setItem('linguabridge_user', JSON.stringify(u));
-        } else if (cleanEmail.includes('iksale9815') || cleanName.includes('iksale9815')) {
-          u.role = 'interpreter';
-          u.isOwner = false;
-          u.badgeNumber = u.badgeNumber || '87265';
-          u.interpreterBadgeId = u.badgeNumber || '87265';
+          u.org = u.org || 'IK Enterprises Client';
           localStorage.setItem('linguabridge_user', JSON.stringify(u));
         } else if (cleanEmail.includes('jasmin') || cleanName.includes('jasmin')) {
           u.role = 'host';
@@ -309,6 +304,23 @@ export default function App() {
             billingType: 'unlimited_owner'
           };
         }
+        const cleanE = (u.email || '').toLowerCase().trim();
+        if (cleanE.includes('iksale9815') || cleanE.includes('iksale9817') || cleanE.includes('jasmin')) {
+          const savedW = localStorage.getItem('linguabridge_wallet');
+          if (savedW) {
+            const parsedW = JSON.parse(savedW);
+            if (parsedW && parsedW.minutesRemaining > 0) return parsedW;
+          }
+          return {
+            userId: u.id || 'usr-client-iksale9815',
+            totalPaid: 100.00,
+            totalMinutesPurchased: 120,
+            minutesUsed: 0,
+            minutesRemaining: 120,
+            billingType: 'prepaid',
+            paymentStatus: 'verified'
+          };
+        }
       }
       const savedWallet = localStorage.getItem('linguabridge_wallet');
       if (savedWallet) return JSON.parse(savedWallet);
@@ -321,6 +333,24 @@ export default function App() {
       billingType: 'prepaid'
     };
   });
+
+  // Automatically fetch & synchronize live wallet balance from server
+  useEffect(() => {
+    if (currentUser?.id || currentUser?.email) {
+      const targetKey = currentUser.id || currentUser.email;
+      fetch(`/api/wallet/${encodeURIComponent(targetKey)}`)
+        .then(r => r.json())
+        .then(w => {
+          if (w && (w.minutesRemaining !== undefined || w.totalMinutesPurchased !== undefined)) {
+            setClientWallet(w);
+            try {
+              localStorage.setItem('linguabridge_wallet', JSON.stringify(w));
+            } catch {}
+          }
+        })
+        .catch(() => {});
+    }
+  }, [currentUser]);
 
   const handleUpdateWallet = (updates) => {
     setClientWallet(prev => {
