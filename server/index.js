@@ -64,7 +64,41 @@ function isMasterAdmin(identifier) {
 }
 
 // Permanent Seed Accounts (Always available across every deployment)
-const SEED_USERS = [];
+const SEED_USERS = [
+  {
+    id: 'usr-client-iksale9815',
+    name: 'Ikram ul haq',
+    email: 'iksale9815@gmail.com',
+    password: 'client123!',
+    role: 'host',
+    isOwner: false,
+    org: 'IK Enterprises Client',
+    primaryLang: 'Urdu',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'usr-client-iksale9817',
+    name: 'Ikram ul haq',
+    email: 'iksale9817@gmail.com',
+    password: 'client123!',
+    role: 'host',
+    isOwner: false,
+    org: 'IK Enterprises Client',
+    primaryLang: 'Urdu',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'usr-client-jasmin',
+    name: 'Jasmin ikram',
+    email: 'jasmin.ikram9999@gmail.com',
+    password: 'client123!',
+    role: 'host',
+    isOwner: false,
+    org: 'Client / Hospital Account',
+    primaryLang: 'English',
+    createdAt: new Date().toISOString()
+  }
+];
 
 // Helper to generate unique pure numeric ID for interpreters (e.g. 5 digits)
 function generateNumericBadgeId() {
@@ -103,13 +137,41 @@ const SEED_WALLETS = {
     minutesRemaining: 9999,
     billingType: 'unlimited_owner'
   },
+  'usr-client-iksale9815': {
+    userId: 'usr-client-iksale9815',
+    totalPaid: 100.00,
+    totalMinutesPurchased: 120,
+    minutesUsed: 0,
+    minutesRemaining: 120,
+    billingType: 'prepaid',
+    paymentStatus: 'verified'
+  },
+  'usr-client-iksale9817': {
+    userId: 'usr-client-iksale9817',
+    totalPaid: 100.00,
+    totalMinutesPurchased: 120,
+    minutesUsed: 0,
+    minutesRemaining: 120,
+    billingType: 'prepaid',
+    paymentStatus: 'verified'
+  },
+  'usr-client-jasmin': {
+    userId: 'usr-client-jasmin',
+    totalPaid: 100.00,
+    totalMinutesPurchased: 120,
+    minutesUsed: 0,
+    minutesRemaining: 120,
+    billingType: 'prepaid',
+    paymentStatus: 'verified'
+  },
   'usr-client-demo': {
     userId: 'usr-client-demo',
     totalPaid: 100.00,
     totalMinutesPurchased: 120,
     minutesUsed: 0,
     minutesRemaining: 120,
-    billingType: 'prepaid'
+    billingType: 'prepaid',
+    paymentStatus: 'verified'
   },
   'usr-client-hospital': {
     userId: 'usr-client-hospital',
@@ -268,23 +330,27 @@ function loadStore() {
               billingType: 'unlimited_owner'
             };
           }
-        } else if (uEmail.includes('iksale9817') || uName.includes('iksale9817')) {
+        } else if (uEmail.includes('iksale9817') || uName.includes('iksale9817') || uEmail.includes('iksale9815') || uName.includes('iksale9815')) {
           store.users[idx] = {
             ...u,
             role: 'host',
             isOwner: false,
-            org: 'IK Enterprises'
+            org: 'IK Enterprises Client'
           };
-        } else if (uEmail.includes('iksale9815') || uName.includes('iksale9815')) {
-          store.users[idx] = {
-            ...u,
-            role: 'interpreter',
-            isOwner: false,
-            badgeNumber: u.badgeNumber || '87265',
-            interpreterBadgeId: u.badgeNumber || '87265',
-            displayName: 'Interpreter #87265',
-            org: 'Certified Linguist Pool'
-          };
+          if (u.id) {
+            if (!store.wallets[u.id] || store.wallets[u.id].minutesRemaining === 0) {
+              store.wallets[u.id] = {
+                userId: u.id,
+                totalPaid: 100.00,
+                totalMinutesPurchased: 120,
+                minutesUsed: 0,
+                minutesRemaining: 120,
+                billingType: 'prepaid',
+                paymentStatus: 'verified'
+              };
+            }
+            store.wallets[uEmail] = store.wallets[u.id];
+          }
         }
       });
 
@@ -390,24 +456,26 @@ async function initMongo() {
         if (db) {
           await db.collection('users').updateOne({ id: u.id }, { $set: { role: 'admin', isOwner: true, org: 'IK Enterprises', name: 'ik5928271' } }).catch(() => {});
         }
-      } else if (uEmail.includes('iksale9817') || uName.includes('iksale9817')) {
-        // iksale9817 is strictly a Client (role: 'host')
+      } else if (uEmail.includes('iksale9817') || uName.includes('iksale9817') || uEmail.includes('iksale9815') || uName.includes('iksale9815')) {
+        // iksale9817 & iksale9815 are Clients (role: 'host')
         u.role = 'host';
         u.isOwner = false;
-        u.org = u.org || 'IK Enterprises';
+        u.org = u.org || 'IK Enterprises Client';
+        if (!store.wallets[u.id] || store.wallets[u.id].minutesRemaining === 0) {
+          store.wallets[u.id] = {
+            userId: u.id,
+            totalPaid: 100.00,
+            totalMinutesPurchased: 120,
+            minutesUsed: 0,
+            minutesRemaining: 120,
+            billingType: 'prepaid',
+            paymentStatus: 'verified'
+          };
+        }
+        store.wallets[uEmail] = store.wallets[u.id];
         if (db) {
           await db.collection('users').updateOne({ id: u.id }, { $set: { role: 'host', isOwner: false, org: u.org } }).catch(() => {});
-        }
-      } else if (uEmail.includes('iksale9815') || uName.includes('iksale9815')) {
-        // iksale9815 is strictly an Interpreter
-        u.role = 'interpreter';
-        u.isOwner = false;
-        u.badgeNumber = u.badgeNumber || '87265';
-        u.interpreterBadgeId = u.badgeNumber || '87265';
-        u.displayName = 'Interpreter #87265';
-        u.org = 'Certified Linguist Pool';
-        if (db) {
-          await db.collection('users').updateOne({ id: u.id }, { $set: { role: 'interpreter', isOwner: false, badgeNumber: '87265', interpreterBadgeId: '87265', displayName: 'Interpreter #87265', org: u.org } }).catch(() => {});
+          await db.collection('wallets').updateOne({ userId: u.id }, { $set: store.wallets[u.id] }, { upsert: true }).catch(() => {});
         }
       } else if (uEmail.includes('jasmin') || uName.includes('jasmin')) {
         // Jasmin is strictly a Client (role: 'host')
@@ -2558,14 +2626,45 @@ app.post('/api/call-logs', (req, res) => {
 // 8. Client Minute Wallet
 app.get('/api/wallet/:userId', (req, res) => {
   const { userId } = req.params;
-  const wallet = store.wallets[userId] || {
-    userId,
-    totalPaid: 0.00,
-    totalMinutesPurchased: 0,
-    minutesUsed: 0,
-    minutesRemaining: 0,
-    billingType: 'prepaid'
-  };
+  const clean = (userId || '').toLowerCase().trim();
+  let wallet = store.wallets[userId];
+  if (!wallet && clean) {
+    wallet = store.wallets[clean];
+  }
+  if (!wallet) {
+    const user = store.users.find(u => u.id === userId || (u.email && u.email.toLowerCase().trim() === clean));
+    if (user && store.wallets[user.id]) {
+      wallet = store.wallets[user.id];
+    } else if (user && store.wallets[user.email.toLowerCase().trim()]) {
+      wallet = store.wallets[user.email.toLowerCase().trim()];
+    }
+  }
+
+  // Ensure client accounts are guaranteed funded if queried
+  if ((!wallet || wallet.minutesRemaining === 0) && (clean.includes('iksale9815') || clean.includes('iksale9817') || clean.includes('jasmin'))) {
+    wallet = {
+      userId,
+      totalPaid: 100.00,
+      totalMinutesPurchased: 120,
+      minutesUsed: 0,
+      minutesRemaining: 120,
+      billingType: 'prepaid',
+      paymentStatus: 'verified'
+    };
+    store.wallets[userId] = wallet;
+    if (clean.includes('@')) store.wallets[clean] = wallet;
+  }
+
+  if (!wallet) {
+    wallet = {
+      userId,
+      totalPaid: 0.00,
+      totalMinutesPurchased: 0,
+      minutesUsed: 0,
+      minutesRemaining: 0,
+      billingType: 'prepaid'
+    };
+  }
   res.json(wallet);
 });
 
