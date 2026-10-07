@@ -129,6 +129,8 @@ export default function ThreeWayCallRoom({
   const scriptProcessorRef = useRef(null);
   const playbackCtxRef = useRef(null);
   const nextPlayTimesRef = useRef({});
+  const audioElementsMapRef = useRef({}); // socketId -> HTMLAudioElement
+  const webrtcConnectedMapRef = useRef({}); // socketId -> boolean
   const isMutedRef = useRef(isMuted);
   const screenStreamRef = useRef(null);
   const localScreenVideoRef = useRef(null);
@@ -182,6 +184,14 @@ export default function ThreeWayCallRoom({
     if (playbackCtxRef.current && playbackCtxRef.current.state === 'suspended') {
       playbackCtxRef.current.resume().catch(() => {});
     }
+    // Attempt play on all remote audio tags
+    Object.values(audioElementsMapRef.current).forEach(el => {
+      if (el) {
+        el.muted = false;
+        el.volume = 1.0;
+        el.play().catch(() => {});
+      }
+    });
     setShowAudioUnlockNotice(false);
   }, []);
 
@@ -218,37 +228,29 @@ export default function ThreeWayCallRoom({
           localCameraVideoRef.current.srcObject = stream;
         }
 
-        // Attach tracks to any established WebRTC peer connections
-        const socket = getSocket();
+        const audioTrack = stream.getAudioTracks()[0];
+
+        // Attach or seamlessly replace track on ALL active RTCPeerConnections
         Object.entries(peersRef.current).forEach(([peerId, pc]) => {
-          stream.getAudioTracks().forEach(track => {
+          if (!pc || pc.connectionState === 'closed') return;
+          if (audioTrack) {
             const senders = pc.getSenders();
             const audioSender = senders.find(s => (s.track && s.track.kind === 'audio') || (!s.track));
             if (audioSender) {
-              audioSender.replaceTrack(track).catch(() => {});
+              audioSender.replaceTrack(audioTrack).catch(e => {
+                console.warn('[ReplaceTrack Error]:', e);
+              });
             } else {
               try {
-                pc.addTrack(track, stream);
-                if (pc.signalingState === 'stable') {
-                  pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false })
-                    .then(offer => pc.setLocalDescription(offer))
-                    .then(() => {
-                      if (socket) {
-                        socket.emit('webrtc-offer', {
-                          targetSocketId: peerId,
-                          offer: pc.localDescription,
-                          senderInfo: { role, name: role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName }
-                        });
-                      }
-                    })
-                    .catch(() => {});
-                }
-              } catch (e) {}
+                pc.addTrack(audioTrack, stream);
+              } catch (e) {
+                console.warn('[AddTrack Error]:', e);
+              }
             }
-          });
+          }
         });
 
-        // Initialize Web Audio API for visual meter & live PCM streaming
+        // Initialize Web Audio API for visual meter & live PCM streaming fallback
         try {
           const AudioCtx = window.AudioContext || window.webkitAudioContext;
           if (AudioCtx) {
@@ -284,7 +286,7 @@ export default function ThreeWayCallRoom({
                   pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
                 }
 
-                // Stream voice chunk if sound detected
+                // Stream voice chunk fallback if sound detected
                 if (maxAmp > 0.0003) {
                   const s = getSocket();
                   if (s && s.connected) {
@@ -321,7 +323,7 @@ export default function ThreeWayCallRoom({
                 const normalized = Math.min(100, Math.floor((avg / 128) * 100));
                 setMicAudioLevel(normalized);
 
-                if (normalized > 10 && !isMutedRef.current) {
+                if (normalized > 8 && !isMutedRef.current) {
                   setActiveSpeaker(role);
                   const now = Date.now();
                   if (!lastSpeakingEmitRef.current || (now - lastSpeakingEmitRef.current > 1000)) {
@@ -353,21 +355,37 @@ export default function ThreeWayCallRoom({
   // ==========================================
   // TOP-LEVEL METHOD: WebRTC Peer Connection
   // ==========================================
-  const createPeerConnection = useCallback((targetSocketId, isInitiator, socket) => {
+  const createPeerConnection = useCallback((targetSocketId, socket) => {
     if (peersRef.current[targetSocketId]) {
       try { peersRef.current[targetSocketId].close(); } catch (e) {}
     }
 
     const pc = new RTCPeerConnection(ICE_SERVERS);
     pc._iceCandidateQueue = [];
+    pc._makingOffer = false;
     peersRef.current[targetSocketId] = pc;
 
+    // 1. Add Audio Transceiver immediately so SDP always includes sendrecv audio
+    try {
+      pc.addTransceiver('audio', { direction: 'sendrecv' });
+    } catch (e) {}
+
+    // 2. Attach local audio track if microphone stream is already active
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getAudioTracks().forEach(track => {
-        try { pc.addTrack(track, mediaStreamRef.current); } catch (e) {}
+        try {
+          const senders = pc.getSenders();
+          const audioSender = senders.find(s => (s.track && s.track.kind === 'audio') || (!s.track));
+          if (audioSender) {
+            audioSender.replaceTrack(track).catch(() => {});
+          } else {
+            pc.addTrack(track, mediaStreamRef.current);
+          }
+        } catch (e) {}
       });
     }
 
+    // 3. ICE Candidate Emission
     pc.onicecandidate = (event) => {
       if (event.candidate && socket) {
         socket.emit('webrtc-ice-candidate', {
@@ -377,29 +395,52 @@ export default function ThreeWayCallRoom({
       }
     };
 
+    // 4. Inbound Remote Track Delivery
     pc.ontrack = (event) => {
       const stream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
       setRemoteStreamsMap(prev => ({ ...prev, [targetSocketId]: stream }));
-      setShowAudioUnlockNotice(false);
+      webrtcConnectedMapRef.current[targetSocketId] = true;
+
+      // Direct element playback check
+      const el = audioElementsMapRef.current[targetSocketId];
+      if (el) {
+        el.srcObject = stream;
+        el.muted = false;
+        el.volume = 1.0;
+        el.play().catch(() => {
+          setShowAudioUnlockNotice(true);
+        });
+      }
     };
 
-    if (isInitiator) {
-      setTimeout(async () => {
-        try {
-          if (pc.signalingState !== 'stable') return;
-          const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
-          if (pc.signalingState !== 'stable') return;
-          await pc.setLocalDescription(offer);
-          if (socket) {
-            socket.emit('webrtc-offer', {
-              targetSocketId,
-              offer,
-              senderInfo: { role, name: role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName }
-            });
-          }
-        } catch (e) {}
-      }, 200);
-    }
+    // 5. Connection State Monitoring
+    pc.onconnectionstatechange = () => {
+      const state = pc.connectionState;
+      if (state === 'connected') {
+        webrtcConnectedMapRef.current[targetSocketId] = true;
+      } else if (state === 'failed' || state === 'disconnected' || state === 'closed') {
+        webrtcConnectedMapRef.current[targetSocketId] = false;
+      }
+    };
+
+    // 6. Perfect Negotiation: onnegotiationneeded
+    pc.onnegotiationneeded = async () => {
+      try {
+        pc._makingOffer = true;
+        await pc.setLocalDescription();
+        if (socket) {
+          socket.emit('webrtc-offer', {
+            targetSocketId,
+            offer: pc.localDescription,
+            senderInfo: { role, name: role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName }
+          });
+        }
+      } catch (err) {
+        console.warn('[WebRTC Negotiation Error]:', err);
+      } finally {
+        pc._makingOffer = false;
+      }
+    };
 
     return pc;
   }, [role, hostName, interpreterName, patientName]);
@@ -426,8 +467,7 @@ export default function ThreeWayCallRoom({
         if (Array.isArray(participants)) {
           participants.forEach(p => {
             if (p.socketId && p.socketId !== currentUserId && p.socketId !== socket.id) {
-              const isInitiator = socket.id < p.socketId;
-              createPeerConnection(p.socketId, isInitiator, socket);
+              createPeerConnection(p.socketId, socket);
             }
           });
         }
@@ -441,38 +481,53 @@ export default function ThreeWayCallRoom({
             sender: 'System',
             role: 'system',
             text: `${p.name} (${p.role}) has joined the 3-party session.`,
-            timestamp: formatTimer(seconds)
+            timestamp: formatTimer(secondsRef.current)
           }
         ]);
 
         if (p.socketId && p.socketId !== socket.id) {
-          const isInitiator = socket.id < p.socketId;
-          createPeerConnection(p.socketId, isInitiator, socket);
+          createPeerConnection(p.socketId, socket);
         }
       });
 
+      // Perfect Negotiation Offer Receiver (Handles Collisions & Polite Rollbacks)
       socket.on('webrtc-offer', async ({ senderSocketId, offer, senderInfo }) => {
         let pc = peersRef.current[senderSocketId];
         if (!pc) {
-          pc = createPeerConnection(senderSocketId, false, socket);
+          pc = createPeerConnection(senderSocketId, socket);
         }
+
         try {
+          const isPolite = (socket.id || '') < senderSocketId;
+          const offerCollision = (pc.signalingState !== 'stable') || pc._makingOffer;
+
+          if (!isPolite && offerCollision) {
+            return;
+          }
+
+          if (offerCollision) {
+            await Promise.all([
+              pc.setLocalDescription({ type: 'rollback' }),
+              pc.setRemoteDescription(new RTCSessionDescription(offer))
+            ]);
+          } else {
+            await pc.setRemoteDescription(new RTCSessionDescription(offer));
+          }
+
+          // Attach local tracks if available
           if (mediaStreamRef.current) {
             mediaStreamRef.current.getAudioTracks().forEach(track => {
               const senders = pc.getSenders();
-              const hasSender = senders.some(s => s.track && s.track.id === track.id);
-              if (!hasSender) {
+              const audioSender = senders.find(s => (s.track && s.track.kind === 'audio') || (!s.track));
+              if (audioSender) {
+                audioSender.replaceTrack(track).catch(() => {});
+              } else {
                 try { pc.addTrack(track, mediaStreamRef.current); } catch (e) {}
               }
             });
           }
 
-          if (pc.signalingState !== 'stable') {
-            try { await pc.setLocalDescription({ type: 'rollback' }); } catch (e) {}
-          }
-
-          await pc.setRemoteDescription(new RTCSessionDescription(offer));
-
+          // Process queued ICE candidates
           if (Array.isArray(pc._iceCandidateQueue) && pc._iceCandidateQueue.length > 0) {
             for (const cand of pc._iceCandidateQueue) {
               await pc.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
@@ -480,14 +535,15 @@ export default function ThreeWayCallRoom({
             pc._iceCandidateQueue = [];
           }
 
-          const answer = await pc.createAnswer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
+          const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
-          socket.emit('webrtc-answer', { targetSocketId: senderSocketId, answer });
+          socket.emit('webrtc-answer', { targetSocketId: senderSocketId, answer: pc.localDescription });
         } catch (err) {
           console.warn('[WebRTC Inbound Offer Processing]:', err);
         }
       });
 
+      // Inbound Answer Receiver
       socket.on('webrtc-answer', async ({ senderSocketId, answer }) => {
         const pc = peersRef.current[senderSocketId];
         if (pc && pc.signalingState === 'have-local-offer') {
@@ -499,10 +555,13 @@ export default function ThreeWayCallRoom({
               }
               pc._iceCandidateQueue = [];
             }
-          } catch (e) {}
+          } catch (e) {
+            console.warn('[WebRTC Inbound Answer Processing]:', e);
+          }
         }
       });
 
+      // Inbound ICE Candidate Receiver
       socket.on('webrtc-ice-candidate', async ({ senderSocketId, candidate }) => {
         const pc = peersRef.current[senderSocketId];
         if (pc && candidate) {
@@ -517,12 +576,17 @@ export default function ThreeWayCallRoom({
         }
       });
 
-      // Enterprise Live Web Audio PCM Stream Receiver
+      // Enterprise Live Web Audio PCM Stream Fallback Receiver (plays smoothly if WebRTC is blocked/connecting)
       socket.on('live-pcm-audio-chunk', ({ senderSocketId, pcmData, sampleRate, senderRole, senderName }) => {
         if (!pcmData || senderSocketId === socket.id) return;
 
         if (senderRole) {
           setActiveSpeaker(senderRole);
+        }
+
+        // If WebRTC is already connected for this peer, skip PCM fallback to avoid duplicate audio
+        if (webrtcConnectedMapRef.current[senderSocketId]) {
+          return;
         }
 
         try {
@@ -581,6 +645,8 @@ export default function ThreeWayCallRoom({
           try { peersRef.current[socketId].close(); } catch (e) {}
           delete peersRef.current[socketId];
         }
+        delete webrtcConnectedMapRef.current[socketId];
+        delete audioElementsMapRef.current[socketId];
         setRemoteStreamsMap(prev => {
           const next = { ...prev };
           delete next[socketId];
@@ -655,9 +721,9 @@ export default function ThreeWayCallRoom({
         try { audioContextRef.current.close(); } catch (e) {}
       }
     };
-  }, [roomId]);
+  }, [roomId, createPeerConnection, startMicrophone]);
 
-  // Global Click / Tap listener to unlock browser audio automatically
+  // Global Click / Tap listener to automatically unlock browser audio output
   useEffect(() => {
     const handleTouch = () => {
       if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
@@ -666,6 +732,14 @@ export default function ThreeWayCallRoom({
       if (playbackCtxRef.current && playbackCtxRef.current.state === 'suspended') {
         playbackCtxRef.current.resume().catch(() => {});
       }
+      Object.values(audioElementsMapRef.current).forEach(el => {
+        if (el) {
+          el.muted = false;
+          el.volume = 1.0;
+          el.play().catch(() => {});
+        }
+      });
+      setShowAudioUnlockNotice(false);
     };
     window.addEventListener('click', handleTouch, { passive: true });
     window.addEventListener('touchstart', handleTouch, { passive: true });
@@ -873,7 +947,30 @@ export default function ThreeWayCallRoom({
 
       </div>
 
-      {/* 2. MICROPHONE NOT CONNECTED / BLOCKED WARNING BANNER */}
+      {/* 2. AUDIO UNLOCK NOTICE / FLOATING BANNER */}
+      {showAudioUnlockNotice && (
+        <div 
+          onClick={unlockAudioOutput}
+          className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 text-xs font-black flex flex-col sm:flex-row items-center justify-between gap-2 cursor-pointer transition shadow-2xl z-50 border-b border-emerald-400 animate-bounce"
+        >
+          <div className="flex items-center gap-2">
+            <Volume2 className="w-5 h-5 text-yellow-300 shrink-0 animate-pulse" />
+            <span>🔊 <strong>Audio Ready:</strong> Tap here or click anywhere on screen to enable live voice playback.</span>
+          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              unlockAudioOutput();
+            }}
+            className="px-3.5 py-1 rounded-lg bg-yellow-400 text-slate-950 text-xs font-black uppercase tracking-wider hover:bg-yellow-300 shadow transition shrink-0 cursor-pointer"
+          >
+            🔊 Tap To Unblock Audio
+          </button>
+        </div>
+      )}
+
+      {/* 3. MICROPHONE NOT CONNECTED / BLOCKED WARNING BANNER */}
       {micPermissionState === 'denied' && (
         <div 
           onClick={startMicrophone}
@@ -896,7 +993,7 @@ export default function ThreeWayCallRoom({
         </div>
       )}
 
-      {/* 3. MAIN CONFERENCE ARENA */}
+      {/* 4. MAIN CONFERENCE ARENA */}
       <div className="flex-1 flex overflow-hidden relative" onClick={unlockAudioOutput}>
         
         {/* Left / Center Video & Audio Stage */}
@@ -1396,11 +1493,18 @@ export default function ThreeWayCallRoom({
           autoPlay
           playsInline
           ref={(el) => {
-            if (el && st && el.srcObject !== st) {
-              el.srcObject = st;
+            if (el) {
+              audioElementsMapRef.current[peerId] = el;
+              if (st && el.srcObject !== st) {
+                el.srcObject = st;
+              }
               el.muted = false;
               el.volume = 1.0;
-              el.play().catch(() => {});
+              el.play().catch(() => {
+                setShowAudioUnlockNotice(true);
+              });
+            } else {
+              delete audioElementsMapRef.current[peerId];
             }
           }}
           style={{ position: 'fixed', top: -9999, left: -9999, width: '1px', height: '1px', opacity: 0, pointerEvents: 'none' }}

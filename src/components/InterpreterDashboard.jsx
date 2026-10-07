@@ -516,15 +516,6 @@ export default function InterpreterDashboard({
     playConnectedChime();
     const callData = incomingCall;
     setIncomingCall(null);
-    
-    // Warm up microphone permission immediately on user gesture
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      try {
-        await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      } catch (e) {
-        console.warn('[Microphone Prompt Warning on Accept]:', e);
-      }
-    }
 
     const socket = getSocket();
     if (socket && callData?.dispatchId) {
