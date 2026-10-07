@@ -2618,12 +2618,30 @@ app.post('/api/call-logs', (req, res) => {
     ...req.body
   };
   store.callLogs = [newLog, ...(store.callLogs || []).filter(l => l.id !== newLog.id)];
+  
+  // Real Automatic Dynamic Wallet Deduction on completed call log
+  const durationSec = typeof newLog.durationSeconds === 'number' ? newLog.durationSeconds : (parseInt(newLog.duration) || 60);
+  const minutesToDeduct = durationSec < 30 ? 0 : Math.max(1, Math.ceil(durationSec / 60));
+
+  if (minutesToDeduct > 0) {
+    const clientIdentifier = newLog.hostEmail || newLog.clientEmail || newLog.hostName || newLog.userId;
+    if (clientIdentifier) {
+      const cleanId = String(clientIdentifier).toLowerCase().trim();
+      const user = store.users.find(u => u.id === clientIdentifier || (u.email && u.email.toLowerCase().trim() === cleanId) || (u.name && u.name.toLowerCase().trim() === cleanId));
+      const targetWallet = (user && store.wallets[user.id]) || store.wallets[clientIdentifier] || store.wallets[cleanId];
+      if (targetWallet) {
+        targetWallet.minutesUsed = (targetWallet.minutesUsed || 0) + minutesToDeduct;
+        targetWallet.minutesRemaining = Math.max(0, (targetWallet.minutesRemaining || 0) - minutesToDeduct);
+      }
+    }
+  }
+
   saveStore();
   io.emit('call-log-added', newLog);
   res.json(newLog);
 });
 
-// 8. Client Minute Wallet
+// 8. Client Minute Wallet (Real Database State with Dynamic Usage from Real Call Logs)
 app.get('/api/wallet/:userId', (req, res) => {
   const { userId } = req.params;
   const clean = (userId || '').toLowerCase().trim();
@@ -2640,31 +2658,44 @@ app.get('/api/wallet/:userId', (req, res) => {
     }
   }
 
-  // Ensure client accounts are guaranteed funded if queried
-  if ((!wallet || wallet.minutesRemaining === 0) && (clean.includes('iksale9815') || clean.includes('iksale9817') || clean.includes('jasmin'))) {
+  // Calculate real minutes used dynamically from real completed call logs for this client
+  const userLogs = (store.callLogs || []).filter(c => {
+    if (!c) return false;
+    const cHost = (c.hostName || '').toLowerCase();
+    const cClient = (c.clientName || '').toLowerCase();
+    const cEmail = (c.clientEmail || c.hostEmail || '').toLowerCase();
+    return (clean && (cEmail === clean || cHost.includes(clean) || cClient.includes(clean)));
+  });
+
+  const realCalculatedMinutesUsed = userLogs.reduce((sum, log) => {
+    const durSec = typeof log.durationSeconds === 'number' ? log.durationSeconds : (parseInt(log.duration) || 60);
+    return sum + (durSec < 30 ? 0 : Math.max(1, Math.ceil(durSec / 60)));
+  }, 0);
+
+  if (!wallet) {
+    const isSpecialClient = clean.includes('iksale9815') || clean.includes('iksale9817') || clean.includes('jasmin');
+    const initialMins = isSpecialClient ? 120 : 0;
+    const initialPaid = isSpecialClient ? 100.00 : 0;
     wallet = {
       userId,
-      totalPaid: 100.00,
-      totalMinutesPurchased: 120,
-      minutesUsed: 0,
-      minutesRemaining: 120,
+      totalPaid: initialPaid,
+      totalMinutesPurchased: initialMins,
+      minutesUsed: realCalculatedMinutesUsed,
+      minutesRemaining: Math.max(0, initialMins - realCalculatedMinutesUsed),
       billingType: 'prepaid',
       paymentStatus: 'verified'
     };
     store.wallets[userId] = wallet;
     if (clean.includes('@')) store.wallets[clean] = wallet;
+  } else {
+    // If real call logs show higher usage, keep minutesUsed updated with real usage!
+    if (realCalculatedMinutesUsed > (wallet.minutesUsed || 0)) {
+      wallet.minutesUsed = realCalculatedMinutesUsed;
+      wallet.minutesRemaining = Math.max(0, (wallet.totalMinutesPurchased || 0) - wallet.minutesUsed);
+      saveStore();
+    }
   }
 
-  if (!wallet) {
-    wallet = {
-      userId,
-      totalPaid: 0.00,
-      totalMinutesPurchased: 0,
-      minutesUsed: 0,
-      minutesRemaining: 0,
-      billingType: 'prepaid'
-    };
-  }
   res.json(wallet);
 });
 
