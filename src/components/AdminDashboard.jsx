@@ -325,6 +325,18 @@ export default function AdminDashboard({
       createdAt: '2026-08-30'
     },
     {
+      id: 'usr-client-iksale9815',
+      name: 'Ikram ul haq',
+      email: 'iksale9815@gmail.com',
+      role: 'host',
+      isOwner: false,
+      org: 'IK Enterprises Client',
+      primaryLang: 'Urdu',
+      specialty: 'General / Healthcare',
+      wallet: { totalPaid: 100, totalMinutesPurchased: 120, minutesUsed: 14, minutesRemaining: 106, billingType: 'prepaid' },
+      createdAt: '2026-08-30'
+    },
+    {
       id: 'usr-client-iksale9817',
       name: 'Clients test',
       email: 'iksale9817@gmail.com',
