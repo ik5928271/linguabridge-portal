@@ -3461,12 +3461,27 @@ function handleLeaveRoom(socket, roomId) {
 const distPath = path.join(process.cwd(), 'dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
+  
+  // Catch-all for SPA GET navigation
   app.get('*', (req, res) => {
     if (!req.path.startsWith('/api') && !req.path.startsWith('/socket.io')) {
       res.sendFile(path.join(distPath, 'index.html'));
     }
   });
+
+  // Catch-all for any accidental POST to root/SPA routes - smoothly redirect to home
+  app.post('*', (req, res, next) => {
+    if (!req.path.startsWith('/api') && !req.path.startsWith('/socket.io')) {
+      return res.redirect(303, '/');
+    }
+    next();
+  });
 }
+
+// Fallback for root POST if dist is not local
+app.post('/', (req, res) => {
+  res.redirect(303, '/');
+});
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
