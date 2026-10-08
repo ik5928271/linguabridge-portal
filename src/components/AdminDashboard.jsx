@@ -316,7 +316,8 @@ export default function AdminDashboard({
       displayName: 'Interpreter #87265',
       org: 'Certified Linguist Pool',
       primaryLang: 'Urdu',
-      specialty: 'General / Customer Support',
+      languages: ['Urdu', 'Punjabi', 'English'],
+      specialty: 'Medical, Legal & General Support',
       hourlyRate: 5,
       minuteRate: 0.20,
       monthlySalary: 1200,
@@ -325,30 +326,15 @@ export default function AdminDashboard({
       createdAt: '2026-08-30'
     },
     {
-      id: 'usr-client-iksale9815',
+      id: 'usr-client-iksale9817',
       name: 'Ikram ul haq',
-      email: 'iksale9815@gmail.com',
+      email: 'iksale9817@gmail.com',
       role: 'host',
       isOwner: false,
       org: 'IK Enterprises Client',
       primaryLang: 'Urdu',
       specialty: 'General / Healthcare',
-      wallet: { totalPaid: 100, totalMinutesPurchased: 120, minutesUsed: 14, minutesRemaining: 106, billingType: 'prepaid' },
-      createdAt: '2026-08-30'
-    },
-    {
-      id: 'usr-client-iksale9817',
-      name: 'Clients test',
-      email: 'iksale9817@gmail.com',
-      role: 'host',
-      isOwner: false,
-      org: 'IK Enterprises',
-      primaryLang: 'English',
-      specialty: 'Medical / Healthcare',
-      hourlyRate: 5,
-      employmentType: 'hourly',
-      rateLabel: '$5 / hr (Shift)',
-      wallet: { totalPaid: 500, totalMinutesPurchased: 500, minutesRemaining: 500, billingType: 'prepaid' },
+      wallet: { totalPaid: 100, totalMinutesPurchased: 120, minutesUsed: 0, minutesRemaining: 120, billingType: 'prepaid' },
       createdAt: '2026-08-30'
     },
     {
