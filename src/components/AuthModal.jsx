@@ -399,8 +399,10 @@ export default function AuthModal({
                 <div className="relative">
                   <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                   <input
+                    id="signin-email"
+                    name="username"
                     type="text"
-                    inputMode="email"
+                    autoComplete="username"
                     autoCapitalize="none"
                     autoCorrect="off"
                     spellCheck="false"
@@ -408,7 +410,7 @@ export default function AuthModal({
                     value={signInEmail}
                     onChange={(e) => setSignInEmail(e.target.value)}
                     placeholder="name@example.com or phone"
-                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-base sm:text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 transition cursor-text touch-manipulation select-text"
+                    className="w-full pl-10 pr-4 py-3.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-base focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 transition cursor-text select-text"
                   />
                 </div>
               </div>
@@ -433,7 +435,10 @@ export default function AuthModal({
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                   <input
+                    id="signin-password"
+                    name="password"
                     type={showSignInPassword ? "text" : "password"}
+                    autoComplete="current-password"
                     autoCapitalize="none"
                     autoCorrect="off"
                     spellCheck="false"
@@ -441,7 +446,7 @@ export default function AuthModal({
                     value={signInPassword}
                     onChange={(e) => setSignInPassword(e.target.value)}
                     placeholder="••••••••••••"
-                    className="w-full pl-10 pr-11 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-base sm:text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 transition font-mono tracking-wide cursor-text touch-manipulation select-text"
+                    className="w-full pl-10 pr-11 py-3.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-base focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 transition font-mono tracking-wide cursor-text select-text"
                   />
                   <button
                     type="button"
