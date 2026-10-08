@@ -66,14 +66,25 @@ function isMasterAdmin(identifier) {
 // Permanent Seed Accounts (Always available across every deployment)
 const SEED_USERS = [
   {
-    id: 'usr-client-iksale9815',
+    id: 'usr-interp-iksale9815',
     name: 'Ikram ul haq',
     email: 'iksale9815@gmail.com',
-    password: 'client123!',
-    role: 'host',
+    password: 'interpreter123!',
+    role: 'interpreter',
     isOwner: false,
-    org: 'IK Enterprises Client',
+    badgeNumber: '87265',
+    interpreterBadgeId: '87265',
+    displayName: 'Interpreter #87265',
+    org: 'Certified Linguist Pool',
     primaryLang: 'Urdu',
+    languages: ['Urdu', 'Punjabi', 'English'],
+    specialty: 'Medical, Legal & General Support',
+    hourlyRate: 5,
+    minuteRate: 0.20,
+    monthlySalary: 1200,
+    employmentType: 'per_minute',
+    rating: 4.99,
+    status: 'approved',
     createdAt: new Date().toISOString()
   },
   {
@@ -85,6 +96,8 @@ const SEED_USERS = [
     isOwner: false,
     org: 'IK Enterprises Client',
     primaryLang: 'Urdu',
+    languages: ['Urdu', 'English'],
+    specialty: 'Medical / Healthcare',
     createdAt: new Date().toISOString()
   },
   {
@@ -136,15 +149,6 @@ const SEED_WALLETS = {
     minutesUsed: 0,
     minutesRemaining: 9999,
     billingType: 'unlimited_owner'
-  },
-  'usr-client-iksale9815': {
-    userId: 'usr-client-iksale9815',
-    totalPaid: 100.00,
-    totalMinutesPurchased: 120,
-    minutesUsed: 0,
-    minutesRemaining: 120,
-    billingType: 'prepaid',
-    paymentStatus: 'verified'
   },
   'usr-client-iksale9817': {
     userId: 'usr-client-iksale9817',
@@ -330,12 +334,32 @@ function loadStore() {
               billingType: 'unlimited_owner'
             };
           }
-        } else if (uEmail.includes('iksale9817') || uName.includes('iksale9817') || uEmail.includes('iksale9815') || uName.includes('iksale9815')) {
+        } else if (uEmail === 'iksale9815@gmail.com' || uEmail.includes('iksale9815')) {
+          store.users[idx] = {
+            ...u,
+            role: 'interpreter',
+            isOwner: false,
+            badgeNumber: '87265',
+            interpreterBadgeId: '87265',
+            displayName: 'Interpreter #87265',
+            org: 'Certified Linguist Pool',
+            primaryLang: 'Urdu',
+            languages: ['Urdu', 'Punjabi', 'English'],
+            specialty: 'Medical, Legal & General Support',
+            status: 'approved',
+            employmentType: 'per_minute',
+            minuteRate: 0.20,
+            hourlyRate: 5
+          };
+          ensureInterpreterBadge(store.users[idx]);
+        } else if (uEmail.includes('iksale9817') || uName.includes('iksale9817')) {
           store.users[idx] = {
             ...u,
             role: 'host',
             isOwner: false,
-            org: 'IK Enterprises Client'
+            org: 'IK Enterprises Client',
+            primaryLang: 'Urdu',
+            languages: ['Urdu', 'English']
           };
           if (u.id) {
             if (!store.wallets[u.id] || store.wallets[u.id].minutesRemaining === 0) {
@@ -456,11 +480,40 @@ async function initMongo() {
         if (db) {
           await db.collection('users').updateOne({ id: u.id }, { $set: { role: 'admin', isOwner: true, org: 'IK Enterprises', name: 'ik5928271' } }).catch(() => {});
         }
-      } else if (uEmail.includes('iksale9817') || uName.includes('iksale9817') || uEmail.includes('iksale9815') || uName.includes('iksale9815')) {
-        // iksale9817 & iksale9815 are Clients (role: 'host')
+      } else if (uEmail === 'iksale9815@gmail.com' || uEmail.includes('iksale9815')) {
+        // iksale9815 is strictly an Interpreter of Urdu / Punjabi
+        u.role = 'interpreter';
+        u.isOwner = false;
+        u.badgeNumber = '87265';
+        u.interpreterBadgeId = '87265';
+        u.displayName = 'Interpreter #87265';
+        u.org = 'Certified Linguist Pool';
+        u.primaryLang = 'Urdu';
+        u.languages = ['Urdu', 'Punjabi', 'English'];
+        u.specialty = 'Medical, Legal & General Support';
+        u.status = 'approved';
+        u.employmentType = 'per_minute';
+        u.minuteRate = 0.20;
+        u.hourlyRate = 5;
+        ensureInterpreterBadge(u);
+        if (db) {
+          await db.collection('users').updateOne({ id: u.id }, { $set: { 
+            role: 'interpreter', 
+            isOwner: false, 
+            badgeNumber: '87265', 
+            interpreterBadgeId: '87265',
+            displayName: 'Interpreter #87265',
+            primaryLang: 'Urdu',
+            languages: ['Urdu', 'Punjabi', 'English'],
+            status: 'approved'
+          } }).catch(() => {});
+        }
+      } else if (uEmail.includes('iksale9817') || uName.includes('iksale9817')) {
+        // iksale9817 is strictly a Client (role: 'host')
         u.role = 'host';
         u.isOwner = false;
         u.org = u.org || 'IK Enterprises Client';
+        u.primaryLang = 'Urdu';
         if (!store.wallets[u.id] || store.wallets[u.id].minutesRemaining === 0) {
           store.wallets[u.id] = {
             userId: u.id,
