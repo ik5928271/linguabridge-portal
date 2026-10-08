@@ -117,18 +117,20 @@ export default function GuestJoinView({
                     autoPlay 
                     playsInline 
                     muted 
-                    className="w-full h-full object-cover mirror"
+                    className={`w-full h-full object-cover mirror ${!cameraReady ? 'hidden' : ''}`}
                   />
                   {/* Fallback visual avatar if camera blocked or denied */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/80 backdrop-blur-xs">
-                    <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-amber-500 to-orange-400 flex items-center justify-center text-white text-2xl font-bold shadow-lg ring-4 ring-amber-500/20">
-                      {guestName ? guestName.charAt(0).toUpperCase() : 'C'}
+                  {!cameraReady && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/80 backdrop-blur-xs">
+                      <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-amber-500 to-orange-400 flex items-center justify-center text-white text-2xl font-bold shadow-lg ring-4 ring-amber-500/20">
+                        {guestName ? guestName.charAt(0).toUpperCase() : 'C'}
+                      </div>
+                      <span className="mt-3 text-xs font-semibold text-slate-200">{guestName || 'Client'}</span>
+                      <span className="text-[10px] text-amber-400 font-medium">
+                        {LANGUAGES.find(l => l.code === selectedLangCode)?.nativeName}
+                      </span>
                     </div>
-                    <span className="mt-3 text-xs font-semibold text-slate-200">{guestName || 'Client'}</span>
-                    <span className="text-[10px] text-amber-400 font-medium">
-                      {LANGUAGES.find(l => l.code === selectedLangCode)?.nativeName}
-                    </span>
-                  </div>
+                  )}
                 </>
               ) : (
                 <div className="flex flex-col items-center justify-center text-slate-500 space-y-2">

@@ -130,6 +130,7 @@ export default function ThreeWayCallRoom({
   const playbackCtxRef = useRef(null);
   const nextPlayTimesRef = useRef({});
   const audioElementsMapRef = useRef({}); // socketId -> HTMLAudioElement
+  const audioObjectsRef = useRef({}); // socketId -> HTMLAudioElement (dynamic Audio objects)
   const webrtcConnectedMapRef = useRef({}); // socketId -> boolean
   const isMutedRef = useRef(isMuted);
   const screenStreamRef = useRef(null);
@@ -184,12 +185,19 @@ export default function ThreeWayCallRoom({
     if (playbackCtxRef.current && playbackCtxRef.current.state === 'suspended') {
       playbackCtxRef.current.resume().catch(() => {});
     }
-    // Attempt play on all remote audio tags
+    // Attempt play on all remote audio tags & Audio instances
     Object.values(audioElementsMapRef.current).forEach(el => {
       if (el) {
         el.muted = false;
         el.volume = 1.0;
         el.play().catch(() => {});
+      }
+    });
+    Object.values(audioObjectsRef.current).forEach(a => {
+      if (a) {
+        a.muted = false;
+        a.volume = 1.0;
+        a.play().catch(() => {});
       }
     });
     setShowAudioUnlockNotice(false);
@@ -287,12 +295,12 @@ export default function ThreeWayCallRoom({
                 }
 
                 // Stream voice chunk fallback if sound detected
-                if (maxAmp > 0.0003) {
+                if (maxAmp > 0.0001) {
                   const s = getSocket();
                   if (s && s.connected) {
                     s.emit('live-pcm-audio-chunk', {
                       roomId,
-                      pcmData: Array.from(pcm16),
+                      pcmData: pcm16.buffer,
                       sampleRate: audioCtx.sampleRate,
                       senderRole: role,
                       senderName: role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName
@@ -399,7 +407,25 @@ export default function ThreeWayCallRoom({
     pc.ontrack = (event) => {
       const stream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
       setRemoteStreamsMap(prev => ({ ...prev, [targetSocketId]: stream }));
-      webrtcConnectedMapRef.current[targetSocketId] = true;
+
+      // Explicit Audio Instance for 100% Reliable Playback
+      try {
+        let audioObj = audioObjectsRef.current[targetSocketId];
+        if (!audioObj) {
+          audioObj = new Audio();
+          audioObjectsRef.current[targetSocketId] = audioObj;
+        }
+        audioObj.srcObject = stream;
+        audioObj.autoplay = true;
+        audioObj.muted = false;
+        audioObj.volume = 1.0;
+        const p = audioObj.play();
+        if (p && p.catch) {
+          p.catch(() => {
+            setShowAudioUnlockNotice(true);
+          });
+        }
+      } catch (e) {}
 
       // Direct element playback check
       const el = audioElementsMapRef.current[targetSocketId];
@@ -414,14 +440,17 @@ export default function ThreeWayCallRoom({
     };
 
     // 5. Connection State Monitoring
-    pc.onconnectionstatechange = () => {
-      const state = pc.connectionState;
-      if (state === 'connected') {
+    const updateConnState = () => {
+      const pcState = pc.connectionState;
+      const iceState = pc.iceConnectionState;
+      if (pcState === 'connected' && (iceState === 'connected' || iceState === 'completed')) {
         webrtcConnectedMapRef.current[targetSocketId] = true;
-      } else if (state === 'failed' || state === 'disconnected' || state === 'closed') {
+      } else if (pcState === 'failed' || pcState === 'disconnected' || pcState === 'closed' || iceState === 'failed' || iceState === 'disconnected' || iceState === 'closed') {
         webrtcConnectedMapRef.current[targetSocketId] = false;
       }
     };
+    pc.onconnectionstatechange = updateConnState;
+    pc.oniceconnectionstatechange = updateConnState;
 
     // 6. Perfect Negotiation: onnegotiationneeded
     pc.onnegotiationneeded = async () => {
@@ -584,8 +613,11 @@ export default function ThreeWayCallRoom({
           setActiveSpeaker(senderRole);
         }
 
-        // If WebRTC is already connected for this peer, skip PCM fallback to avoid duplicate audio
-        if (webrtcConnectedMapRef.current[senderSocketId]) {
+        const pc = peersRef.current[senderSocketId];
+        const isWebRtcWorking = pc && (pc.connectionState === 'connected') && (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') && webrtcConnectedMapRef.current[senderSocketId];
+
+        // If WebRTC is already 100% connected with active transport, skip PCM fallback to avoid duplicate audio
+        if (isWebRtcWorking) {
           return;
         }
 
@@ -645,8 +677,16 @@ export default function ThreeWayCallRoom({
           try { peersRef.current[socketId].close(); } catch (e) {}
           delete peersRef.current[socketId];
         }
+        if (audioObjectsRef.current[socketId]) {
+          try {
+            audioObjectsRef.current[socketId].pause();
+            audioObjectsRef.current[socketId].srcObject = null;
+          } catch (e) {}
+          delete audioObjectsRef.current[socketId];
+        }
         delete webrtcConnectedMapRef.current[socketId];
         delete audioElementsMapRef.current[socketId];
+        delete nextPlayTimesRef.current[socketId];
         setRemoteStreamsMap(prev => {
           const next = { ...prev };
           delete next[socketId];
