@@ -7,7 +7,7 @@
     "dev": "vite",
     "server": "node --max-old-space-size=256 server/index.js",
     "start": "node --max-old-space-size=256 server/index.js",
-    "build": "vite build",
+    "build": "vite build && npm --prefix standalone-meet install && npm --prefix standalone-meet run build",
     "preview": "vite preview"
   },
   "dependencies": {

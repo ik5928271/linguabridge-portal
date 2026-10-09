@@ -3640,6 +3640,15 @@ function handleLeaveRoom(socket, roomId) {
   }
 }
 
+// Serve Standalone Dedicated 3-Way Meeting Portal under /meet if standalone-meet/dist exists
+const standaloneMeetDist = path.join(process.cwd(), 'standalone-meet', 'dist');
+if (fs.existsSync(standaloneMeetDist)) {
+  app.use('/meet', express.static(standaloneMeetDist));
+  app.get('/meet/*', (req, res) => {
+    res.sendFile(path.join(standaloneMeetDist, 'index.html'));
+  });
+}
+
 // Serve built static frontend in production if dist/ exists
 const distPath = path.join(process.cwd(), 'dist');
 if (fs.existsSync(distPath)) {
@@ -3647,7 +3656,7 @@ if (fs.existsSync(distPath)) {
   
   // Catch-all for SPA GET navigation
   app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api') && !req.path.startsWith('/socket.io')) {
+    if (!req.path.startsWith('/api') && !req.path.startsWith('/socket.io') && !req.path.startsWith('/meet')) {
       res.sendFile(path.join(distPath, 'index.html'));
     }
   });
