@@ -35,26 +35,19 @@ import {
 } from '../services/audioService';
 import { getSocket } from '../services/socket';
 
-// WebRTC ICE STUN/TURN Configuration for Global 100% Mobile & Firewall Penetration
+// WebRTC ICE STUN Configuration for Global Mobile & Firewall Penetration
 const ICE_SERVERS = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
     { urls: 'stun:stun.cloudflare.com:3478' },
-    { urls: 'stun:stun.services.mozilla.com' },
-    { urls: 'stun:stun.relay.metered.ca:80' },
-    {
-      urls: 'turn:openrelay.metered.ca:80',
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
-    },
-    {
-      urls: 'turn:openrelay.metered.ca:443',
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
-    }
-  ]
+    { urls: 'stun:global.stun.twilio.com:3478' },
+    { urls: 'stun:stun.services.mozilla.com' }
+  ],
+  iceCandidatePoolSize: 10
 };
 
 export default function ThreeWayCallRoom({ 
@@ -361,7 +354,7 @@ export default function ThreeWayCallRoom({
   }, [callType, role, hostName, interpreterName, patientName, roomId]);
 
   // ==========================================
-  // TOP-LEVEL METHOD: WebRTC Peer Connection
+  // TOP-LEVEL METHOD: WebRTC Peer Connection & Negotiation
   // ==========================================
   const createPeerConnection = useCallback((targetSocketId, socket) => {
     if (peersRef.current[targetSocketId]) {
@@ -370,7 +363,6 @@ export default function ThreeWayCallRoom({
 
     const pc = new RTCPeerConnection(ICE_SERVERS);
     pc._iceCandidateQueue = [];
-    pc._makingOffer = false;
     peersRef.current[targetSocketId] = pc;
 
     // 1. Add Audio Transceiver immediately so SDP always includes sendrecv audio
@@ -452,27 +444,29 @@ export default function ThreeWayCallRoom({
     pc.onconnectionstatechange = updateConnState;
     pc.oniceconnectionstatechange = updateConnState;
 
-    // 6. Perfect Negotiation: onnegotiationneeded
-    pc.onnegotiationneeded = async () => {
-      try {
-        pc._makingOffer = true;
-        await pc.setLocalDescription();
-        if (socket) {
-          socket.emit('webrtc-offer', {
-            targetSocketId,
-            offer: pc.localDescription,
-            senderInfo: { role, name: role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName }
-          });
-        }
-      } catch (err) {
-        console.warn('[WebRTC Negotiation Error]:', err);
-      } finally {
-        pc._makingOffer = false;
-      }
-    };
-
     return pc;
-  }, [role, hostName, interpreterName, patientName]);
+  }, []);
+
+  // Initiator sends the Offer to a remote peer
+  const initiatePeerOffer = useCallback(async (targetSocketId, socket) => {
+    const pc = createPeerConnection(targetSocketId, socket);
+    try {
+      const offer = await pc.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: callType === 'video'
+      });
+      await pc.setLocalDescription(offer);
+      if (socket) {
+        socket.emit('webrtc-offer', {
+          targetSocketId,
+          offer: pc.localDescription,
+          senderInfo: { role, name: role === 'host' ? hostName : role === 'interpreter' ? interpreterName : patientName }
+        });
+      }
+    } catch (err) {
+      console.warn('[WebRTC Initiate Offer Error]:', err);
+    }
+  }, [callType, role, hostName, interpreterName, patientName, createPeerConnection]);
 
   // ==========================================
   // Socket.io Lifecycle & Signaling
@@ -490,13 +484,14 @@ export default function ThreeWayCallRoom({
         specialty
       });
 
+      // When joining, new joiner initiates call to all already-present participants
       socket.on('room-joined-success', ({ participants, currentUserId, targetLanguage: sLang, specialty: sSpec }) => {
         if (sLang) setTargetLanguage(sLang);
         if (sSpec) setSpecialty(sSpec);
         if (Array.isArray(participants)) {
           participants.forEach(p => {
             if (p.socketId && p.socketId !== currentUserId && p.socketId !== socket.id) {
-              createPeerConnection(p.socketId, socket);
+              initiatePeerOffer(p.socketId, socket);
             }
           });
         }
@@ -513,35 +508,15 @@ export default function ThreeWayCallRoom({
             timestamp: formatTimer(secondsRef.current)
           }
         ]);
-
-        if (p.socketId && p.socketId !== socket.id) {
-          createPeerConnection(p.socketId, socket);
-        }
+        // Note: New participant will send offer to us via room-joined-success
       });
 
-      // Perfect Negotiation Offer Receiver (Handles Collisions & Polite Rollbacks)
+      // Inbound Offer Receiver (Receiver sets remote offer, creates answer, and replies)
       socket.on('webrtc-offer', async ({ senderSocketId, offer, senderInfo }) => {
-        let pc = peersRef.current[senderSocketId];
-        if (!pc) {
-          pc = createPeerConnection(senderSocketId, socket);
-        }
+        const pc = createPeerConnection(senderSocketId, socket);
 
         try {
-          const isPolite = (socket.id || '') < senderSocketId;
-          const offerCollision = (pc.signalingState !== 'stable') || pc._makingOffer;
-
-          if (!isPolite && offerCollision) {
-            return;
-          }
-
-          if (offerCollision) {
-            await Promise.all([
-              pc.setLocalDescription({ type: 'rollback' }),
-              pc.setRemoteDescription(new RTCSessionDescription(offer))
-            ]);
-          } else {
-            await pc.setRemoteDescription(new RTCSessionDescription(offer));
-          }
+          await pc.setRemoteDescription(new RTCSessionDescription(offer));
 
           // Attach local tracks if available
           if (mediaStreamRef.current) {
@@ -568,14 +543,14 @@ export default function ThreeWayCallRoom({
           await pc.setLocalDescription(answer);
           socket.emit('webrtc-answer', { targetSocketId: senderSocketId, answer: pc.localDescription });
         } catch (err) {
-          console.warn('[WebRTC Inbound Offer Processing]:', err);
+          console.warn('[WebRTC Inbound Offer Processing Error]:', err);
         }
       });
 
       // Inbound Answer Receiver
       socket.on('webrtc-answer', async ({ senderSocketId, answer }) => {
         const pc = peersRef.current[senderSocketId];
-        if (pc && pc.signalingState === 'have-local-offer') {
+        if (pc) {
           try {
             await pc.setRemoteDescription(new RTCSessionDescription(answer));
             if (Array.isArray(pc._iceCandidateQueue) && pc._iceCandidateQueue.length > 0) {
@@ -585,7 +560,7 @@ export default function ThreeWayCallRoom({
               pc._iceCandidateQueue = [];
             }
           } catch (e) {
-            console.warn('[WebRTC Inbound Answer Processing]:', e);
+            console.warn('[WebRTC Inbound Answer Processing Error]:', e);
           }
         }
       });
@@ -633,25 +608,30 @@ export default function ThreeWayCallRoom({
             playCtx.resume().catch(() => {});
           }
 
-          let int16Array = null;
+          let float32Array = null;
           if (pcmData instanceof ArrayBuffer) {
-            int16Array = new Int16Array(pcmData);
-          } else if (pcmData && pcmData.buffer instanceof ArrayBuffer && pcmData.byteLength !== undefined) {
-            int16Array = new Int16Array(pcmData.buffer, pcmData.byteOffset || 0, pcmData.length || (pcmData.byteLength / 2));
+            const dataView = new DataView(pcmData);
+            const numSamples = Math.floor(pcmData.byteLength / 2);
+            float32Array = new Float32Array(numSamples);
+            for (let i = 0; i < numSamples; i++) {
+              float32Array[i] = dataView.getInt16(i * 2, true) / 32768.0;
+            }
+          } else if (pcmData && (pcmData.buffer || pcmData.byteLength !== undefined)) {
+            const u8 = pcmData instanceof Uint8Array ? pcmData : new Uint8Array(pcmData.buffer || pcmData, pcmData.byteOffset || 0, pcmData.byteLength || pcmData.length);
+            const dataView = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+            const numSamples = Math.floor(u8.byteLength / 2);
+            float32Array = new Float32Array(numSamples);
+            for (let i = 0; i < numSamples; i++) {
+              float32Array[i] = dataView.getInt16(i * 2, true) / 32768.0;
+            }
           } else if (Array.isArray(pcmData)) {
-            int16Array = new Int16Array(pcmData);
-          } else if (pcmData && pcmData.type === 'Buffer' && Array.isArray(pcmData.data)) {
-            int16Array = new Int16Array(new Uint8Array(pcmData.data).buffer);
-          } else if (typeof pcmData === 'object' && pcmData !== null) {
-            int16Array = new Int16Array(Object.values(pcmData));
+            float32Array = new Float32Array(pcmData.length);
+            for (let i = 0; i < pcmData.length; i++) {
+              float32Array[i] = pcmData[i] / 32768.0;
+            }
           }
 
-          if (!int16Array || int16Array.length === 0) return;
-
-          const float32Array = new Float32Array(int16Array.length);
-          for (let i = 0; i < int16Array.length; i++) {
-            float32Array[i] = int16Array[i] / 32768.0;
-          }
+          if (!float32Array || float32Array.length === 0) return;
 
           const audioBuffer = playCtx.createBuffer(1, float32Array.length, sampleRate || 44100);
           audioBuffer.getChannelData(0).set(float32Array);
@@ -662,7 +642,7 @@ export default function ThreeWayCallRoom({
 
           const currentTime = playCtx.currentTime;
           let nextTime = nextPlayTimesRef.current[senderSocketId] || currentTime;
-          if (nextTime < currentTime || nextTime > currentTime + 0.1) {
+          if (nextTime < currentTime || nextTime > currentTime + 0.2) {
             nextTime = currentTime + 0.005;
           }
           sourceNode.start(nextTime);
