@@ -3643,8 +3643,16 @@ function handleLeaveRoom(socket, roomId) {
 // Serve Standalone Dedicated 3-Way Meeting Portal under /meet if standalone-meet/dist exists
 const standaloneMeetDist = path.join(process.cwd(), 'standalone-meet', 'dist');
 if (fs.existsSync(standaloneMeetDist)) {
-  app.use('/meet', express.static(standaloneMeetDist));
+  app.use('/meet', express.static(standaloneMeetDist, { index: 'index.html' }));
+  app.get(['/meet', '/meet/'], (req, res) => {
+    res.sendFile(path.join(standaloneMeetDist, 'index.html'));
+  });
   app.get('/meet/*', (req, res) => {
+    const subPath = req.params[0] || '';
+    const filePath = path.join(standaloneMeetDist, subPath);
+    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+      return res.sendFile(filePath);
+    }
     res.sendFile(path.join(standaloneMeetDist, 'index.html'));
   });
 }
