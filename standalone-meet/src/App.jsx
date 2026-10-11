@@ -25,7 +25,10 @@ export default function App() {
   }, []);
 
   const handleJoin = (config) => {
-    setMeetingConfig(config);
+    setMeetingConfig({
+      ...config,
+      displayName: config.name || config.displayName || `${config.role?.toUpperCase() || 'GUEST'} User`
+    });
   };
 
   const handleLeave = () => {
@@ -42,9 +45,12 @@ export default function App() {
       {meetingConfig ? (
         <JitsiMeetingRoom 
           roomId={meetingConfig.roomId}
-          displayName={meetingConfig.displayName}
+          participantName={meetingConfig.displayName || meetingConfig.name}
+          displayName={meetingConfig.displayName || meetingConfig.name}
           role={meetingConfig.role}
+          targetLanguage={meetingConfig.language}
           language={meetingConfig.language}
+          onEndCall={handleLeave}
           onLeave={handleLeave}
         />
       ) : (
