@@ -774,19 +774,26 @@ export default function AdminDashboard({
       socket.on('client-room-activity', handleClientRoomActivity);
     }
 
+    // Lightweight polling: only poll active rooms & presence every 15s (heavy data like CVs/receipts update via Socket.io)
     const timer = setInterval(() => {
-      fetchUsers();
-      fetchApplications();
-      fetchInquiries();
-      fetchReceipts();
-      fetchAnalytics();
-      fetchOnlinePresence();
-      fetchAppointments();
-      fetchActiveRooms();
-    }, 5000);
+      if (document.visibilityState === 'visible') {
+        fetchOnlinePresence();
+        fetchActiveRooms();
+      }
+    }, 15000);
+
+    // Slower refresh for appointments & users every 60s when tab is visible
+    const slowTimer = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchUsers();
+        fetchAppointments();
+        fetchInquiries();
+      }
+    }, 60000);
 
     return () => {
       clearInterval(timer);
+      clearInterval(slowTimer);
       if (socket) {
         if (handleNewInquiry) socket.off('new-inquiry', handleNewInquiry);
         if (handleUpdatedInquiry) socket.off('inquiry-updated', handleUpdatedInquiry);
