@@ -3640,23 +3640,6 @@ function handleLeaveRoom(socket, roomId) {
   }
 }
 
-// Serve Standalone Dedicated 3-Way Meeting Portal under /meet if standalone-meet/dist exists
-const standaloneMeetDist = path.join(process.cwd(), 'standalone-meet', 'dist');
-if (fs.existsSync(standaloneMeetDist)) {
-  app.use('/meet', express.static(standaloneMeetDist, { index: 'index.html' }));
-  app.get(['/meet', '/meet/'], (req, res) => {
-    res.sendFile(path.join(standaloneMeetDist, 'index.html'));
-  });
-  app.get('/meet/*', (req, res) => {
-    const subPath = req.params[0] || '';
-    const filePath = path.join(standaloneMeetDist, subPath);
-    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-      return res.sendFile(filePath);
-    }
-    res.sendFile(path.join(standaloneMeetDist, 'index.html'));
-  });
-}
-
 // Serve built static frontend in production if dist/ exists
 const distPath = path.join(process.cwd(), 'dist');
 if (fs.existsSync(distPath)) {
@@ -3664,7 +3647,7 @@ if (fs.existsSync(distPath)) {
   
   // Catch-all for SPA GET navigation
   app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api') && !req.path.startsWith('/socket.io') && !req.path.startsWith('/meet')) {
+    if (!req.path.startsWith('/api') && !req.path.startsWith('/socket.io')) {
       res.sendFile(path.join(distPath, 'index.html'));
     }
   });
